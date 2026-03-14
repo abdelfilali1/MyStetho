@@ -20,10 +20,14 @@ def get_current_user(request: Request) -> dict | None:
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
+async def login_page(request: Request, db: aiosqlite.Connection = Depends(get_db)):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/", status_code=302)
+    cursor = await db.execute("SELECT COUNT(*) FROM users")
+    count = (await cursor.fetchone())[0]
+    if count == 0:
+        return RedirectResponse(url="/setup", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
@@ -34,6 +38,11 @@ async def login(
     password: str = Form(...),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    cursor = await db.execute("SELECT COUNT(*) FROM users")
+    count = (await cursor.fetchone())[0]
+    if count == 0:
+        return RedirectResponse(url="/setup", status_code=302)
+
     cursor = await db.execute(
         "SELECT id, email, password_hash, first_name, last_name, role FROM users WHERE email = ? AND is_active = 1",
         (email,),

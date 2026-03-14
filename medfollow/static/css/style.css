@@ -379,6 +379,23 @@ a {
     font-size: 13px;
 }
 
+.auth-alt-link {
+    margin-top: 14px;
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.auth-alt-link a {
+    color: #1179cc;
+    text-decoration: none;
+}
+
+.auth-alt-link a:hover {
+    text-decoration: underline;
+}
+
 /* ===== FORMS ===== */
 .auth-form {
     display: flex;
