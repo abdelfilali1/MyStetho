@@ -26,6 +26,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MyStetho", lifespan=lifespan)
 
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # Static files
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 

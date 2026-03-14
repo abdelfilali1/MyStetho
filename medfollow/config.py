@@ -1,13 +1,24 @@
 import os
 import secrets
+import tempfile
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def _resolve_database_path() -> str:
+    explicit_path = os.getenv("MEDFOLLOW_DATABASE_PATH")
+    if explicit_path:
+        return explicit_path
+
+    local_path = os.path.join(BASE_DIR, "data", "medfollow.db")
+    try:
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        return local_path
+    except OSError:
+        temp_dir = tempfile.gettempdir()
+        return os.path.join(temp_dir, "medfollow.db")
+
 # Database
-DATABASE_PATH = os.getenv(
-    "MEDFOLLOW_DATABASE_PATH",
-    os.path.join(BASE_DIR, "data", "medfollow.db"),
-)
+DATABASE_PATH = _resolve_database_path()
 
 # Server
 HOST = os.getenv("HOST", "0.0.0.0")
