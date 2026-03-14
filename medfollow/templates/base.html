@@ -12,7 +12,9 @@
 </head>
 <body>
     {% if user %}
-    <nav class="sidebar">
+    <div id="mobile-nav-backdrop" class="mobile-nav-backdrop no-print" onclick="toggleMobileNav(false)"></div>
+
+    <nav id="app-sidebar" class="sidebar">
         <div class="sidebar-header">
             <div class="brand">
                 <img src="/static/img/logo3.png" alt="Logo MyStetho" class="brand-logo">
@@ -82,13 +84,25 @@
                     <span class="user-role">{{ user.role }}</span>
                 </div>
             </div>
-            <a href="/logout" class="logout-btn">Déconnexion</a>
+            <a href="/logout" class="logout-btn">Deconnexion</a>
         </div>
     </nav>
+
     <main class="content">
+        <div class="mobile-header no-print">
+            <button type="button" class="mobile-nav-toggle" aria-label="Ouvrir le menu" onclick="toggleMobileNav(true)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <a href="/" class="mobile-brand">
+                <img src="/static/img/logo3.png" alt="Logo MyStetho" class="mobile-brand-logo">
+                <span class="mobile-brand-name">MyStetho</span>
+            </a>
+            <a href="/appointments" class="mobile-quick-link">Agenda</a>
+        </div>
+
         <div class="content-topbar">
             <div class="doctor-highlight">
-                <span class="doctor-highlight-label">Médecin connecté</span>
+                <span class="doctor-highlight-label">Medecin connecte</span>
                 <span class="doctor-highlight-name">Dr. {{ user.email.split('@')[0] | replace('.', ' ') | title }}</span>
             </div>
         </div>
@@ -99,6 +113,41 @@
         {% block content_full %}{% endblock %}
     </main>
     {% endif %}
+
+    {% if user %}
+    <script>
+    (function() {
+        const sidebar = document.getElementById('app-sidebar');
+        const backdrop = document.getElementById('mobile-nav-backdrop');
+
+        function setMobileNav(open) {
+            if (!sidebar || !backdrop) return;
+            sidebar.classList.toggle('is-open', open);
+            backdrop.classList.toggle('is-visible', open);
+            document.body.classList.toggle('mobile-nav-open', open);
+        }
+
+        window.toggleMobileNav = setMobileNav;
+
+        sidebar.querySelectorAll('a').forEach((link) => {
+            link.addEventListener('click', () => setMobileNav(false));
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                setMobileNav(false);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 860) {
+                setMobileNav(false);
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

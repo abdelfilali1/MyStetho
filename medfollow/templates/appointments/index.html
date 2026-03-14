@@ -68,6 +68,30 @@
     @media (max-width: 900px) {
         .agenda-layout { gap: 16px; }
         .agenda-create-modal { width: 94vw; }
+        .fc { padding: 10px; }
+        .fc .fc-toolbar { gap: 8px; }
+        .fc .fc-toolbar-title { font-size: 16px !important; }
+        .fc .fc-daygrid-day-frame { min-height: 64px; }
+        .fc .fc-daygrid-day-top { padding-left: 20px; }
+        .day-add-btn {
+            width: 14px;
+            height: 14px;
+            font-size: 10px;
+            top: 5px;
+            left: 4px;
+        }
+    }
+
+    @media (max-width: 620px) {
+        .fc .fc-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .fc .fc-toolbar-chunk {
+            display: flex;
+            justify-content: center;
+        }
+        .fc .fc-toolbar-title { text-align: center; }
     }
 </style>
 {% endblock %}
@@ -281,14 +305,14 @@ function closeCreateModal() {
 
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
+    const isMobileView = window.matchMedia('(max-width: 900px)').matches;
+
     _calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
+        initialView: isMobileView ? 'timeGridDay' : 'dayGridMonth',
         locale: 'fr',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
+        headerToolbar: isMobileView
+            ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
+            : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
         buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour' },
         events: '/appointments/api/events',
         editable: false,
@@ -298,6 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
         slotMaxTime: '21:00:00',
         allDaySlot: false,
         height: 'auto',
+        dayMaxEventRows: isMobileView ? 2 : 4,
         dayCellDidMount: function(info) {
             const btn = document.createElement('button');
             btn.type = 'button';
