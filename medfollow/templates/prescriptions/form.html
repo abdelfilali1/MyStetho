@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Nouvelle ordonnance — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Nouvelle ordonnance</h2>
+    <a href="/prescriptions" class="btn btn-outline">Retour</a>
+</div>
+
+<form method="POST" action="/prescriptions/new" id="prescriptionForm">
+    <div class="detail-grid">
+        <div class="card">
+            <div class="card-header"><h3>Médicaments</h3></div>
+            <div class="card-body">
+                <div id="medications-list">
+                    <div class="med-item" data-index="0">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label>Médicament *</label>
+                                <input type="text" name="med_name_0" required placeholder="Paracétamol 1000mg" list="med-suggestions">
+                            </div>
+                            <div class="form-group">
+                                <label>Posologie *</label>
+                                <input type="text" name="med_dosage_0" required placeholder="1 comprimé">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Fréquence *</label>
+                                <input type="text" name="med_frequency_0" required placeholder="3 fois/jour">
+                            </div>
+                            <div class="form-group">
+                                <label>Durée</label>
+                                <input type="text" name="med_duration_0" placeholder="7 jours">
+                            </div>
+                            <div class="form-group">
+                                <label>Quantité</label>
+                                <input type="number" name="med_quantity_0" placeholder="2">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Instructions</label>
+                            <input type="text" name="med_instructions_0" placeholder="À prendre pendant les repas">
+                        </div>
+                        <hr style="border: none; border-top: 1px solid var(--gray-200); margin: 16px 0;">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="addMedication()">+ Ajouter un médicament</button>
+                <datalist id="med-suggestions">
+                    {% for m in medications %}
+                    <option value="{{ m.name }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <div class="card-header"><h3>Informations</h3></div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Patient *</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <select name="patient_id" id="sel-patient-p" required style="flex:1;">
+                                <option value="">Sélectionner...</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {{ 'selected' if selected_patient_id and selected_patient_id == p.id }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <a href="/patients/new?next=/prescriptions/new" class="btn btn-outline btn-sm" title="Créer un nouveau patient">+</a>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Praticien *</label>
+                        <select name="doctor_id" required>
+                            {% for d in doctors %}
+                            <option value="{{ d.id }}" {{ 'selected' if d.id == user.sub }}>Dr. {{ d.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if selected_consultation_id %}
+                    <input type="hidden" name="consultation_id" value="{{ selected_consultation_id }}">
+                    {% endif %}
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="3" placeholder="Notes sur l'ordonnance..."></textarea>
+                    </div>
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="is_renewable" name="is_renewable">
+                        <label for="is_renewable" style="font-weight: normal;">Renouvelable</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top: 16px;">Créer l'ordonnance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let medIndex = 1;
+function addMedication() {
+    const list = document.getElementById('medications-list');
+    const html = `
+    <div class="med-item" data-index="${medIndex}">
+        <div style="display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.med-item').remove()" style="color: var(--danger);">Supprimer</button>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+                <label>Médicament *</label>
+                <input type="text" name="med_name_${medIndex}" required placeholder="Nom du médicament" list="med-suggestions">
+            </div>
+            <div class="form-group">
+                <label>Posologie *</label>
+                <input type="text" name="med_dosage_${medIndex}" required placeholder="1 comprimé">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Fréquence *</label>
+                <input type="text" name="med_frequency_${medIndex}" required placeholder="3 fois/jour">
+            </div>
+            <div class="form-group">
+                <label>Durée</label>
+                <input type="text" name="med_duration_${medIndex}" placeholder="7 jours">
+            </div>
+            <div class="form-group">
+                <label>Quantité</label>
+                <input type="number" name="med_quantity_${medIndex}" placeholder="2">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Instructions</label>
+            <input type="text" name="med_instructions_${medIndex}" placeholder="À prendre pendant les repas">
+        </div>
+        <hr style="border: none; border-top: 1px solid var(--gray-200); margin: 16px 0;">
+    </div>`;
+    list.insertAdjacentHTML('beforeend', html);
+    medIndex++;
+}
+</script>
+{% endblock %}
+

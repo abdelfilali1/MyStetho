@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Documents — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Documents</h2>
+        <p class="subtitle">{{ documents|length }} document{{ 's' if documents|length != 1 }}</p>
+    </div>
+    <a href="/documents/upload" class="btn btn-primary">+ Importer un document</a>
+</div>
+
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <form method="GET" action="/documents" class="search-form">
+            <select name="patient_id" class="search-input" style="flex: 0 0 200px;">
+                <option value="">Tous les patients</option>
+                {% for p in patients %}
+                <option value="{{ p.id }}" {{ 'selected' if selected_patient_id and selected_patient_id == p.id }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                {% endfor %}
+            </select>
+            <select name="category" class="search-input" style="flex: 0 0 160px;">
+                <option value="">Toutes catégories</option>
+                <option value="radio" {{ 'selected' if selected_category == 'radio' }}>Radiologie</option>
+                <option value="labo" {{ 'selected' if selected_category == 'labo' }}>Laboratoire</option>
+                <option value="courrier" {{ 'selected' if selected_category == 'courrier' }}>Courrier</option>
+                <option value="compte_rendu" {{ 'selected' if selected_category == 'compte_rendu' }}>Compte-rendu</option>
+                <option value="ordonnance" {{ 'selected' if selected_category == 'ordonnance' }}>Ordonnance</option>
+                <option value="autre" {{ 'selected' if selected_category == 'autre' }}>Autre</option>
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm">Filtrer</button>
+            {% if selected_patient_id or selected_category %}
+            <a href="/documents" class="btn btn-outline btn-sm">Effacer</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if documents %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Patient</th>
+                    <th>Catégorie</th>
+                    <th>Taille</th>
+                    <th>Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in documents %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--gray-400);"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            {{ d.title }}
+                        </div>
+                    </td>
+                    <td><a href="/patients/{{ d.patient_id }}" class="patient-link">{{ d.patient_name }}</a></td>
+                    <td><span class="badge badge-{{ d.category }}">{{ d.category }}</span></td>
+                    <td>{{ '%.1f' | format(d.file_size / 1024) }} Ko</td>
+                    <td>{{ d.created_at[:10] }}</td>
+                    <td>
+                        <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
+                        <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer ce document ')">
+                            <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">×</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">Aucun document. <a href="/documents/upload">Importer un document</a></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

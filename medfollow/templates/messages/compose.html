@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Nouveau message — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>{{ 'Répondre' if original else 'Nouveau message' }}</h2>
+    <a href="/messages" class="btn btn-outline">Retour</a>
+</div>
+
+{% if original %}
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header"><h3>Message original de {{ original.sender_name }}</h3></div>
+    <div class="card-body">
+        <p style="color: var(--gray-600); font-size: 14px;">{{ original.body }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="POST" action="/messages/new" style="display: flex; flex-direction: column; gap: 16px;">
+            {% if original %}
+            <input type="hidden" name="parent_message_id" value="{{ original.id }}">
+            <input type="hidden" name="recipient_id" value="{{ original.sender_id }}">
+            {% else %}
+            <div class="form-group">
+                <label>Destinataire *</label>
+                <select name="recipient_id" required>
+                    <option value="">Sélectionner...</option>
+                    {% for u in users_list %}
+                    <option value="{{ u.id }}">{{ u.last_name | upper }} {{ u.first_name }} ({{ u.role }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="form-group">
+                <label>Sujet</label>
+                <input type="text" name="subject" value="{{ 'RE: ' ~ (original.subject or '') if original else '' }}" placeholder="Objet du message">
+            </div>
+            <div class="form-group">
+                <label>Patient concerné (optionnel)</label>
+                <select name="patient_id">
+                    <option value="">Aucun</option>
+                    {% for p in patients %}
+                    <option value="{{ p.id }}" {{ 'selected' if original and original.patient_id == p.id }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Message *</label>
+                <textarea name="body" rows="6" required placeholder="Votre message..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Envoyer</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Ordonnance #{{ prescription.id }} — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Ordonnance #{{ prescription.id }}</h2>
+        <p class="subtitle">{{ prescription.prescription_date }} — {{ prescription.patient_name }} — Dr. {{ prescription.doctor_name }}</p>
+    </div>
+    <div style="display:flex;gap:8px;" class="no-print">
+        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+        <a href="/prescriptions/{{ prescription.id }}/pdf" class="btn btn-primary">Télécharger PDF</a>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="card">
+        <div class="card-header"><h3>Médicaments prescrits</h3></div>
+        <div class="card-body">
+            {% if items %}
+            {% for item in items %}
+            <div class="prescription-item">
+                <div class="prescription-item-header">
+                    <strong>{{ item.medication_name }}</strong>
+                </div>
+                <div class="prescription-item-details">
+                    <span>Posologie : {{ item.dosage }}</span>
+                    <span>Fréquence : {{ item.frequency }}</span>
+                    {% if item.duration %}<span>Durée : {{ item.duration }}</span>{% endif %}
+                    {% if item.quantity %}<span>Quantité : {{ item.quantity }}</span>{% endif %}
+                    {% if item.instructions %}<span>Instructions : {{ item.instructions }}</span>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="empty-state">Aucun médicament dans cette ordonnance</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Informations</h3></div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Patient</span>
+                    <span class="info-value"><a href="/patients/{{ prescription.patient_id }}" class="patient-link">{{ prescription.patient_name }}</a></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Date de naissance</span>
+                    <span class="info-value">{{ prescription.date_of_birth }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Prescripteur</span>
+                    <span class="info-value">Dr. {{ prescription.doctor_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Spécialité</span>
+                    <span class="info-value">{{ prescription.specialty or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Statut</span>
+                    <span class="info-value"><span class="badge badge-{{ 'confirme' if prescription.status == 'active' else 'termine' }}">{{ prescription.status }}</span></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Renouvelable</span>
+                    <span class="info-value">{{ 'Oui' if prescription.is_renewable else 'Non' }}</span>
+                </div>
+            </div>
+            {% if prescription.notes %}
+            <div class="info-notes">
+                <span class="info-label">Notes</span>
+                <p>{{ prescription.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

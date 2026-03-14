@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Facture {{ invoice.invoice_number }} — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Facture {{ invoice.invoice_number }}</h2>
+        <p class="subtitle">{{ invoice.invoice_date }} — {{ invoice.patient_name }} — Dr. {{ invoice.doctor_name }}</p>
+    </div>
+    <span class="badge badge-{{ 'confirme' if invoice.status == 'payee' else 'planifie' if invoice.status == 'emise' else 'en_cours' }}" style="font-size: 14px; padding: 6px 16px;">{{ invoice.status | upper }}</span>
+</div>
+
+<div class="detail-grid">
+    <div>
+        <div class="card">
+            <div class="card-header"><h3>Détail de la facture</h3></div>
+            <div class="card-body" style="padding: 0;">
+                <table class="table">
+                    <thead><tr><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.description }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ '%.2f' | format(item.unit_price) }} €</td>
+                            <td><strong>{{ '%.2f' | format(item.total_price) }} €</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="border-top: 2px solid var(--gray-300);">
+                            <td colspan="3" style="text-align: right; font-weight: 700;">Total</td>
+                            <td style="font-weight: 700; font-size: 16px;">{{ '%.2f' | format(invoice.total_amount) }} €</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px;">
+            <div class="card-header"><h3>Paiements</h3></div>
+            <div class="card-body">
+                {% if payments %}
+                <table class="table">
+                    <thead><tr><th>Date</th><th>Montant</th><th>Mode</th><th>Référence</th></tr></thead>
+                    <tbody>
+                        {% for p in payments %}
+                        <tr>
+                            <td>{{ p.payment_date }}</td>
+                            <td>{{ '%.2f' | format(p.amount) }} €</td>
+                            <td>{{ p.payment_method }}</td>
+                            <td>{{ p.reference or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state" style="padding: 12px;">Aucun paiement enregistré</p>
+                {% endif %}
+
+                {% if invoice.status != 'payee' %}
+                <form method="POST" action="/invoices/{{ invoice.id }}/pay" class="history-form" style="margin-top: 16px;">
+                    <h4 style="font-size: 14px; color: var(--gray-600); margin-bottom: 8px;">Enregistrer un paiement</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="number" step="0.01" name="amount" required placeholder="Montant" value="{{ '%.2f' | format(invoice.total_amount - invoice.paid_amount) }}">
+                        </div>
+                        <div class="form-group">
+                            <select name="payment_method" required>
+                                <option value="carte">Carte</option>
+                                <option value="especes">Espèces</option>
+                                <option value="cheque">Chèque</option>
+                                <option value="virement">Virement</option>
+                                <option value="tiers_payant">Tiers payant</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" name="reference" placeholder="Référence">
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm">Encaisser</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Informations</h3></div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Patient</span>
+                    <span class="info-value"><a href="/patients/{{ invoice.patient_id }}" class="patient-link">{{ invoice.patient_name }}</a></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">N° Sécu</span>
+                    <span class="info-value">{{ invoice.social_security_number or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Praticien</span>
+                    <span class="info-value">Dr. {{ invoice.doctor_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Spécialité</span>
+                    <span class="info-value">{{ invoice.specialty or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Tiers payant</span>
+                    <span class="info-value">{{ 'Oui' if invoice.tiers_payant else 'Non' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Reste dû</span>
+                    <span class="info-value" style="font-weight: 700; color: {{ 'var(--success)' if invoice.total_amount <= invoice.paid_amount else 'var(--danger)' }};">{{ '%.2f' | format(invoice.total_amount - invoice.paid_amount) }} €</span>
+                </div>
+            </div>
+            {% if invoice.notes %}
+            <div class="info-notes">
+                <span class="info-label">Notes</span>
+                <p>{{ invoice.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

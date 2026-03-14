@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Ordonnances — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Ordonnances</h2>
+        <p class="subtitle">{{ prescriptions|length }} ordonnance{{ 's' if prescriptions|length != 1 }}</p>
+    </div>
+    <a href="/prescriptions/new" class="btn btn-primary">+ Nouvelle ordonnance</a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if prescriptions %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Patient</th>
+                    <th>Praticien</th>
+                    <th>Médicaments</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in prescriptions %}
+                <tr>
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.prescription_date }}</td>
+                    <td><a href="/patients/{{ p.patient_id }}" class="patient-link">{{ p.patient_name }}</a></td>
+                    <td>Dr. {{ p.doctor_name }}</td>
+                    <td>{{ p.item_count }} médicament{{ 's' if p.item_count != 1 }}</td>
+                    <td><span class="badge badge-{{ 'confirme' if p.status == 'active' else 'termine' }}">{{ p.status }}</span></td>
+                    <td>
+                        <a href="/prescriptions/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
+                        <a href="/prescriptions/{{ p.id }}/pdf" class="btn btn-outline btn-sm" target="_blank">PDF</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">Aucune ordonnance. <a href="/prescriptions/new">Créer une ordonnance</a></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

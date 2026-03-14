@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Message — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ message.subject or '(Sans sujet)' }}</h2>
+        <p class="subtitle">De {{ message.sender_name }} à {{ message.recipient_name }} — {{ message.created_at[:16] }}</p>
+    </div>
+    <a href="/messages/new?reply_to={{ message.id }}" class="btn btn-primary">Répondre</a>
+</div>
+
+{% if message.patient_name %}
+<div class="alert alert-success" style="margin-bottom: 16px;">
+    Patient concerné : <a href="/patients/{{ message.patient_id }}" class="patient-link" style="color: inherit; font-weight: 600;">{{ message.patient_name }}</a>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <div class="message-body">{{ message.body }}</div>
+    </div>
+</div>
+
+{% if replies %}
+<h3 style="margin: 24px 0 12px; font-size: 16px;">Réponses</h3>
+{% for r in replies %}
+<div class="card" style="margin-bottom: 12px;">
+    <div class="card-header">
+        <span><strong>{{ r.sender_name }}</strong> — {{ r.created_at[:16] }}</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size: 14px;">{{ r.body }}</p>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
+

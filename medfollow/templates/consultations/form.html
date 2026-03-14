@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier' if consultation else 'Nouvelle' }} consultation — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>{{ 'Modifier la consultation' if consultation and consultation.id is defined else 'Nouvelle consultation' }}</h2>
+    <a href="/consultations" class="btn btn-outline">Retour</a>
+</div>
+
+{% if error %}
+<div class="alert alert-error" style="margin-bottom: 20px;">{{ error }}</div>
+{% endif %}
+
+<form method="POST" action="{{ '/consultations/' ~ consultation.id ~ '/edit' if consultation and consultation.id is defined else '/consultations/new' }}">
+    <div class="detail-grid">
+        <!-- Left: clinical info -->
+        <div class="card">
+            <div class="card-header"><h3>Informations cliniques</h3></div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Patient *</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <select name="patient_id" id="sel-patient-c" required style="flex:1;">
+                                <option value="">Sélectionner...</option>
+                                {% for p in patients %}
+                                <option value="{{ p.id }}" {{ 'selected' if (consultation and consultation.patient_id == p.id) or (selected_patient_id and selected_patient_id == p.id) }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <a href="/patients/new?next=/consultations/new" class="btn btn-outline btn-sm" title="Créer un nouveau patient">+</a>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Praticien *</label>
+                        <select name="doctor_id" required>
+                            {% for d in doctors %}
+                            <option value="{{ d.id }}" {{ 'selected' if (consultation and consultation.doctor_id == d.id) or (not consultation and d.id == user.sub) }}>Dr. {{ d.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {% if selected_appointment_id %}
+                <input type="hidden" name="appointment_id" value="{{ selected_appointment_id }}">
+                {% endif %}
+
+                <div class="form-group" style="margin-top: 12px;">
+                    <label>Motif de consultation</label>
+                    <input type="text" name="reason" value="{{ consultation.reason if consultation and consultation.reason else '' }}" placeholder="Douleur au genou droit">
+                </div>
+                <div class="form-group">
+                    <label>Symptômes</label>
+                    <textarea name="symptoms" rows="3" placeholder="Décrivez les symptômes...">{{ consultation.symptoms if consultation and consultation.symptoms else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Examen clinique</label>
+                    <textarea name="clinical_exam" rows="3" placeholder="Résultats de l'examen...">{{ consultation.clinical_exam if consultation and consultation.clinical_exam else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Diagnostic</label>
+                    <textarea name="diagnosis" rows="2" placeholder="Diagnostic...">{{ consultation.diagnosis if consultation and consultation.diagnosis else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Plan de traitement</label>
+                    <textarea name="treatment_plan" rows="3" placeholder="Traitement prescrit...">{{ consultation.treatment_plan if consultation and consultation.treatment_plan else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="2" placeholder="Notes complémentaires...">{{ consultation.notes if consultation and consultation.notes else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: vitals -->
+        <div>
+            <div class="card">
+                <div class="card-header"><h3>Constantes vitales</h3></div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Poids (kg)</label>
+                            <input type="number" step="0.1" name="weight" value="{{ consultation.v_weight if consultation and consultation.v_weight else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Taille (cm)</label>
+                            <input type="number" step="0.1" name="height" value="{{ consultation.v_height if consultation and consultation.v_height else '' }}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>TA Sys (mmHg)</label>
+                            <input type="number" name="blood_pressure_sys" value="{{ consultation.v_blood_pressure_sys if consultation and consultation.v_blood_pressure_sys else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>TA Dia (mmHg)</label>
+                            <input type="number" name="blood_pressure_dia" value="{{ consultation.v_blood_pressure_dia if consultation and consultation.v_blood_pressure_dia else '' }}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>FC (bpm)</label>
+                            <input type="number" name="heart_rate" value="{{ consultation.v_heart_rate if consultation and consultation.v_heart_rate else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Temp (°C)</label>
+                            <input type="number" step="0.1" name="temperature" value="{{ consultation.v_temperature if consultation and consultation.v_temperature else '' }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>SpO2 (%)</label>
+                        <input type="number" step="0.1" name="spo2" value="{{ consultation.v_spo2 if consultation and consultation.v_spo2 else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 16px; border: none; padding: 0;">
+                <a href="/consultations" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">{{ 'Enregistrer' if consultation and consultation.id is defined else 'Créer la consultation' }}</button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+

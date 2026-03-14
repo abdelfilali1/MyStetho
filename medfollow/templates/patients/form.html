@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier' if patient and patient.id is defined else 'Nouveau' }} patient — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ 'Modifier le patient' if patient and patient.id is defined else 'Nouveau patient' }}</h2>
+        <p class="subtitle">{{ 'Modifiez les informations du patient' if patient and patient.id is defined else 'Remplissez les informations du patient' }}</p>
+    </div>
+    <a href="/patients" class="btn btn-outline">Retour à la liste</a>
+</div>
+
+{% if error %}
+<div class="alert alert-error" style="margin-bottom: 20px;">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST" action="{{ '/patients/' ~ patient.id ~ '/edit' if patient and patient.id is defined else '/patients/new' }}" class="patient-form">
+            {% if next %}<input type="hidden" name="next_url" value="{{ next }}">{% endif %}
+
+            <h4 class="section-title">Identité</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="last_name">Nom *</label>
+                    <input type="text" id="last_name" name="last_name" required value="{{ patient.last_name if patient else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="first_name">Prénom *</label>
+                    <input type="text" id="first_name" name="first_name" required value="{{ patient.first_name if patient else '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="date_of_birth">Date de naissance *</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" required value="{{ patient.date_of_birth if patient else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="gender">Genre</label>
+                    <select id="gender" name="gender">
+                        <option value="">—</option>
+                        <option value="M" {{ 'selected' if patient and patient.gender == 'M' }}>Masculin</option>
+                        <option value="F" {{ 'selected' if patient and patient.gender == 'F' }}>Féminin</option>
+                        <option value="Autre" {{ 'selected' if patient and patient.gender == 'Autre' }}>Autre</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="blood_type">Groupe sanguin</label>
+                    <select id="blood_type" name="blood_type">
+                        <option value="">—</option>
+                        {% for bt in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+                        <option value="{{ bt }}" {{ 'selected' if patient and patient.blood_type == bt }}>{{ bt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <h4 class="section-title">Contact</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="phone">Téléphone</label>
+                    <input type="tel" id="phone" name="phone" value="{{ patient.phone if patient and patient.phone else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ patient.email if patient and patient.email else '' }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="address">Adresse</label>
+                <input type="text" id="address" name="address" value="{{ patient.address if patient and patient.address else '' }}">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="city">Ville</label>
+                    <input type="text" id="city" name="city" value="{{ patient.city if patient and patient.city else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="postal_code">Code postal</label>
+                    <input type="text" id="postal_code" name="postal_code" value="{{ patient.postal_code if patient and patient.postal_code else '' }}">
+                </div>
+            </div>
+
+            <h4 class="section-title">Sécurité sociale & Assurance</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="social_security_number">N° Sécurité sociale</label>
+                    <input type="text" id="social_security_number" name="social_security_number" value="{{ patient.social_security_number if patient and patient.social_security_number else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="referring_doctor">Médecin traitant</label>
+                    <input type="text" id="referring_doctor" name="referring_doctor" value="{{ patient.referring_doctor if patient and patient.referring_doctor else '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="insurance_name">Mutuelle</label>
+                    <input type="text" id="insurance_name" name="insurance_name" value="{{ patient.insurance_name if patient and patient.insurance_name else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="insurance_number">N° Adhérent mutuelle</label>
+                    <input type="text" id="insurance_number" name="insurance_number" value="{{ patient.insurance_number if patient and patient.insurance_number else '' }}">
+                </div>
+            </div>
+
+            <h4 class="section-title">Contact d'urgence</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emergency_contact_name">Nom du contact</label>
+                    <input type="text" id="emergency_contact_name" name="emergency_contact_name" value="{{ patient.emergency_contact_name if patient and patient.emergency_contact_name else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="emergency_contact_phone">Téléphone du contact</label>
+                    <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone" value="{{ patient.emergency_contact_phone if patient and patient.emergency_contact_phone else '' }}">
+                </div>
+            </div>
+
+            <h4 class="section-title">Notes</h4>
+            <div class="form-group">
+                <textarea id="notes" name="notes" rows="3" placeholder="Notes libres...">{{ patient.notes if patient and patient.notes else '' }}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <a href="/patients" class="btn btn-outline">Annuler</a>
+                <button type="submit" class="btn btn-primary">{{ 'Enregistrer les modifications' if patient and patient.id is defined else 'Créer le patient' }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

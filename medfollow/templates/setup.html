@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Configuration initiale - MyStetho{% endblock %}
+
+{% block content_full %}
+<div class="auth-container">
+    <div class="auth-card auth-card-wide">
+        <div class="auth-header">
+            <div class="brand brand-auth">
+                <img src="/static/img/logo3.png" alt="Logo MyStetho" class="brand-logo">
+                <div class="brand-copy">
+                    <h1 class="logo">MyStetho</h1>
+                    <p class="brand-tag">Cabinet Médical Nouvelle Génération</p>
+                </div>
+            </div>
+            <p>Configuration initiale - créez votre compte administrateur</p>
+        </div>
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/setup" class="auth-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">Prénom</label>
+                    <input type="text" id="first_name" name="first_name" required placeholder="Amine">
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Nom</label>
+                    <input type="text" id="last_name" name="last_name" required placeholder="Bennani">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="specialty">Spécialité</label>
+                <input type="text" id="specialty" name="specialty" placeholder="Médecine générale">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="docteur@mystetho.ma">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" name="password" required minlength="6" placeholder="********">
+                </div>
+                <div class="form-group">
+                    <label for="password_confirm">Confirmer</label>
+                    <input type="password" id="password_confirm" name="password_confirm" required minlength="6" placeholder="********">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Créer le compte et démarrer</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

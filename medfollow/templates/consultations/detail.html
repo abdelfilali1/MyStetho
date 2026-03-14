@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Consultation #{{ consultation.id }} — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Consultation du {{ consultation.consultation_date[:10] }}</h2>
+        <p class="subtitle">Patient : <a href="/patients/{{ consultation.pid }}" class="patient-link">{{ consultation.patient_name }}</a> — Dr. {{ consultation.doctor_name }}</p>
+    </div>
+    <div style="display: flex; gap: 8px;" class="no-print">
+        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+        <a href="/consultations/{{ consultation.id }}/pdf" class="btn btn-primary">Télécharger PDF</a>
+        <a href="/consultations/{{ consultation.id }}/edit" class="btn btn-outline">Modifier</a>
+        <a href="/prescriptions/new?consultation_id={{ consultation.id }}&patient_id={{ consultation.pid }}" class="btn btn-outline">Prescrire</a>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="card">
+        <div class="card-header"><h3>Détails cliniques</h3></div>
+        <div class="card-body">
+            <div class="clinical-section">
+                <h4>Motif</h4>
+                <p>{{ consultation.reason or 'Non renseigné' }}</p>
+            </div>
+            <div class="clinical-section">
+                <h4>Symptômes</h4>
+                <p>{{ consultation.symptoms or 'Non renseigné' }}</p>
+            </div>
+            <div class="clinical-section">
+                <h4>Examen clinique</h4>
+                <p>{{ consultation.clinical_exam or 'Non renseigné' }}</p>
+            </div>
+            <div class="clinical-section">
+                <h4>Diagnostic</h4>
+                <p class="highlight">{{ consultation.diagnosis or 'Non renseigné' }}</p>
+            </div>
+            <div class="clinical-section">
+                <h4>Plan de traitement</h4>
+                <p>{{ consultation.treatment_plan or 'Non renseigné' }}</p>
+            </div>
+            {% if consultation.notes %}
+            <div class="clinical-section">
+                <h4>Notes</h4>
+                <p>{{ consultation.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        {% if vitals %}
+        <div class="card">
+            <div class="card-header"><h3>Constantes vitales</h3></div>
+            <div class="card-body">
+                <div class="vitals-grid">
+                    {% if vitals.weight %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.weight }}</span>
+                        <span class="vital-label">Poids (kg)</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.height %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.height }}</span>
+                        <span class="vital-label">Taille (cm)</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.blood_pressure_sys %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.blood_pressure_sys }}/{{ vitals.blood_pressure_dia or '' }}</span>
+                        <span class="vital-label">Tension (mmHg)</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.heart_rate %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.heart_rate }}</span>
+                        <span class="vital-label">FC (bpm)</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.temperature %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.temperature }}°C</span>
+                        <span class="vital-label">Température</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.spo2 %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.spo2 }}%</span>
+                        <span class="vital-label">SpO2</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+                <h3>Ordonnances</h3>
+                <a href="/prescriptions/new?consultation_id={{ consultation.id }}&patient_id={{ consultation.pid }}" class="btn btn-outline btn-sm">+ Ajouter</a>
+            </div>
+            <div class="card-body">
+                {% if prescriptions %}
+                <ul class="list">
+                    {% for p in prescriptions %}
+                    <li class="list-item">
+                        <div class="list-info">
+                            <a href="/prescriptions/{{ p.id }}" class="list-title patient-link">Ordonnance #{{ p.id }}</a>
+                            <span class="list-subtitle">{{ p.items_summary or 'Aucun médicament' }}</span>
+                        </div>
+                        <span class="badge badge-{{ 'confirme' if p.status == 'active' else 'termine' }}">{{ p.status }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="empty-state" style="padding: 16px;">Aucune ordonnance</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

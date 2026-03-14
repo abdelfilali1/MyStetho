@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Patients — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Patients</h2>
+        <p class="subtitle">{{ patients|length }} patient{{ 's' if patients|length != 1 }} enregistré{{ 's' if patients|length != 1 }}</p>
+    </div>
+    <a href="/patients/new" class="btn btn-primary">+ Nouveau patient</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <form method="GET" action="/patients" class="search-form">
+            <input type="text" name="q" value="{{ search }}" placeholder="Rechercher par nom, téléphone, n° sécu..." class="search-input">
+            <button type="submit" class="btn btn-outline btn-sm">Rechercher</button>
+            {% if search %}
+            <a href="/patients" class="btn btn-outline btn-sm">Effacer</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if patients %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Date de naissance</th>
+                    <th>Téléphone</th>
+                    <th>Ville</th>
+                    <th>N° Sécu</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in patients %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="list-avatar">{{ p.first_name[0] }}{{ p.last_name[0] }}</div>
+                            <div>
+                                <a href="/patients/{{ p.id }}" class="patient-link">{{ p.last_name | upper }} {{ p.first_name }}</a>
+                                {% if p.gender %}
+                                <span class="gender-badge">{{ p.gender }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ p.date_of_birth }}</td>
+                    <td>{{ p.phone or '—' }}</td>
+                    <td>{{ p.city or '—' }}</td>
+                    <td>{{ p.social_security_number or '—' }}</td>
+                    <td>
+                        <a href="/patients/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">
+            {% if search %}
+            Aucun patient trouvé pour "{{ search }}"
+            {% else %}
+            Aucun patient enregistré. <a href="/patients/new">Ajouter un patient</a>
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

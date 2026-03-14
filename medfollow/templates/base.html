@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MyStetho{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% if user %}
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <img src="/static/img/logo3.png" alt="Logo MyStetho" class="brand-logo">
+                <div class="brand-copy">
+                    <h1 class="logo">MyStetho</h1>
+                    <p class="brand-tag">Smart Clinical Workspace</p>
+                </div>
+            </div>
+        </div>
+        <ul class="nav-links">
+            <li class="{% if active == 'dashboard' %}active{% endif %}">
+                <a href="/">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>Tableau de bord</span>
+                </a>
+            </li>
+            <li class="{% if active == 'patients' %}active{% endif %}">
+                <a href="/patients">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    <span>Patients</span>
+                </a>
+            </li>
+            <li class="{% if active == 'appointments' %}active{% endif %}">
+                <a href="/appointments">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Agenda</span>
+                </a>
+            </li>
+            <li class="nav-separator"></li>
+            <li class="{% if active == 'consultations' %}active{% endif %}">
+                <a href="/consultations">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Consultations</span>
+                </a>
+            </li>
+            <li class="{% if active == 'prescriptions' %}active{% endif %}">
+                <a href="/prescriptions">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span>Ordonnances</span>
+                </a>
+            </li>
+            <li class="{% if active == 'documents' %}active{% endif %}">
+                <a href="/documents">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    <span>Documents</span>
+                </a>
+            </li>
+            <li class="nav-separator"></li>
+            <li class="{% if active == 'messages' %}active{% endif %}">
+                <a href="/messages">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    <span>Messagerie</span>
+                </a>
+            </li>
+            <li class="{% if active == 'invoices' %}active{% endif %}">
+                <a href="/invoices">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    <span>Facturation</span>
+                </a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">{{ user.email[0]|upper }}</div>
+                <div class="user-details">
+                    <span class="user-name">{{ user.email }}</span>
+                    <span class="user-role">{{ user.role }}</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">Déconnexion</a>
+        </div>
+    </nav>
+    <main class="content">
+        <div class="content-topbar">
+            <div class="doctor-highlight">
+                <span class="doctor-highlight-label">Médecin connecté</span>
+                <span class="doctor-highlight-name">Dr. {{ user.email.split('@')[0] | replace('.', ' ') | title }}</span>
+            </div>
+        </div>
+        {% block content %}{% endblock %}
+    </main>
+    {% else %}
+    <main class="content-full">
+        {% block content_full %}{% endblock %}
+    </main>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

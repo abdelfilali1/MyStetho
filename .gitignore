@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local tools / temp
+.claude/
+.codex_tmp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Application runtime data
+medfollow/data/*.db
+medfollow/data/.secret_key
+medfollow/uploads/
+medfollow/server.out.log
+medfollow/server.err.log

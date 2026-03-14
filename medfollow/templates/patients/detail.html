@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}{{ patient.last_name | upper }} {{ patient.first_name }} — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ patient.last_name | upper }} {{ patient.first_name }}</h2>
+        <p class="subtitle">Dossier patient #{{ patient.id }}</p>
+    </div>
+    <div style="display: flex; gap: 8px;" class="no-print">
+        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+        <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline">Modifier</a>
+        <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer ce patient ')">
+            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+        </form>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <!-- Info card -->
+    <div class="card">
+        <div class="card-header"><h3>Informations personnelles</h3></div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Date de naissance</span>
+                    <span class="info-value">{{ patient.date_of_birth }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Genre</span>
+                    <span class="info-value">{{ patient.gender or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Groupe sanguin</span>
+                    <span class="info-value">{{ patient.blood_type or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Téléphone</span>
+                    <span class="info-value">{{ patient.phone or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email</span>
+                    <span class="info-value">{{ patient.email or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Adresse</span>
+                    <span class="info-value">{{ [patient.address, patient.postal_code, patient.city] | select | join(', ') or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">N° Sécu</span>
+                    <span class="info-value">{{ patient.social_security_number or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Médecin traitant</span>
+                    <span class="info-value">{{ patient.referring_doctor or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Mutuelle</span>
+                    <span class="info-value">{{ patient.insurance_name or '—' }}{% if patient.insurance_number %} ({{ patient.insurance_number }}){% endif %}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Contact d'urgence</span>
+                    <span class="info-value">{{ patient.emergency_contact_name or '—' }}{% if patient.emergency_contact_phone %} — {{ patient.emergency_contact_phone }}{% endif %}</span>
+                </div>
+            </div>
+            {% if patient.notes %}
+            <div class="info-notes">
+                <span class="info-label">Notes</span>
+                <p>{{ patient.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Medical history -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Antécédents médicaux</h3>
+        </div>
+        <div class="card-body">
+            {% if history %}
+            <ul class="list">
+                {% for h in history %}
+                <li class="list-item">
+                    <span class="badge badge-{{ h.type }}">{{ h.type }}</span>
+                    <div class="list-info" style="margin-left: 8px;">
+                        <span class="list-title">{{ h.description }}</span>
+                        <span class="list-subtitle">{{ h.date_recorded or '' }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucun antécédent enregistré</p>
+            {% endif %}
+
+            <form method="POST" action="/patients/{{ patient.id }}/history" class="history-form">
+                <h4 style="margin: 16px 0 8px; font-size: 14px; color: var(--gray-600);">Ajouter un antécédent</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <select name="type" required>
+                            <option value="medical">Médical</option>
+                            <option value="surgical">Chirurgical</option>
+                            <option value="family">Familial</option>
+                            <option value="allergy">Allergie</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 2;">
+                        <input type="text" name="description" required placeholder="Description...">
+                    </div>
+                    <div class="form-group">
+                        <input type="date" name="date_recorded">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Appointments & Consultations -->
+<div class="detail-grid" style="margin-top: 20px;">
+    <div class="card">
+        <div class="card-header"><h3>Derniers rendez-vous</h3></div>
+        <div class="card-body">
+            {% if appointments %}
+            <table class="table">
+                <thead>
+                    <tr><th>Date</th><th>Motif</th><th>Statut</th></tr>
+                </thead>
+                <tbody>
+                    {% for a in appointments %}
+                    <tr>
+                        <td>{{ a.start_datetime[:16] }}</td>
+                        <td>{{ a.title }}</td>
+                        <td><span class="badge badge-{{ a.status }}">{{ a.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucun rendez-vous</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Dernières consultations</h3></div>
+        <div class="card-body">
+            {% if consultations %}
+            <table class="table">
+                <thead>
+                    <tr><th>Date</th><th>Motif</th><th>Diagnostic</th></tr>
+                </thead>
+                <tbody>
+                    {% for c in consultations %}
+                    <tr>
+                        <td>{{ c.consultation_date[:10] }}</td>
+                        <td>{{ c.reason or '—' }}</td>
+                        <td>{{ c.diagnosis or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucune consultation</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

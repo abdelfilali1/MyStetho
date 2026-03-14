@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Facturation — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Facturation</h2>
+    <a href="/invoices/new" class="btn btn-primary">+ Nouvelle facture</a>
+</div>
+
+<div class="stats-grid" style="margin-bottom: 20px;">
+    <div class="stat-card">
+        <div class="stat-icon appointments"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ '%.2f' | format(total_ca) }} €</span>
+            <span class="stat-label">Chiffre d'affaires</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon patients"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/></svg></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ '%.2f' | format(total_paid) }} €</span>
+            <span class="stat-label">Encaissé</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon consultations"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ '%.2f' | format(total_unpaid) }} €</span>
+            <span class="stat-label">Impayés</span>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 12px;">
+    <div class="card-header">
+        <div style="display: flex; gap: 8px;">
+            <a href="/invoices" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline' }}">Toutes</a>
+            <a href="/invoices?status=brouillon" class="btn btn-sm {{ 'btn-primary' if selected_status == 'brouillon' else 'btn-outline' }}">Brouillons</a>
+            <a href="/invoices?status=emise" class="btn btn-sm {{ 'btn-primary' if selected_status == 'emise' else 'btn-outline' }}">Émises</a>
+            <a href="/invoices?status=payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'payee' else 'btn-outline' }}">Payées</a>
+            <a href="/invoices?status=partiellement_payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'partiellement_payee' else 'btn-outline' }}">Part. payées</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if invoices %}
+        <table class="table">
+            <thead>
+                <tr><th>N°</th><th>Date</th><th>Patient</th><th>Montant</th><th>Payé</th><th>Statut</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td><strong>{{ inv.invoice_number }}</strong></td>
+                    <td>{{ inv.invoice_date }}</td>
+                    <td><a href="/patients/{{ inv.patient_id }}" class="patient-link">{{ inv.patient_name }}</a></td>
+                    <td>{{ '%.2f' | format(inv.total_amount) }} €</td>
+                    <td>{{ '%.2f' | format(inv.paid_amount) }} €</td>
+                    <td><span class="badge badge-{{ 'confirme' if inv.status == 'payee' else 'planifie' if inv.status == 'emise' else 'en_cours' if inv.status == 'partiellement_payee' else 'termine' }}">{{ inv.status }}</span></td>
+                    <td><a href="/invoices/{{ inv.id }}" class="btn btn-outline btn-sm">Voir</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">Aucune facture. <a href="/invoices/new">Créer une facture</a></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

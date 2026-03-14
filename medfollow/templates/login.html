@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Connexion - MyStetho{% endblock %}
+
+{% block content_full %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="brand brand-auth">
+                <img src="/static/img/logo3.png" alt="Logo MyStetho" class="brand-logo">
+                <div class="brand-copy">
+                    <h1 class="logo">MyStetho</h1>
+                    <p class="brand-tag">Cabinet Médical Nouvelle Génération</p>
+                </div>
+            </div>
+            <p>Connectez-vous à votre espace</p>
+        </div>
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/login" class="auth-form">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required autofocus placeholder="docteur@cabinet.fr">
+            </div>
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" required placeholder="********">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

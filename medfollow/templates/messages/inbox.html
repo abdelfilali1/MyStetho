@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Messagerie — MyStetho{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Messagerie</h2>
+    <a href="/messages/new" class="btn btn-primary">+ Nouveau message</a>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="showTab('received', this)">Reçus ({{ received|length }})</button>
+    <button class="tab" onclick="showTab('sent', this)">Envoyés ({{ sent|length }})</button>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <div id="tab-received">
+            {% if received %}
+            <table class="table">
+                <thead><tr><th>De</th><th>Sujet</th><th>Patient</th><th>Date</th><th></th></tr></thead>
+                <tbody>
+                    {% for m in received %}
+                    <tr class="{{ 'unread' if not m.is_read }}">
+                        <td><strong>{{ m.sender_name }}</strong></td>
+                        <td>{{ m.subject or '(Sans sujet)' }}</td>
+                        <td>{{ m.patient_name or '—' }}</td>
+                        <td>{{ m.created_at[:16] }}</td>
+                        <td><a href="/messages/{{ m.id }}" class="btn btn-outline btn-sm">Lire</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">Aucun message reçu</p>
+            {% endif %}
+        </div>
+        <div id="tab-sent" style="display: none;">
+            {% if sent %}
+            <table class="table">
+                <thead><tr><th>À</th><th>Sujet</th><th>Patient</th><th>Date</th><th></th></tr></thead>
+                <tbody>
+                    {% for m in sent %}
+                    <tr>
+                        <td>{{ m.recipient_name }}</td>
+                        <td>{{ m.subject or '(Sans sujet)' }}</td>
+                        <td>{{ m.patient_name or '—' }}</td>
+                        <td>{{ m.created_at[:16] }}</td>
+                        <td><a href="/messages/{{ m.id }}" class="btn btn-outline btn-sm">Voir</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">Aucun message envoyé</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(name, btn) {
+    document.getElementById('tab-received').style.display = name === 'received'  '' : 'none';
+    document.getElementById('tab-sent').style.display = name === 'sent'  '' : 'none';
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+}
+</script>
+{% endblock %}
+
