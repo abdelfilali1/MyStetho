@@ -21,6 +21,7 @@ Thumbs.db
 
 # Application runtime data
 medfollow/data/*.db
+!medfollow/data/medfollow.db
 medfollow/data/.secret_key
 medfollow/uploads/
 medfollow/server.out.log
