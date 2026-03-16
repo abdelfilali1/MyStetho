@@ -23,14 +23,26 @@
     </div>
 </div>
 
+{% set is_dentist = user.specialty and 'dent' in user.specialty|lower %}
+
 <div class="detail-grid">
     <div class="card">
-        <div class="card-header"><h3>Détails cliniques</h3></div>
+        <div class="card-header"><h3>{{ 'Détails de la consultation dentaire' if is_dentist else 'Détails cliniques' }}</h3></div>
         <div class="card-body">
             <div class="clinical-section">
                 <h4>Motif</h4>
                 <p>{{ consultation.reason or 'Non renseigné' }}</p>
             </div>
+            {% if is_dentist %}
+            <div class="clinical-section">
+                <h4>Dent(s) concernée(s)</h4>
+                <p>{{ consultation.symptoms or 'Non renseigné' }}</p>
+            </div>
+            <div class="clinical-section">
+                <h4>Examen endo-buccal</h4>
+                <p>{{ consultation.clinical_exam or 'Non renseigné' }}</p>
+            </div>
+            {% else %}
             <div class="clinical-section">
                 <h4>Symptômes</h4>
                 <p>{{ consultation.symptoms or 'Non renseigné' }}</p>
@@ -39,17 +51,18 @@
                 <h4>Examen clinique</h4>
                 <p>{{ consultation.clinical_exam or 'Non renseigné' }}</p>
             </div>
+            {% endif %}
             <div class="clinical-section">
                 <h4>Diagnostic</h4>
                 <p class="highlight">{{ consultation.diagnosis or 'Non renseigné' }}</p>
             </div>
             <div class="clinical-section">
-                <h4>Plan de traitement</h4>
+                <h4>{{ 'Actes réalisés' if is_dentist else 'Plan de traitement' }}</h4>
                 <p>{{ consultation.treatment_plan or 'Non renseigné' }}</p>
             </div>
             {% if consultation.notes %}
             <div class="clinical-section">
-                <h4>Notes</h4>
+                <h4>{{ 'Notes / Suivi' if is_dentist else 'Notes' }}</h4>
                 <p>{{ consultation.notes }}</p>
             </div>
             {% endif %}
@@ -57,6 +70,31 @@
     </div>
 
     <div>
+        {% if is_dentist %}
+        {# Dental: show TA + link to odontogram #}
+        {% if vitals and (vitals.blood_pressure_sys or vitals.notes) %}
+        <div class="card">
+            <div class="card-header"><h3>Examen extra-buccal</h3></div>
+            <div class="card-body">
+                <div class="vitals-grid">
+                    {% if vitals.blood_pressure_sys %}
+                    <div class="vital-item">
+                        <span class="vital-value">{{ vitals.blood_pressure_sys }}/{{ vitals.blood_pressure_dia or '' }}</span>
+                        <span class="vital-label">Tension (mmHg)</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="card" style="margin-top: 16px;">
+            <div class="card-header"><h3>Schéma dentaire</h3></div>
+            <div class="card-body" style="text-align:center;padding:20px;">
+                <a href="/dental/{{ consultation.pid }}" class="btn btn-outline">Ouvrir l'odontogramme</a>
+            </div>
+        </div>
+        {% else %}
+        {# General: full vitals #}
         {% if vitals %}
         <div class="card">
             <div class="card-header"><h3>Constantes vitales</h3></div>
@@ -108,6 +146,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         {% endif %}
 
         <div class="card" style="margin-top: 16px;">
