@@ -1,5 +1,57 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Modifier' if consultation else 'Nouvelle' }} consultation — MyStetho{% endblock %}
+{% block head %}
+{{ super() }}
+<style>
+#dental-teeth-dropdown {
+    width: 100%;
+}
+
+#dental-teeth-toggle {
+    min-height: 44px;
+}
+
+#dental-teeth-label {
+    display: block;
+    max-width: calc(100% - 22px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+#dental-teeth-menu label:hover {
+    background: var(--gray-100);
+}
+
+@media (max-width: 860px) {
+    #dental-teeth-menu {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        margin-top: 8px;
+        box-shadow: none !important;
+        max-height: 220px !important;
+    }
+
+    #dental-teeth-options {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 580px) {
+    #dental-teeth-toggle {
+        font-size: 15px !important;
+        padding: 11px 12px !important;
+    }
+
+    #dental-teeth-menu {
+        max-height: 200px !important;
+    }
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">

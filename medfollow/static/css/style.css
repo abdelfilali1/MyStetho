@@ -1221,9 +1221,34 @@ tr.unread td {
         flex-direction: column;
         grid-template-columns: 1fr;
     }
+
+    .page-header-left,
+    .page-header-right {
+        width: 100%;
+    }
+
+    .page-header-right {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .form-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .form-actions .btn {
+        flex: 1 1 180px;
+    }
 }
 
 @media (max-width: 580px) {
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
     .mobile-brand-name {
         font-size: 16px;
     }
@@ -1234,10 +1259,49 @@ tr.unread td {
 
     .page-header h2 {
         font-size: 24px;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+
+    .page-header .btn {
+        width: 100%;
     }
 
     .auth-card {
         padding: 22px;
+    }
+
+    .card-header,
+    .card-body {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        flex: none;
+    }
+
+    .mobile-card-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .filter-bar .form-group {
+        min-width: 100%;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea,
+    .search-input {
+        font-size: 16px;
     }
 }
 
