@@ -23,28 +23,51 @@ def require_user(request: Request) -> dict:
 async def list_patients(
     request: Request,
     q: str = "",
+    page: int = 1,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    per_page = 20
+    offset = (page - 1) * per_page
+
     if q:
+        like = f"%{q.lower()}%"
+        count_cursor = await db.execute(
+            """SELECT COUNT(*) FROM patients WHERE doctor_id = ? AND is_active = 1 AND (lower(first_name) LIKE ? OR lower(last_name) LIKE ? OR phone LIKE ? OR social_security_number LIKE ?)""",
+            (user["sub"], like, like, f"%{q}%", f"%{q}%"),
+        )
+        total_count = (await count_cursor.fetchone())[0]
+
         cursor = await db.execute(
-            """SELECT * FROM patients WHERE is_active = 1 AND (lower(first_name) LIKE ? OR lower(last_name) LIKE ? OR phone LIKE ? OR social_security_number LIKE ?) ORDER BY last_name, first_name""",
-            (f"%{q.lower()}%", f"%{q.lower()}%", f"%{q}%", f"%{q}%"),
+            """SELECT * FROM patients WHERE doctor_id = ? AND is_active = 1 AND (lower(first_name) LIKE ? OR lower(last_name) LIKE ? OR phone LIKE ? OR social_security_number LIKE ?) ORDER BY last_name, first_name LIMIT ? OFFSET ?""",
+            (user["sub"], like, like, f"%{q}%", f"%{q}%", per_page, offset),
         )
     else:
+        count_cursor = await db.execute(
+            "SELECT COUNT(*) FROM patients WHERE doctor_id = ? AND is_active = 1",
+            (user["sub"],),
+        )
+        total_count = (await count_cursor.fetchone())[0]
+
         cursor = await db.execute(
-            "SELECT * FROM patients WHERE is_active = 1 ORDER BY last_name, first_name"
+            "SELECT * FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name, first_name LIMIT ? OFFSET ?",
+            (user["sub"], per_page, offset),
         )
 
     rows = await cursor.fetchall()
     patients = [dict(row) for row in rows]
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
 
     return templates.TemplateResponse(
         "patients/list.html",
-        {"request": request, "user": user, "active": "patients", "patients": patients, "search": q},
+        {
+            "request": request, "user": user, "active": "patients",
+            "patients": patients, "search": q,
+            "page": page, "total_pages": total_pages, "total_count": total_count,
+        },
     )
 
 
@@ -72,8 +95,8 @@ async def quick_create_patient(
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     cursor = await db.execute(
-        "INSERT INTO patients (first_name, last_name, date_of_birth) VALUES (?, ?, ?)",
-        (first_name.strip(), last_name.strip(), date_of_birth),
+        "INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth) VALUES (?, ?, ?, ?)",
+        (user["sub"], first_name.strip(), last_name.strip(), date_of_birth),
     )
     await db.commit()
     return JSONResponse(content={"id": cursor.lastrowid, "name": f"{last_name.upper()} {first_name}"})
@@ -108,8 +131,9 @@ async def create_patient(
 
     try:
         cur = await db.execute(
-            """INSERT INTO patients (first_name, last_name, date_of_birth, gender, social_security_number, email, phone, address, city, postal_code, blood_type, referring_doctor, insurance_name, insurance_number, emergency_contact_name, emergency_contact_phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth, gender, social_security_number, email, phone, address, city, postal_code, blood_type, referring_doctor, insurance_name, insurance_number, emergency_contact_name, emergency_contact_phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
+                user["sub"],
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
                 email or None, phone or None, address or None,
@@ -147,7 +171,7 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT * FROM patients WHERE id = ? ", (patient_id,))
+    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/patients", status_code=302)
@@ -187,7 +211,7 @@ async def edit_patient_form(request: Request, patient_id: int, db: aiosqlite.Con
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT * FROM patients WHERE id = ? ", (patient_id,))
+    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/patients", status_code=302)
@@ -227,7 +251,7 @@ async def update_patient(
 
     try:
         await db.execute(
-            """UPDATE patients SET first_name= ?, last_name= ?, date_of_birth= ?, gender= ?, social_security_number= ?, email= ?, phone= ?, address= ?, city= ?, postal_code= ?, blood_type= ?, referring_doctor= ?, insurance_name= ?, insurance_number= ?, emergency_contact_name= ?, emergency_contact_phone= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? """,
+            """UPDATE patients SET first_name= ?, last_name= ?, date_of_birth= ?, gender= ?, social_security_number= ?, email= ?, phone= ?, address= ?, city= ?, postal_code= ?, blood_type= ?, referring_doctor= ?, insurance_name= ?, insurance_number= ?, emergency_contact_name= ?, emergency_contact_phone= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ?""",
             (
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
@@ -235,7 +259,7 @@ async def update_patient(
                 city or None, postal_code or None, blood_type or None,
                 referring_doctor or None, insurance_name or None, insurance_number or None,
                 emergency_contact_name or None, emergency_contact_phone or None, notes or None,
-                patient_id,
+                patient_id, user["sub"],
             ),
         )
         await db.commit()
@@ -264,7 +288,7 @@ async def delete_patient(request: Request, patient_id: int, db: aiosqlite.Connec
         return RedirectResponse(url="/login", status_code=302)
 
     # Soft delete
-    await db.execute("UPDATE patients SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? ", (patient_id,))
+    await db.execute("UPDATE patients SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     await db.commit()
     return RedirectResponse(url="/patients", status_code=302)
 

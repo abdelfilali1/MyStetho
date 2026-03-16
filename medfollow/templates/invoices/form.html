@@ -24,7 +24,7 @@
                                 <input type="number" name="item_qty_0" value="1" min="1">
                             </div>
                             <div class="form-group">
-                                <label>Prix unit. (€)</label>
+                                <label>Prix unit. (DH)</label>
                                 <input type="number" step="0.01" name="item_price_0" required placeholder="50.00" onchange="calcTotal()">
                             </div>
                         </div>
@@ -33,7 +33,7 @@
                             <select name="item_act_id_0" onchange="fillAct(this, 0)">
                                 <option value="">— Sélectionner un acte —</option>
                                 {% for a in acts %}
-                                <option value="{{ a.id }}" data-name="{{ a.name }}" data-price="{{ a.base_price }}">{{ a.code }} — {{ a.name }} ({{ '%.2f' | format(a.base_price) }} €)</option>
+                                <option value="{{ a.id }}" data-name="{{ a.name }}" data-price="{{ a.base_price }}">{{ a.code }} — {{ a.name }} ({{ '%.2f' | format(a.base_price) }} DH)</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -42,7 +42,7 @@
                 </div>
                 <button type="button" class="btn btn-outline btn-sm" onclick="addItem()">+ Ajouter une ligne</button>
                 <div style="margin-top: 16px; text-align: right; font-size: 18px; font-weight: 700;">
-                    Total : <span id="total-display">0.00</span> €
+                    Total : <span id="total-display">0.00</span> DH
                 </div>
             </div>
         </div>
@@ -108,7 +108,7 @@ function addItem() {
                 <input type="number" name="item_qty_${itemIndex}" value="1" min="1" onchange="calcTotal()">
             </div>
             <div class="form-group">
-                <label>Prix unit. (€)</label>
+                <label>Prix unit. (DH)</label>
                 <input type="number" step="0.01" name="item_price_${itemIndex}" required placeholder="0.00" onchange="calcTotal()">
             </div>
         </div>
@@ -117,7 +117,7 @@ function addItem() {
             <select name="item_act_id_${itemIndex}" onchange="fillAct(this, ${itemIndex})">
                 <option value="">— Sélectionner un acte —</option>
                 {% for a in acts %}
-                <option value="{{ a.id }}" data-name="{{ a.name }}" data-price="{{ a.base_price }}">{{ a.code }} — {{ a.name }} ({{ '%.2f' | format(a.base_price) }} €)</option>
+                <option value="{{ a.id }}" data-name="{{ a.name }}" data-price="{{ a.base_price }}">{{ a.code }} — {{ a.name }} ({{ '%.2f' | format(a.base_price) }} DH)</option>
                 {% endfor %}
             </select>
         </div>

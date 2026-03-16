@@ -18,25 +18,43 @@ async def list_documents(
     request: Request,
     patient_id: Optional[int] = None,
     category: Optional[str] = None,
+    page: int = 1,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    query = """SELECT d.*, p.first_name || ' ' || p.last_name AS patient_name FROM documents d JOIN patients p ON d.patient_id = p.id WHERE 1=1"""
-    params = []
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    base_where = "WHERE 1=1"
+    params: list = []
 
     if patient_id:
-        query += " AND d.patient_id = ?"
+        base_where += " AND d.patient_id = ?"
         params.append(patient_id)
     if category:
-        query += " AND d.category = ?"
+        base_where += " AND d.category = ?"
         params.append(category)
 
-    query += " ORDER BY d.created_at DESC LIMIT 50"
-    cursor = await db.execute(query, params)
-    documents = [dict(r) for r in await cursor.fetchall()]
+    count_cursor = await db.execute(
+        f"SELECT COUNT(*) FROM documents d {base_where}", params
+    )
+    total_count = (await count_cursor.fetchone())[0]
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+
+    query = f"""SELECT d.*, p.first_name || ' ' || p.last_name AS patient_name
+                FROM documents d JOIN patients p ON d.patient_id = p.id
+                {base_where} ORDER BY d.created_at DESC LIMIT ? OFFSET ?"""
+    cursor = await db.execute(query, params + [per_page, offset])
+    documents = []
+    for r in await cursor.fetchall():
+        doc = dict(r)
+        # Extract file_name from file_path for preview detection
+        fp = doc.get("file_path", "")
+        doc["file_name"] = os.path.basename(fp) if fp else ""
+        documents.append(doc)
 
     cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
     patients = [dict(r) for r in await cursor.fetchall()]
@@ -47,6 +65,7 @@ async def list_documents(
             "request": request, "user": user, "active": "documents",
             "documents": documents, "patients": patients,
             "selected_patient_id": patient_id, "selected_category": category,
+            "page": page, "total_pages": total_pages, "total_count": total_count,
         },
     )
 

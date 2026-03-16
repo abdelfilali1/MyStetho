@@ -79,35 +79,36 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Poids (kg)</label>
-                            <input type="number" step="0.1" name="weight" value="{{ consultation.v_weight if consultation and consultation.v_weight else '' }}">
+                            <input type="number" step="0.1" name="weight" id="v-weight" value="{{ consultation.v_weight if consultation and consultation.v_weight else '' }}" oninput="calcBMI()">
                         </div>
                         <div class="form-group">
                             <label>Taille (cm)</label>
-                            <input type="number" step="0.1" name="height" value="{{ consultation.v_height if consultation and consultation.v_height else '' }}">
+                            <input type="number" step="0.1" name="height" id="v-height" value="{{ consultation.v_height if consultation and consultation.v_height else '' }}" oninput="calcBMI()">
                         </div>
                     </div>
+                    <div class="bmi-display" id="bmi-display"></div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>TA Sys (mmHg)</label>
+                            <label class="tooltip-trigger" data-tooltip="Tension Artérielle Systolique">TA Sys (mmHg)</label>
                             <input type="number" name="blood_pressure_sys" value="{{ consultation.v_blood_pressure_sys if consultation and consultation.v_blood_pressure_sys else '' }}">
                         </div>
                         <div class="form-group">
-                            <label>TA Dia (mmHg)</label>
+                            <label class="tooltip-trigger" data-tooltip="Tension Artérielle Diastolique">TA Dia (mmHg)</label>
                             <input type="number" name="blood_pressure_dia" value="{{ consultation.v_blood_pressure_dia if consultation and consultation.v_blood_pressure_dia else '' }}">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>FC (bpm)</label>
+                            <label class="tooltip-trigger" data-tooltip="Fréquence Cardiaque">FC (bpm)</label>
                             <input type="number" name="heart_rate" value="{{ consultation.v_heart_rate if consultation and consultation.v_heart_rate else '' }}">
                         </div>
                         <div class="form-group">
-                            <label>Temp (°C)</label>
+                            <label class="tooltip-trigger" data-tooltip="Température corporelle">Temp (°C)</label>
                             <input type="number" step="0.1" name="temperature" value="{{ consultation.v_temperature if consultation and consultation.v_temperature else '' }}">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>SpO2 (%)</label>
+                        <label class="tooltip-trigger" data-tooltip="Saturation en oxygène">SpO2 (%)</label>
                         <input type="number" step="0.1" name="spo2" value="{{ consultation.v_spo2 if consultation and consultation.v_spo2 else '' }}">
                     </div>
                 </div>
@@ -120,5 +121,29 @@
         </div>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcBMI() {
+    const w = parseFloat(document.getElementById('v-weight').value);
+    const h = parseFloat(document.getElementById('v-height').value);
+    const el = document.getElementById('bmi-display');
+    if (w > 0 && h > 0) {
+        const hm = h / 100;
+        const bmi = (w / (hm * hm)).toFixed(1);
+        let cat = '';
+        if (bmi < 18.5) cat = 'Insuffisance pondérale';
+        else if (bmi < 25) cat = 'Poids normal';
+        else if (bmi < 30) cat = 'Surpoids';
+        else cat = 'Obésité';
+        el.textContent = 'IMC : ' + bmi + ' kg/m\u00B2 — ' + cat;
+        el.classList.add('visible');
+    } else {
+        el.classList.remove('visible');
+    }
+}
+calcBMI();
+</script>
 {% endblock %}
 

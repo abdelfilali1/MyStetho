@@ -17,14 +17,14 @@
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
-        <form method="POST" action="/login" class="auth-form">
+        <form method="POST" action="/login" class="auth-form" id="login-form">
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required autofocus placeholder="docteur@cabinet.fr">
+                <label for="email">Email <span class="required-star">*</span></label>
+                <input type="email" id="email" name="email" required autofocus placeholder="docteur@cabinet.fr" aria-required="true">
             </div>
             <div class="form-group">
-                <label for="password">Mot de passe</label>
-                <input type="password" id="password" name="password" required placeholder="********">
+                <label for="password">Mot de passe <span class="required-star">*</span></label>
+                <input type="password" id="password" name="password" required placeholder="********" aria-required="true">
             </div>
             <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
         </form>

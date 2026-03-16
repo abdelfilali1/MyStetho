@@ -59,15 +59,27 @@
                         <th>Patient</th>
                         <th>Motif</th>
                         <th>Statut</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for apt in today_appointments %}
                     <tr>
                         <td>{{ apt.start_datetime[11:16] }}</td>
-                        <td>{{ apt.patient_name }}</td>
+                        <td><a href="/patients/{{ apt.patient_id }}" class="patient-link">{{ apt.patient_name }}</a></td>
                         <td>{{ apt.title }}</td>
-                        <td><span class="badge badge-{{ apt.status }}">{{ apt.status }}</span></td>
+                        <td>
+                            <select class="status-select status-{{ apt.status }}" data-apt-id="{{ apt.id }}" onchange="quickStatus(this)">
+                                {% for s in ['planifie', 'confirme', 'en_cours', 'termine', 'annule', 'absent'] %}
+                                <option value="{{ s }}" {{ 'selected' if apt.status == s }}>{{ s | replace('_', ' ') | capitalize }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            {% if apt.status != 'termine' %}
+                            <a href="/consultations/new?patient_id={{ apt.patient_id }}&appointment_id={{ apt.id }}" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px;">Consulter</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -101,5 +113,42 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.status-select {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 20px 4px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+}
+.status-select.status-planifie { background-color: var(--primary-light); color: var(--primary); }
+.status-select.status-confirme { background-color: var(--success-light); color: var(--success); }
+.status-select.status-en_cours { background-color: var(--warning-light); color: var(--warning); }
+.status-select.status-termine { background-color: var(--gray-200); color: var(--gray-600); }
+.status-select.status-annule, .status-select.status-absent { background-color: var(--danger-light); color: var(--danger); }
+</style>
+<script>
+async function quickStatus(sel) {
+    const aptId = sel.dataset.aptId;
+    const status = sel.value;
+    const fd = new FormData();
+    fd.append('status', status);
+    const res = await fetch('/appointments/' + aptId + '/status', { method: 'POST', body: fd });
+    if (res.ok) {
+        sel.className = 'status-select status-' + status;
+    }
+}
+</script>
 {% endblock %}
 

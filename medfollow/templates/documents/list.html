@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Documents — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Documents</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
         <h2>Documents</h2>
-        <p class="subtitle">{{ documents|length }} document{{ 's' if documents|length != 1 }}</p>
+        <p class="subtitle">{{ total_count if total_count is defined else documents|length }} document{{ 's' if (total_count if total_count is defined else documents|length) != 1 }}</p>
     </div>
     <a href="/documents/upload" class="btn btn-primary">+ Importer un document</a>
 </div>
@@ -64,8 +71,12 @@
                     <td>{{ '%.1f' | format(d.file_size / 1024) }} Ko</td>
                     <td>{{ d.created_at[:10] }}</td>
                     <td>
+                        {% set is_previewable = d.file_name and (d.file_name.endswith('.pdf') or d.file_name.endswith('.png') or d.file_name.endswith('.jpg') or d.file_name.endswith('.jpeg') or d.file_name.endswith('.gif') or d.file_name.endswith('.webp')) %}
+                        {% if is_previewable %}
+                        <button type="button" class="btn btn-outline btn-sm" onclick="previewDoc('/documents/{{ d.id }}/download', '{{ d.title }}', '{{ d.file_name }}')">Aperçu</button>
+                        {% endif %}
                         <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
-                        <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer ce document ')">
+                        <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer le document « {{ d.title }} » ?')">
                             <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">×</button>
                         </form>
                     </td>
@@ -73,10 +84,58 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="pagination">
+            <a href="/documents?patient_id={{ selected_patient_id or '' }}&category={{ selected_category or '' }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            {% for p_num in range(1, total_pages + 1) %}
+                {% if p_num == page %}
+                <span class="active">{{ p_num }}</span>
+                {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
+                <a href="/documents?patient_id={{ selected_patient_id or '' }}&category={{ selected_category or '' }}&page={{ p_num }}">{{ p_num }}</a>
+                {% elif p_num == 4 or p_num == total_pages - 2 %}
+                <span>…</span>
+                {% endif %}
+            {% endfor %}
+            <a href="/documents?patient_id={{ selected_patient_id or '' }}&category={{ selected_category or '' }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+        </div>
+        {% endif %}
         {% else %}
         <p class="empty-state">Aucun document. <a href="/documents/upload">Importer un document</a></p>
         {% endif %}
     </div>
 </div>
+
+<!-- Document preview overlay -->
+<div id="doc-preview-overlay" class="preview-overlay" style="display:none;" onclick="if(event.target===this)closeDocPreview()">
+    <div class="preview-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 id="doc-preview-title" style="margin:0;font-size:16px;"></h3>
+            <button onclick="closeDocPreview()" class="btn btn-outline btn-sm">✕ Fermer</button>
+        </div>
+        <div id="doc-preview-content" style="flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewDoc(url, title, filename) {
+    document.getElementById('doc-preview-title').textContent = title;
+    const content = document.getElementById('doc-preview-content');
+    const ext = filename.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+        content.innerHTML = '<iframe src="' + url + '" style="width:100%;height:70vh;border:none;border-radius:8px;"></iframe>';
+    } else {
+        content.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:70vh;border-radius:8px;" alt="' + title + '">';
+    }
+    document.getElementById('doc-preview-overlay').style.display = 'flex';
+}
+function closeDocPreview() {
+    document.getElementById('doc-preview-overlay').style.display = 'none';
+    document.getElementById('doc-preview-content').innerHTML = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDocPreview(); });
+</script>
 {% endblock %}
 

@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Consultation #{{ consultation.id }} — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/consultations">Consultations</a><span class="breadcrumb-sep">/</span>
+    <span>#{{ consultation.id }}</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -64,6 +72,13 @@
                     <div class="vital-item">
                         <span class="vital-value">{{ vitals.height }}</span>
                         <span class="vital-label">Taille (cm)</span>
+                    </div>
+                    {% endif %}
+                    {% if vitals.weight and vitals.height %}
+                    <div class="vital-item" style="background:rgba(28,140,248,0.08);border-color:rgba(28,140,248,0.3);">
+                        {% set bmi = (vitals.weight / ((vitals.height / 100) ** 2)) %}
+                        <span class="vital-value">{{ '%.1f' | format(bmi) }}</span>
+                        <span class="vital-label">IMC (kg/m²)</span>
                     </div>
                     {% endif %}
                     {% if vitals.blood_pressure_sys %}

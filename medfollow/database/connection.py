@@ -39,11 +39,12 @@ async def init_db():
 
         CREATE TABLE IF NOT EXISTS patients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
             date_of_birth DATE NOT NULL,
             gender TEXT CHECK(gender IN ('M', 'F', 'Autre')),
-            social_security_number TEXT UNIQUE,
+            social_security_number TEXT,
             email TEXT,
             phone TEXT,
             address TEXT,
@@ -298,4 +299,39 @@ async def init_db():
     """)
 
     await db.commit()
+
+    # Migration: add doctor_id to patients if missing
+    try:
+        await db.execute("ALTER TABLE patients ADD COLUMN doctor_id INTEGER REFERENCES users(id)")
+        await db.commit()
+    except Exception:
+        pass  # Column already exists
+
+    # Dental tables migration
+    await db.executescript("""
+        CREATE TABLE IF NOT EXISTS dental_teeth (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            tooth_number INTEGER NOT NULL,
+            condition TEXT DEFAULT 'sain',
+            notes TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            UNIQUE(patient_id, tooth_number)
+        );
+        CREATE TABLE IF NOT EXISTS dental_treatments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            tooth_number INTEGER NOT NULL,
+            treatment_type TEXT NOT NULL,
+            description TEXT,
+            treatment_date DATE DEFAULT CURRENT_DATE,
+            doctor_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            FOREIGN KEY (doctor_id) REFERENCES users(id)
+        );
+    """)
+    await db.commit()
+
     await db.close()

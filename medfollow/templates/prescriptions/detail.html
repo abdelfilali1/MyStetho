@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Ordonnance #{{ prescription.id }} — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/prescriptions">Ordonnances</a><span class="breadcrumb-sep">/</span>
+    <span>#{{ prescription.id }}</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -10,6 +18,9 @@
     <div style="display:flex;gap:8px;" class="no-print">
         <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
         <a href="/prescriptions/{{ prescription.id }}/pdf" class="btn btn-primary">Télécharger PDF</a>
+        {% if prescription.status == 'active' %}
+        <a href="/prescriptions/{{ prescription.id }}/edit" class="btn btn-outline">Modifier</a>
+        {% endif %}
     </div>
 </div>
 

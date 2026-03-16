@@ -14,19 +14,62 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_consultations(request: Request, db: aiosqlite.Connection = Depends(get_db)):
+async def list_consultations(
+    request: Request,
+    q: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
+    db: aiosqlite.Connection = Depends(get_db),
+):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    uid = user["sub"]
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    base_query = """FROM consultations c
+        JOIN patients p ON c.patient_id = p.id
+        JOIN users u ON c.doctor_id = u.id
+        WHERE c.doctor_id = ?"""
+    params: list = [uid]
+
+    if q:
+        like = f"%{q.strip().lower()}%"
+        base_query += """ AND (lower(p.first_name) LIKE ? OR lower(p.last_name) LIKE ?
+                          OR lower(c.reason) LIKE ? OR lower(c.diagnosis) LIKE ?)"""
+        params.extend([like, like, like, like])
+
+    if date_from:
+        base_query += " AND c.consultation_date >= ?"
+        params.append(date_from)
+
+    if date_to:
+        base_query += " AND c.consultation_date <= ?"
+        params.append(date_to)
+
+    count_cursor = await db.execute(f"SELECT COUNT(*) {base_query}", params)
+    total_count = (await count_cursor.fetchone())[0]
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+
     cursor = await db.execute(
-        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, u.first_name || ' ' || u.last_name AS doctor_name FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id ORDER BY c.consultation_date DESC LIMIT 50"""
+        f"""SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name,
+                   u.first_name || ' ' || u.last_name AS doctor_name
+            {base_query} ORDER BY c.consultation_date DESC LIMIT ? OFFSET ?""",
+        params + [per_page, offset],
     )
     consultations = [dict(r) for r in await cursor.fetchall()]
 
     return templates.TemplateResponse(
         "consultations/list.html",
-        {"request": request, "user": user, "active": "consultations", "consultations": consultations},
+        {
+            "request": request, "user": user, "active": "consultations",
+            "consultations": consultations,
+            "q": q, "date_from": date_from, "date_to": date_to,
+            "page": page, "total_pages": total_pages, "total_count": total_count,
+        },
     )
 
 
@@ -41,8 +84,9 @@ async def new_consultation_form(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    uid = user["sub"]
     cursor = await db.execute(
-        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name"
+        "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,)
     )
     patients = [dict(r) for r in await cursor.fetchall()]
 
@@ -92,7 +136,7 @@ async def create_consultation(
 
     if not patient_id or not doctor_id:
         cursor = await db.execute(
-            "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name"
+            "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (user["sub"],)
         )
         patients = [dict(r) for r in await cursor.fetchall()]
         cursor = await db.execute(
@@ -232,7 +276,9 @@ async def edit_consultation_form(request: Request, consultation_id: int, db: aio
     if vitals_row:
         consultation.update({f"v_{k}": v for k, v in dict(vitals_row).items()})
 
-    cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (user["sub"],)
+    )
     patients = [dict(r) for r in await cursor.fetchall()]
 
     cursor = await db.execute("SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') ORDER BY last_name")

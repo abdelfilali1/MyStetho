@@ -1,44 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Facturation — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Facturation</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h2>Facturation</h2>
+    <div>
+        <h2>Facturation</h2>
+        <p class="subtitle">{{ total_count if total_count is defined else invoices|length }} facture{{ 's' if (total_count if total_count is defined else invoices|length) != 1 }}</p>
+    </div>
     <a href="/invoices/new" class="btn btn-primary">+ Nouvelle facture</a>
 </div>
 
-<div class="stats-grid" style="margin-bottom: 20px;">
+<div class="stats-grid" style="margin-bottom: 20px; grid-template-columns: repeat(5, 1fr);">
     <div class="stat-card">
         <div class="stat-icon appointments"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
         <div class="stat-info">
-            <span class="stat-value">{{ '%.2f' | format(total_ca) }} €</span>
-            <span class="stat-label">Chiffre d'affaires</span>
+            <span class="stat-value">{{ '%.2f' | format(total_ca) }} DH</span>
+            <span class="stat-label">CA total</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon messages"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ '%.2f' | format(ca_annual) }} DH</span>
+            <span class="stat-label">CA annuel</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon prescriptions"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ '%.2f' | format(ca_monthly) }} DH</span>
+            <span class="stat-label">CA mensuel</span>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon patients"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/></svg></div>
         <div class="stat-info">
-            <span class="stat-value">{{ '%.2f' | format(total_paid) }} €</span>
+            <span class="stat-value">{{ '%.2f' | format(total_paid) }} DH</span>
             <span class="stat-label">Encaissé</span>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon consultations"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
         <div class="stat-info">
-            <span class="stat-value">{{ '%.2f' | format(total_unpaid) }} €</span>
+            <span class="stat-value">{{ '%.2f' | format(total_unpaid) }} DH</span>
             <span class="stat-label">Impayés</span>
         </div>
     </div>
 </div>
 
 <div class="card" style="margin-bottom: 12px;">
-    <div class="card-header">
-        <div style="display: flex; gap: 8px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <a href="/invoices" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline' }}">Toutes</a>
             <a href="/invoices?status=brouillon" class="btn btn-sm {{ 'btn-primary' if selected_status == 'brouillon' else 'btn-outline' }}">Brouillons</a>
             <a href="/invoices?status=emise" class="btn btn-sm {{ 'btn-primary' if selected_status == 'emise' else 'btn-outline' }}">Émises</a>
             <a href="/invoices?status=payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'payee' else 'btn-outline' }}">Payées</a>
             <a href="/invoices?status=partiellement_payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'partiellement_payee' else 'btn-outline' }}">Part. payées</a>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            {% if (date_from is defined and date_from) or (date_to is defined and date_to) %}
+            <span style="font-size:12px;color:var(--gray-500);">
+                {{ date_from if date_from else '...' }} → {{ date_to if date_to else '...' }}
+            </span>
+            <a href="/invoices{{ '?status=' ~ selected_status if selected_status else '' }}" class="btn btn-outline btn-sm">✕</a>
+            {% endif %}
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('date-filter-modal').style.display='flex'">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Filtrer par date
+            </button>
         </div>
     </div>
 </div>
@@ -56,18 +92,55 @@
                     <td><strong>{{ inv.invoice_number }}</strong></td>
                     <td>{{ inv.invoice_date }}</td>
                     <td><a href="/patients/{{ inv.patient_id }}" class="patient-link">{{ inv.patient_name }}</a></td>
-                    <td>{{ '%.2f' | format(inv.total_amount) }} €</td>
-                    <td>{{ '%.2f' | format(inv.paid_amount) }} €</td>
+                    <td>{{ '%.2f' | format(inv.total_amount) }} DH</td>
+                    <td>{{ '%.2f' | format(inv.paid_amount) }} DH</td>
                     <td><span class="badge badge-{{ 'confirme' if inv.status == 'payee' else 'planifie' if inv.status == 'emise' else 'en_cours' if inv.status == 'partiellement_payee' else 'termine' }}">{{ inv.status }}</span></td>
                     <td><a href="/invoices/{{ inv.id }}" class="btn btn-outline btn-sm">Voir</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="pagination">
+            <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            {% for p_num in range(1, total_pages + 1) %}
+                {% if p_num == page %}
+                <span class="active">{{ p_num }}</span>
+                {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
+                <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ p_num }}">{{ p_num }}</a>
+                {% elif p_num == 4 or p_num == total_pages - 2 %}
+                <span>…</span>
+                {% endif %}
+            {% endfor %}
+            <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+        </div>
+        {% endif %}
         {% else %}
         <p class="empty-state">Aucune facture. <a href="/invoices/new">Créer une facture</a></p>
         {% endif %}
     </div>
 </div>
-{% endblock %}
 
+<!-- Date filter modal -->
+<div id="date-filter-modal" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.5);z-index:3000;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#fff;border-radius:16px;padding:24px;width:360px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,0.25);">
+        <h3 style="margin:0 0 16px;font-size:16px;color:var(--gray-900);">Filtrer par date</h3>
+        <form method="GET" action="/invoices">
+            {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:13px;color:var(--gray-600);margin-bottom:4px;display:block;">Date début</label>
+                <input type="date" name="date_from" value="{{ date_from if date_from is defined else '' }}" style="width:100%;">
+            </div>
+            <div class="form-group" style="margin-bottom:20px;">
+                <label style="font-size:13px;color:var(--gray-600);margin-bottom:4px;display:block;">Date fin</label>
+                <input type="date" name="date_to" value="{{ date_to if date_to is defined else '' }}" style="width:100%;">
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('date-filter-modal').style.display='none'">Annuler</button>
+                <button type="submit" class="btn btn-primary">Filtrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

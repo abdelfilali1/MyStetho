@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Modifier' if patient and patient.id is defined else 'Nouveau' }} patient — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/patients">Patients</a><span class="breadcrumb-sep">/</span>
+    <span>{{ 'Modifier' if patient and patient.id is defined else 'Nouveau' }}</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>

@@ -1,0 +1,28 @@
+{
+  "name": "learn-cc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:odontogram": "esbuild ./frontend/odontogram-view.jsx --bundle --format=iife --global-name=OdontoNpm --platform=browser --target=es2019 --outdir=medfollow/static/js --entry-names=odontogram-view.iife",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abdelfilali1/MyStetho.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/abdelfilali1/MyStetho/issues"
+  },
+  "homepage": "https://github.com/abdelfilali1/MyStetho#readme",
+  "dependencies": {
+    "esbuild": "^0.27.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-odontogram": "^0.5.5"
+  }
+}

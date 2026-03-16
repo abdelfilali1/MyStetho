@@ -1,13 +1,32 @@
 {% extends "base.html" %}
 {% block title %}Consultations — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Consultations</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
         <h2>Consultations</h2>
-        <p class="subtitle">{{ consultations|length }} consultation{{ 's' if consultations|length != 1 }}</p>
+        <p class="subtitle">{{ total_count if total_count is defined else consultations|length }} consultation{{ 's' if (total_count if total_count is defined else consultations|length) != 1 }}</p>
     </div>
     <a href="/consultations/new" class="btn btn-primary">+ Nouvelle consultation</a>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+    <div class="card-header">
+        <form method="GET" action="/consultations" class="search-form">
+            <input type="text" name="q" value="{{ q if q is defined else '' }}" placeholder="Rechercher par patient, motif, diagnostic..." class="search-input">
+            <button type="submit" class="btn btn-outline btn-sm">Rechercher</button>
+            {% if q is defined and q %}
+            <a href="/consultations" class="btn btn-outline btn-sm">Effacer</a>
+            {% endif %}
+        </form>
+    </div>
 </div>
 
 <div class="card">
@@ -37,10 +56,25 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="pagination">
+            <a href="/consultations?q={{ q if q is defined else '' }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            {% for p_num in range(1, total_pages + 1) %}
+                {% if p_num == page %}
+                <span class="active">{{ p_num }}</span>
+                {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
+                <a href="/consultations?q={{ q if q is defined else '' }}&page={{ p_num }}">{{ p_num }}</a>
+                {% elif p_num == 4 or p_num == total_pages - 2 %}
+                <span>…</span>
+                {% endif %}
+            {% endfor %}
+            <a href="/consultations?q={{ q if q is defined else '' }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+        </div>
+        {% endif %}
         {% else %}
         <p class="empty-state">Aucune consultation enregistrée. <a href="/consultations/new">Créer une consultation</a></p>
         {% endif %}
     </div>
 </div>
 {% endblock %}
-

@@ -18,9 +18,11 @@ async def agenda(request: Request, db: aiosqlite.Connection = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    uid = user["sub"]
+
     # Get all patients for the new appointment form
     cursor = await db.execute(
-        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name"
+        "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,)
     )
     patients = [dict(r) for r in await cursor.fetchall()]
 
@@ -48,12 +50,13 @@ async def get_events(
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    query = """ SELECT a.*, p.first_name || ' ' || p.last_name AS patient_name FROM appointments a JOIN patients p ON a.patient_id = p.id """
-    params = []
+    uid = user["sub"]
+    query = """ SELECT a.*, p.first_name || ' ' || p.last_name AS patient_name FROM appointments a JOIN patients p ON a.patient_id = p.id WHERE a.doctor_id = ? """
+    params = [uid]
 
     if start and end:
-        query += " WHERE a.start_datetime >= ? AND a.start_datetime <= ? "
-        params = [start, end]
+        query += " AND a.start_datetime >= ? AND a.start_datetime <= ? "
+        params += [start, end]
 
     query += " ORDER BY a.start_datetime"
     cursor = await db.execute(query, params)

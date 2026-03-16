@@ -75,6 +75,15 @@
                     <span>Facturation</span>
                 </a>
             </li>
+            {% if user.role == 'admin' %}
+            <li class="nav-separator"></li>
+            <li class="{% if active == 'admin_users' %}active{% endif %}">
+                <a href="/admin/users">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><line x1="19" y1="8" x2="23" y2="8"/><line x1="21" y1="6" x2="21" y2="10"/></svg>
+                    <span>Utilisateurs</span>
+                </a>
+            </li>
+            {% endif %}
         </ul>
         <div class="sidebar-footer">
             <div class="user-info">
@@ -100,14 +109,17 @@
             <a href="/appointments" class="mobile-quick-link">Agenda</a>
         </div>
 
-        <div class="content-topbar">
-            <div class="doctor-highlight">
-                <span class="doctor-highlight-label">Medecin connecte</span>
-                <span class="doctor-highlight-name">Dr. {{ user.email.split('@')[0] | replace('.', ' ') | title }}</span>
-            </div>
-        </div>
+
+        {% block breadcrumb %}{% endblock %}
+
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Toast -->
+    <div id="app-toast" class="app-toast"></div>
+
+
+
     {% else %}
     <main class="content-full">
         {% block content_full %}{% endblock %}
@@ -144,10 +156,34 @@
                 setMobileNav(false);
             }
         });
+
+
+        // === Toast ===
+        window.showToast = function(msg, type) {
+            const t = document.getElementById('app-toast');
+            if (!t) return;
+            t.textContent = msg;
+            t.className = 'app-toast visible' + (type ? ' toast-' + type : '');
+            setTimeout(() => { t.classList.remove('visible'); }, 3000);
+        };
+
+
+        // === Loading State on Submit ===
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function() {
+                const btn = this.querySelector('button[type="submit"]');
+                if (btn && !btn.classList.contains('is-loading')) {
+                    btn.classList.add('is-loading');
+                    btn.disabled = true;
+                }
+            });
+        });
+
     })();
     </script>
     {% endif %}
 
     {% block scripts %}{% endblock %}
+
 </body>
 </html>

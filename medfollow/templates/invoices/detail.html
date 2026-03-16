@@ -22,15 +22,15 @@
                         <tr>
                             <td>{{ item.description }}</td>
                             <td>{{ item.quantity }}</td>
-                            <td>{{ '%.2f' | format(item.unit_price) }} €</td>
-                            <td><strong>{{ '%.2f' | format(item.total_price) }} €</strong></td>
+                            <td>{{ '%.2f' | format(item.unit_price) }} DH</td>
+                            <td><strong>{{ '%.2f' | format(item.total_price) }} DH</strong></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr style="border-top: 2px solid var(--gray-300);">
                             <td colspan="3" style="text-align: right; font-weight: 700;">Total</td>
-                            <td style="font-weight: 700; font-size: 16px;">{{ '%.2f' | format(invoice.total_amount) }} €</td>
+                            <td style="font-weight: 700; font-size: 16px;">{{ '%.2f' | format(invoice.total_amount) }} DH</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -47,7 +47,7 @@
                         {% for p in payments %}
                         <tr>
                             <td>{{ p.payment_date }}</td>
-                            <td>{{ '%.2f' | format(p.amount) }} €</td>
+                            <td>{{ '%.2f' | format(p.amount) }} DH</td>
                             <td>{{ p.payment_method }}</td>
                             <td>{{ p.reference or '—' }}</td>
                         </tr>
@@ -111,7 +111,7 @@
                 </div>
                 <div class="info-item">
                     <span class="info-label">Reste dû</span>
-                    <span class="info-value" style="font-weight: 700; color: {{ 'var(--success)' if invoice.total_amount <= invoice.paid_amount else 'var(--danger)' }};">{{ '%.2f' | format(invoice.total_amount - invoice.paid_amount) }} €</span>
+                    <span class="info-value" style="font-weight: 700; color: {{ 'var(--success)' if invoice.total_amount <= invoice.paid_amount else 'var(--danger)' }};">{{ '%.2f' | format(invoice.total_amount - invoice.paid_amount) }} DH</span>
                 </div>
             </div>
             {% if invoice.notes %}

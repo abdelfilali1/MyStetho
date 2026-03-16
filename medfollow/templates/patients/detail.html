@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ patient.last_name | upper }} {{ patient.first_name }} — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/patients">Patients</a><span class="breadcrumb-sep">/</span>
+    <span>{{ patient.last_name | upper }} {{ patient.first_name }}</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -8,9 +16,17 @@
         <p class="subtitle">Dossier patient #{{ patient.id }}</p>
     </div>
     <div style="display: flex; gap: 8px;" class="no-print">
+        {% if user.specialty == 'Dentiste' %}
+        <a href="/dental/{{ patient.id }}?ui=20260316-12" class="btn btn-primary" style="gap:6px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.5 3 1 4l1 8c.2 1 1 2 2 2h4c1 0 1.8-1 2-2l1-8c.5-1 1-2.5 1-4 0-2.5-2.5-5-6-5z"/>
+            </svg>
+            Odontogramme
+        </a>
+        {% endif %}
         <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
         <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline">Modifier</a>
-        <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer ce patient ')">
+        <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer le patient {{ patient.last_name | upper }} {{ patient.first_name }} ? Cette action est irréversible.')">
             <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
         </form>
     </div>
@@ -24,7 +40,7 @@
             <div class="info-grid">
                 <div class="info-item">
                     <span class="info-label">Date de naissance</span>
-                    <span class="info-value">{{ patient.date_of_birth }}</span>
+                    <span class="info-value">{{ patient.date_of_birth }}{% if patient.date_of_birth %} {% set bp = patient.date_of_birth.split('-') %}{% if bp|length == 3 %}<span style="color:var(--gray-400);font-size:12px;margin-left:4px;">({{ now_year - bp[0]|int }} ans)</span>{% endif %}{% endif %}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Genre</span>

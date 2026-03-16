@@ -1,0 +1,842 @@
+{% extends "base.html" %}
+{% block title %}Odontogramme — {{ patient.last_name | upper }} {{ patient.first_name }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/js/odontogram-view.iife.css?v=20260316-12">
+<style>
+/* ===========================
+   ODONTOGRAM PAGE
+=========================== */
+
+.odo-page {
+    width: min(100%, 900px);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 4px;
+}
+
+/* ---- Header ---- */
+.odo-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+}
+.odo-header-left { display: flex; align-items: center; gap: 14px; }
+.odo-back-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--stroke);
+    color: var(--gray-600); text-decoration: none;
+    box-shadow: var(--shadow-soft); flex-shrink: 0;
+    font-size: 18px; transition: background 0.15s, box-shadow 0.15s;
+}
+.odo-back-btn:hover { background: white; box-shadow: var(--shadow-medium); }
+.odo-title-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, #1c8cf8, #0f61cf);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(28,140,248,0.32);
+    flex-shrink: 0; font-size: 24px;
+}
+.odo-title-h { font-size: 18px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.025em; margin: 0; }
+.odo-title-sub { font-size: 11px; color: var(--gray-500); margin: 2px 0 0 0; }
+
+/* ---- Stats Cards ---- */
+.odo-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 8px;
+}
+.stat-kpi {
+    background: var(--panel-strong); border: 1px solid var(--stroke);
+    border-radius: 12px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: var(--shadow-soft);
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-kpi:hover { box-shadow: var(--shadow-medium); transform: translateY(-1px); }
+.stat-kpi-icon {
+    width: 30px; height: 30px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+}
+.stat-kpi-icon svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+.stat-kpi-num { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.stat-kpi-label { font-size: 10px; color: var(--gray-500); margin-top: 1px; font-weight: 500; }
+
+/* ---- View Toggle ---- */
+.view-toggle-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+}
+.view-segmented {
+    display: flex; gap: 0;
+    background: var(--gray-100); border-radius: 11px;
+    padding: 4px; border: 1px solid var(--gray-200);
+}
+.view-btn {
+    padding: 6px 14px; border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    color: var(--gray-500); background: transparent;
+    transition: all 0.18s; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+}
+.view-btn.active {
+    background: white; color: var(--gray-900);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+}
+
+/* ---- Odontogram Dark Box (SVG view) ---- */
+.odonto-box {
+    background: linear-gradient(165deg, #0c1829 0%, #0f172a 50%, #0a1528 100%);
+    border-radius: 14px; padding: 12px 12px 10px;
+    margin-bottom: 8px; position: relative; overflow: visible;
+    box-shadow: 0 24px 56px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.odonto-box::before {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 55%; height: 55%;
+    background: radial-gradient(ellipse, rgba(28,140,248,0.05) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+}
+#svg-chart { position: relative; z-index: 1; width: 100%; height: auto; display: block; }
+.tooth-g { cursor: pointer; transition: filter 0.18s ease; }
+.tooth-g:hover { filter: drop-shadow(0 0 7px rgba(251,191,36,0.85)) brightness(1.1); }
+.tooth-g:active { filter: drop-shadow(0 0 12px rgba(251,191,36,1)) brightness(1.2); }
+.tooth-g.selected { filter: drop-shadow(0 0 10px rgba(251,191,36,0.95)) brightness(1.12); }
+
+/* ---- React Odontogram View ---- */
+#view-odontogram {
+    display: none;
+    background: var(--panel-strong);
+    border: 1px solid var(--stroke);
+    border-radius: 14px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-soft);
+}
+#react-odo-root {
+    display: flex;
+    justify-content: center;
+    overflow-x: hidden;
+}
+/* Override react-odontogram styles to match our design */
+#react-odo-root .odontogram-container { font-family: 'Manrope', sans-serif !important; }
+#react-odo-root svg { cursor: pointer; }
+#react-odo-root .Odontogram {
+    width: 100%;
+    flex: 0 0 auto;
+}
+#react-odo-root[data-layout="circle"] .Odontogram svg {
+    width: 216px !important;
+    max-width: 100%;
+    height: auto !important;
+    display: block;
+    margin: 0 auto;
+}
+#react-odo-root[data-layout="square"] .Odontogram svg {
+    width: 560px !important;
+    max-width: 100%;
+    height: auto !important;
+    display: block;
+    margin: 0 auto;
+}
+
+/* ---- Legend ---- */
+.odo-legend {
+    background: var(--panel-strong); border: 1px solid var(--stroke);
+    border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow-soft);
+}
+.odo-legend-title {
+    font-size: 10px; font-weight: 700; color: var(--gray-500);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+}
+.odo-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+}
+.legend-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: transparent; border: none;
+    border-radius: 0; padding: 0;
+    font-size: 11px; color: var(--gray-700); font-weight: 500;
+    transition: background 0.15s;
+    white-space: normal;
+}
+.legend-pill:hover { background: transparent; }
+.legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.08);
+}
+
+/* ---- Slide-in Panel ---- */
+#panel {
+    position: fixed; top: 0; right: -460px;
+    width: 430px; height: 100vh; background: #fff;
+    box-shadow: -12px 0 48px rgba(0,0,0,0.15), -1px 0 0 rgba(0,0,0,0.05);
+    z-index: 2000; transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column;
+}
+#panel.open { right: 0; }
+.panel-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 22px 18px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    background: linear-gradient(135deg, #0f172a, #1e3a5f); color: white;
+}
+.panel-hdr-tooth { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.03em; }
+.panel-hdr-name { font-size: 12px; color: rgba(148,163,184,0.9); margin-top: 3px; }
+.panel-close-btn {
+    background: rgba(255,255,255,0.1); border: none; cursor: pointer;
+    width: 36px; height: 36px; border-radius: 9px;
+    font-size: 16px; color: rgba(255,255,255,0.8);
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+}
+.panel-close-btn:hover { background: rgba(255,255,255,0.2); }
+.panel-body { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.panel-section-label {
+    font-size: 10px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 10px;
+}
+.panel-select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0;
+    border-radius: 9px; font-size: 13px; color: #0f172a;
+    background: white; margin-bottom: 10px; appearance: auto;
+    transition: border-color 0.15s;
+}
+.panel-select:focus { border-color: #1c8cf8; outline: none; }
+.panel-textarea {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0;
+    border-radius: 9px; font-size: 13px; color: #0f172a;
+    resize: vertical; box-sizing: border-box; font-family: inherit;
+    margin-bottom: 10px; transition: border-color 0.15s;
+}
+.panel-textarea:focus { border-color: #1c8cf8; outline: none; }
+.panel-btn-primary {
+    width: 100%; padding: 11px; background: #1c8cf8; color: white;
+    border: none; border-radius: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+}
+.panel-btn-primary:hover { background: #0f76d9; }
+.panel-add-box {
+    background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;
+}
+.panel-btn-dark {
+    width: 100%; padding: 10px; background: #0f172a; color: white;
+    border: none; border-radius: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+}
+.panel-btn-dark:hover { background: #1e293b; }
+.treatment-card {
+    background: white; border-radius: 10px; padding: 11px 14px;
+    margin-bottom: 8px; border: 1.5px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.treatment-type { font-weight: 700; font-size: 13px; color: #1e293b; }
+.treatment-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+.treatment-date { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+.treatment-del {
+    background: #fef2f2; border: none; cursor: pointer;
+    width: 28px; height: 28px; border-radius: 7px; font-size: 13px;
+    color: #ef4444; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; transition: background 0.15s;
+}
+.treatment-del:hover { background: #fee2e2; }
+
+/* ---- Overlay & Toast ---- */
+#overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 1999; backdrop-filter: blur(2px);
+}
+#overlay.open { display: block; }
+#toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: white; padding: 10px 22px;
+    border-radius: 50px; font-size: 13px; font-weight: 600;
+    z-index: 3000; opacity: 0; transition: opacity 0.3s ease;
+    pointer-events: none; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+@media (max-width: 900px) { .odo-legend-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 780px) { .odo-stats { grid-template-columns: repeat(2, 1fr); } .odo-legend-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { #panel { width: 100vw; right: -100vw; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="odo-page">
+
+    <!-- Header -->
+    <div class="odo-header">
+        <div class="odo-header-left">
+            <a href="/patients/{{ patient.id }}" class="odo-back-btn">←</a>
+            <div class="odo-title-icon">🦷</div>
+            <div>
+                <h2 class="odo-title-h">{{ patient.last_name|upper }} {{ patient.first_name }}</h2>
+                <p class="odo-title-sub">Odontogramme · Schéma dentaire interactif (FDI) · UI v20260316-12</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="odo-stats" id="stats-row"></div>
+
+    <!-- View Toggle -->
+    <div class="view-toggle-bar">
+        <div class="view-segmented">
+            <button class="view-btn" id="btn-layout" onclick="switchView('layout')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                Disposition
+            </button>
+            <button class="view-btn active" id="btn-odontogram" onclick="switchView('odontogram')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                Odontogramme
+            </button>
+        </div>
+    </div>
+
+    <!-- SVG Layout View -->
+    <div id="view-layout" style="display:none;">
+        <div class="odonto-box">
+            <svg id="svg-chart" viewBox="0 0 820 280" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+    </div>
+
+    <!-- React Odontogram View -->
+    <div id="view-odontogram">
+        <div id="react-odo-root"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="odo-legend">
+        <div class="odo-legend-title">Légende des conditions</div>
+        <div class="odo-legend-grid">
+            <span class="legend-pill"><span class="legend-dot" style="background:#e2e8f0;"></span>Sain</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ef4444;"></span>Carie</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Obturation composite</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#64748b;"></span>Amalgame</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Couronne</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#fbbf24;"></span>Couronne provisoire</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#374151;"></span>Absent / Extrait</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Implant</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#92400e;"></span>Dévitalisé (RCT)</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ea580c;"></span>Bridge</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#dc2626;"></span>Fracture</span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<div id="overlay" onclick="closePanel()"></div>
+
+<div id="panel">
+    <div class="panel-hdr">
+        <div>
+            <div id="p-num" class="panel-hdr-tooth"></div>
+            <div id="p-name" class="panel-hdr-name"></div>
+        </div>
+        <button onclick="closePanel()" class="panel-close-btn">✕</button>
+    </div>
+    <div class="panel-body">
+        <div>
+            <div class="panel-section-label">Condition de la dent</div>
+            <select id="p-cond" class="panel-select">
+                <option value="sain">Sain</option>
+                <option value="carie">Carie</option>
+                <option value="obturation">Obturation composite</option>
+                <option value="obturation_amalgame">Amalgame</option>
+                <option value="couronne">Couronne</option>
+                <option value="couronne_provisoire">Couronne provisoire</option>
+                <option value="extraction">Absent / Extrait</option>
+                <option value="implant">Implant</option>
+                <option value="devitalise">Dévitalisé (RCT)</option>
+                <option value="bridge">Bridge</option>
+                <option value="fracture">Fracture</option>
+            </select>
+            <textarea id="p-notes" rows="3" placeholder="Notes cliniques..." class="panel-textarea"></textarea>
+            <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
+        </div>
+        <div>
+            <div class="panel-section-label">Traitements</div>
+            <div id="p-treatments"></div>
+        </div>
+        <div class="panel-add-box">
+            <div class="panel-section-label">Ajouter un traitement</div>
+            <select id="new-t-type" class="panel-select">
+                <option value="Examen">Examen</option>
+                <option value="Détartrage">Détartrage</option>
+                <option value="Extraction">Extraction</option>
+                <option value="Obturation composite">Obturation composite</option>
+                <option value="Amalgame">Amalgame</option>
+                <option value="Traitement endodontique">Traitement endodontique</option>
+                <option value="Couronne">Couronne</option>
+                <option value="Couronne provisoire">Couronne provisoire</option>
+                <option value="Bridge">Bridge</option>
+                <option value="Implant">Implant</option>
+                <option value="Prothèse partielle">Prothèse partielle</option>
+                <option value="Prothèse totale">Prothèse totale</option>
+                <option value="Blanchiment">Blanchiment</option>
+                <option value="Orthodontie">Orthodontie</option>
+                <option value="Radiographie">Radiographie</option>
+                <option value="Autre">Autre</option>
+            </select>
+            <input type="date" id="new-t-date" class="panel-select" style="margin-bottom:8px;">
+            <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
+            <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/js/odontogram-view.iife.js?v=20260316-12"></script>
+<script>
+// ===== DATA =====
+const PATIENT_ID = {{ patient.id }};
+const teethData = {{ teeth_data_json | safe }};
+
+const UPPER = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
+const LOWER = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
+
+const TOOTH_NAMES = {
+    11:"Inc. centrale sup. droite", 12:"Inc. latérale sup. droite",
+    13:"Canine sup. droite", 14:"1ère prémo. sup. droite",
+    15:"2ème prémo. sup. droite", 16:"1ère molaire sup. droite",
+    17:"2ème molaire sup. droite", 18:"Sagesse sup. droite",
+    21:"Inc. centrale sup. gauche", 22:"Inc. latérale sup. gauche",
+    23:"Canine sup. gauche", 24:"1ère prémo. sup. gauche",
+    25:"2ème prémo. sup. gauche", 26:"1ère molaire sup. gauche",
+    27:"2ème molaire sup. gauche", 28:"Sagesse sup. gauche",
+    31:"Inc. centrale inf. gauche", 32:"Inc. latérale inf. gauche",
+    33:"Canine inf. gauche", 34:"1ère prémo. inf. gauche",
+    35:"2ème prémo. inf. gauche", 36:"1ère molaire inf. gauche",
+    37:"2ème molaire inf. gauche", 38:"Sagesse inf. gauche",
+    41:"Inc. centrale inf. droite", 42:"Inc. latérale inf. droite",
+    43:"Canine inf. droite", 44:"1ère prémo. inf. droite",
+    45:"2ème prémo. inf. droite", 46:"1ère molaire inf. droite",
+    47:"2ème molaire inf. droite", 48:"Sagesse inf. droite"
+};
+
+const CONDS = {
+    sain:               {label:"Sain",                color:"#e2e8f0"},
+    carie:              {label:"Carie",               color:"#ef4444"},
+    obturation:         {label:"Obturation composite",color:"#3b82f6"},
+    obturation_amalgame:{label:"Amalgame",            color:"#64748b"},
+    couronne:           {label:"Couronne",            color:"#f59e0b"},
+    couronne_provisoire:{label:"Couronne provisoire", color:"#fbbf24"},
+    extraction:         {label:"Absent / Extrait",    color:"#374151"},
+    implant:            {label:"Implant",             color:"#8b5cf6"},
+    devitalise:         {label:"Dévitalisé (RCT)",    color:"#92400e"},
+    bridge:             {label:"Bridge",              color:"#ea580c"},
+    fracture:           {label:"Fracture",            color:"#dc2626"},
+};
+
+// Colors for react-odontogram teethConditions
+const COND_REACT = {
+    carie:              ['#fca5a5', '#dc2626'],
+    obturation:         ['#bfdbfe', '#2563eb'],
+    obturation_amalgame:['#cbd5e1', '#475569'],
+    couronne:           ['#fde68a', '#d97706'],
+    couronne_provisoire:['#fef3c7', '#f59e0b'],
+    extraction:         ['#6b7280', '#374151'],
+    implant:            ['#ddd6fe', '#6d28d9'],
+    devitalise:         ['#fed7aa', '#92400e'],
+    bridge:             ['#fdba74', '#ea580c'],
+    fracture:           ['#fecaca', '#b91c1c'],
+};
+
+const COND_GRADIENT = {
+    sain:               ['#ffffff', '#e8dcc8'],
+    carie:              ['#fca5a5', '#dc2626'],
+    obturation:         ['#bfdbfe', '#2563eb'],
+    obturation_amalgame:['#cbd5e1', '#475569'],
+    couronne:           ['#fde68a', '#d97706'],
+    couronne_provisoire:['#fef3c7', '#f59e0b'],
+    extraction:         ['#374151', '#111827'],
+    implant:            ['#ddd6fe', '#6d28d9'],
+    devitalise:         ['#fed7aa', '#92400e'],
+    bridge:             ['#fed7aa', '#ea580c'],
+    fracture:           ['#fecaca', '#b91c1c'],
+};
+
+let currentTooth = null;
+let selectedTooth = null;
+let reactOdoMounted = false;
+let _odoBridge = null;
+let _setReactConditions = null;
+let _setReactSelectedTooth = null;
+let _setReactLayout = null;
+let currentReactLayout = 'circle';
+
+// ===== CONVERT teethData → teethConditions for react-odontogram =====
+function buildTeethConditions() {
+    const groups = {};
+    Object.entries(teethData).forEach(([num, data]) => {
+        const cond = data.condition || 'sain';
+        if (cond === 'sain') return;
+        if (!groups[cond]) groups[cond] = [];
+        groups[cond].push('teeth-' + num);
+    });
+    return Object.entries(groups).map(([cond, teeth]) => {
+        const colors = COND_REACT[cond] || ['#e2e8f0', '#94a3b8'];
+        return { label: CONDS[cond]?.label || cond, teeth, fillColor: colors[0], outlineColor: colors[1] };
+    });
+}
+
+// ===== VIEW TOGGLE =====
+function switchView(view) {
+    const isLayout = view === 'layout';
+    currentReactLayout = isLayout ? 'square' : 'circle';
+    const root = document.getElementById('react-odo-root');
+    if (root) root.dataset.layout = currentReactLayout;
+    document.getElementById('view-layout').style.display     = 'none';
+    document.getElementById('view-odontogram').style.display = 'block';
+    document.getElementById('btn-layout').classList.toggle('active', isLayout);
+    document.getElementById('btn-odontogram').classList.toggle('active', !isLayout);
+
+    if (!reactOdoMounted) {
+        mountReactOdontogram();
+    } else {
+        if (_setReactLayout) _setReactLayout(currentReactLayout);
+        if (_setReactSelectedTooth) _setReactSelectedTooth(selectedTooth);
+    }
+}
+
+// ===== MOUNT REACT ODONTOGRAM =====
+function mountReactOdontogram() {
+    try {
+        const mountOdontogram = window.OdontoNpm && window.OdontoNpm.mountOdontogram;
+        if (!mountOdontogram) throw new Error('window.OdontoNpm.mountOdontogram unavailable');
+        const root = document.getElementById('react-odo-root');
+        if (root) root.dataset.layout = currentReactLayout;
+
+        _odoBridge = mountOdontogram(root, {
+            initialConditions: buildTeethConditions(),
+            initialSelectedTooth: selectedTooth,
+            onSelect: (fdiNum) => openPanel(fdiNum),
+            layout: currentReactLayout,
+        });
+        _setReactConditions = (nextConditions) => {
+            if (_odoBridge && _odoBridge.updateConditions) _odoBridge.updateConditions(nextConditions);
+        };
+        _setReactSelectedTooth = (toothNum) => {
+            if (_odoBridge && _odoBridge.updateSelectedTooth) _odoBridge.updateSelectedTooth(toothNum);
+        };
+        _setReactLayout = (nextLayout) => {
+            if (_odoBridge && _odoBridge.updateLayout) _odoBridge.updateLayout(nextLayout);
+        };
+        reactOdoMounted = true;
+    } catch (err) {
+        console.error('React odontogram load failed:', err);
+        const root = document.getElementById('react-odo-root');
+        if (root) {
+            root.innerHTML = '<div style="padding:14px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;font-size:13px;">Erreur de chargement de la vue npm react-odontogram.</div>';
+        }
+        showToast('Erreur react-odontogram (npm)');
+    }
+}
+
+// ===== SVG LAYOUT VIEW =====
+const TW = 44, TH = 44, STEP = 48;
+const UPPER_Y = 55, LOWER_Y = 175;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function mkEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+}
+function isAnterior(n) { return n % 10 <= 3; }
+function setSelectedTooth(toothNum) {
+    selectedTooth = toothNum;
+    document.querySelectorAll('#svg-chart .tooth-g.selected').forEach(el => el.classList.remove('selected'));
+    if (toothNum === null || toothNum === undefined) return;
+    const target = document.querySelector(`#svg-chart .tooth-g[data-tooth="${toothNum}"]`);
+    if (target) target.classList.add('selected');
+}
+
+function drawTooth(svg, n, x, y) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.classList.add('tooth-g');
+    if (selectedTooth === n) g.classList.add('selected');
+    g.dataset.tooth = n;
+
+    const d = teethData[String(n)];
+    const cond = d ? d.condition : 'sain';
+    const gradColors = COND_GRADIENT[cond] || COND_GRADIENT.sain;
+    const strokeColor = gradColors[1];
+
+    let defs = svg.querySelector('defs');
+    const gradId = `grad-${n}`;
+    const grad = document.createElementNS(SVG_NS, 'linearGradient');
+    grad.setAttribute('id', gradId);
+    grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+    grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+    const s1 = document.createElementNS(SVG_NS, 'stop');
+    s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', gradColors[0]);
+    const s2 = document.createElementNS(SVG_NS, 'stop');
+    s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', gradColors[1]);
+    grad.appendChild(s1); grad.appendChild(s2);
+    const oldGrad = defs.querySelector(`#${gradId}`);
+    if (oldGrad) oldGrad.remove();
+    defs.appendChild(grad);
+
+    if (cond === 'extraction') {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:8, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('line', {x1:x+8,    y1:y+8,    x2:x+TW-8, y2:y+TH-8, stroke:'#ef4444','stroke-width':2.5,'stroke-linecap':'round'}));
+        g.appendChild(mkEl('line', {x1:x+TW-8, y1:y+8,    x2:x+8,    y2:y+TH-8, stroke:'#ef4444','stroke-width':2.5,'stroke-linecap':'round'}));
+    } else if (isAnterior(n)) {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:16, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, 'stroke-opacity':0.6, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('rect', {x:x+4, y:y+2, width:TW-8, height:4, rx:3, fill:'rgba(255,255,255,0.6)'}));
+    } else {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:8, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, 'stroke-opacity':0.6, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('polygon', {points:`${x},${y} ${x+TW},${y} ${x+TW-13},${y+13} ${x+13},${y+13}`, fill:'rgba(255,255,255,0.15)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x+13},${y+TH-13} ${x+TW-13},${y+TH-13} ${x+TW},${y+TH} ${x},${y+TH}`, fill:'rgba(0,0,0,0.12)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x},${y} ${x+13},${y+13} ${x+13},${y+TH-13} ${x},${y+TH}`, fill:'rgba(255,255,255,0.08)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x+TW-13},${y+13} ${x+TW},${y} ${x+TW},${y+TH} ${x+TW-13},${y+TH-13}`, fill:'rgba(0,0,0,0.08)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        const occlusalFill = cond === 'sain' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)';
+        g.appendChild(mkEl('rect', {x:x+13, y:y+13, width:TW-26, height:TH-26, fill:occlusalFill, stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('rect', {x:x+4, y:y+2, width:TW-8, height:4, rx:3, fill:'rgba(255,255,255,0.6)'}));
+    }
+
+    const isUpper = UPPER.includes(n);
+    const lbl = document.createElementNS(SVG_NS, 'text');
+    lbl.setAttribute('x', x + TW/2); lbl.setAttribute('y', isUpper ? y-6 : y+TH+14);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '9');
+    lbl.setAttribute('fill', '#94a3b8'); lbl.setAttribute('font-family', 'monospace');
+    lbl.textContent = n;
+    g.appendChild(lbl);
+
+    g.style.cursor = 'pointer';
+    g.onclick = function() { openPanel(n); };
+    g.onmouseenter = function() { g.style.filter = 'url(#tooth-glow) brightness(1.08)'; };
+    g.onmouseleave = function() { g.style.filter = ''; };
+    svg.appendChild(g);
+}
+
+function buildStats() {
+    const stats = {sain:0, traite:0, carie:0, absent:0};
+    [...UPPER, ...LOWER].forEach(n => {
+        const d = teethData[String(n)];
+        const c = d ? d.condition : 'sain';
+        if (c === 'sain') stats.sain++;
+        else if (c === 'extraction') stats.absent++;
+        else if (c === 'carie' || c === 'fracture') stats.carie++;
+        else stats.traite++;
+    });
+    const row = document.getElementById('stats-row');
+    if (!row) return;
+    row.innerHTML = `
+        <div class="stat-kpi">
+            <div class="stat-kpi-icon" style="background:rgba(34,197,94,0.12);color:#16a34a;">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.5 3 1 4l1 8c.2 1 1 2 2 2h4c1 0 1.8-1 2-2l1-8c.5-1 1-2.5 1-4 0-2.5-2.5-5-6-5z"/>
+                </svg>
+            </div>
+            <div><div class="stat-kpi-num" style="color:#16a34a;">${stats.sain}</div><div class="stat-kpi-label">Saines</div></div>
+        </div>
+        <div class="stat-kpi">
+            <div class="stat-kpi-icon" style="background:rgba(59,130,246,0.12);color:#2563eb;">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5"/>
+                </svg>
+            </div>
+            <div><div class="stat-kpi-num" style="color:#2563eb;">${stats.traite}</div><div class="stat-kpi-label">Traitées</div></div>
+        </div>
+        <div class="stat-kpi">
+            <div class="stat-kpi-icon" style="background:rgba(239,68,68,0.12);color:#dc2626;">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 9v4"/>
+                    <path d="M12 17h.01"/>
+                    <path d="M10.3 3.9l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0z"/>
+                </svg>
+            </div>
+            <div><div class="stat-kpi-num" style="color:#dc2626;">${stats.carie}</div><div class="stat-kpi-label">À traiter</div></div>
+        </div>
+        <div class="stat-kpi">
+            <div class="stat-kpi-icon" style="background:rgba(100,116,139,0.12);color:#64748b;">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12h14"/>
+                </svg>
+            </div>
+            <div><div class="stat-kpi-num" style="color:#64748b;">${stats.absent}</div><div class="stat-kpi-label">Absentes</div></div>
+        </div>`;
+}
+
+function buildChart() {
+    const svg = document.getElementById('svg-chart');
+    if (!svg) return;
+
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.innerHTML = `
+        <filter id="tooth-shadow" x="-25%" y="-25%" width="150%" height="150%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.35"/>
+        </filter>
+        <filter id="tooth-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feFlood flood-color="#fbbf24" flood-opacity="0.6" result="color"/>
+            <feComposite in="color" in2="blur" operator="in" result="glow"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>`;
+    svg.appendChild(defs);
+
+    const X0 = 28;
+    const divX = X0 + 7*STEP + TW + 2;
+    svg.appendChild(mkEl('line', {x1:divX, y1:18, x2:divX, y2:272, stroke:'rgba(148,163,184,0.18)', 'stroke-width':1, 'stroke-dasharray':'4 3'}));
+
+    function addLabel(text, x, y, anchor) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', x); t.setAttribute('y', y);
+        t.setAttribute('fill', 'rgba(148,163,184,0.55)');
+        t.setAttribute('font-size', '10'); t.setAttribute('font-family', 'sans-serif');
+        t.setAttribute('text-anchor', anchor || 'start');
+        t.textContent = text;
+        svg.appendChild(t);
+    }
+    addLabel('MAXILLAIRE SUPÉRIEUR', X0, 22);
+    addLabel('MANDIBULE INFÉRIEURE', X0, 163);
+    addLabel('◀ Côté Droit', X0, 130);
+    addLabel('Côté Gauche ▶', X0 + 16*STEP - 4, 130, 'end');
+
+    UPPER.forEach((n, i) => drawTooth(svg, n, X0 + i*STEP, UPPER_Y));
+    LOWER.forEach((n, i) => drawTooth(svg, n, X0 + i*STEP, LOWER_Y));
+    buildStats();
+}
+
+// ===== PANEL =====
+function openPanel(toothNum) {
+    currentTooth = toothNum;
+    setSelectedTooth(toothNum);
+    document.getElementById('p-num').textContent  = 'Dent ' + toothNum;
+    document.getElementById('p-name').textContent = TOOTH_NAMES[toothNum] || '';
+    const d = teethData[String(toothNum)] || {};
+    document.getElementById('p-cond').value  = d.condition || 'sain';
+    document.getElementById('p-notes').value = d.notes || '';
+    document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#94a3b8;font-size:13px;text-align:center;">Chargement...</div>';
+    document.getElementById('panel').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    fetch(`/dental/${PATIENT_ID}/tooth/${toothNum}/data`)
+        .then(r => r.json())
+        .then(data => {
+            renderTreatments(data.treatments);
+            document.getElementById('new-t-date').value = new Date().toISOString().split('T')[0];
+        })
+        .catch(() => {
+            document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13px;">Erreur de chargement</div>';
+        });
+}
+
+function closePanel() {
+    document.getElementById('panel').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    currentTooth = null;
+}
+
+function renderTreatments(list) {
+    const el = document.getElementById('p-treatments');
+    if (!list || list.length === 0) {
+        el.innerHTML = '<p style="padding:10px 0;color:#94a3b8;font-size:13px;text-align:center;">Aucun traitement enregistré</p>';
+        return;
+    }
+    el.innerHTML = list.map(t => `
+        <div class="treatment-card">
+            <div>
+                <div class="treatment-type">${escapeHtml(t.treatment_type)}</div>
+                ${t.description ? `<div class="treatment-desc">${escapeHtml(t.description)}</div>` : ''}
+                <div class="treatment-date">📅 ${escapeHtml(t.treatment_date)}</div>
+            </div>
+            <button onclick="delTreatment(${t.id})" class="treatment-del">✕</button>
+        </div>`).join('');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function saveCondition() {
+    if (!currentTooth) return;
+    const condition = document.getElementById('p-cond').value;
+    const notes     = document.getElementById('p-notes').value;
+    const fd = new FormData();
+    fd.append('condition', condition); fd.append('notes', notes);
+    try {
+        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition`, {method:'POST', body:fd});
+        if (r.ok) {
+            teethData[String(currentTooth)] = {condition, notes};
+            const svg = document.getElementById('svg-chart');
+            const old = svg.querySelector(`[data-tooth="${currentTooth}"]`);
+            if (old) old.remove();
+            drawTooth(svg, currentTooth, getToothPos(currentTooth).x, getToothPos(currentTooth).y);
+            setSelectedTooth(currentTooth);
+            buildStats();
+            if (_setReactConditions) _setReactConditions(buildTeethConditions());
+            showToast('Condition enregistrée ✓');
+        } else { showToast('Erreur lors de l\'enregistrement'); }
+    } catch (e) { showToast('Erreur réseau'); }
+}
+
+async function addTreatment() {
+    if (!currentTooth) return;
+    const fd = new FormData();
+    fd.append('treatment_type', document.getElementById('new-t-type').value);
+    fd.append('description',    document.getElementById('new-t-desc').value);
+    fd.append('treatment_date', document.getElementById('new-t-date').value);
+    try {
+        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
+        if (r.ok) {
+            const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
+            renderTreatments(data.treatments);
+            document.getElementById('new-t-desc').value = '';
+            showToast('Traitement ajouté ✓');
+        } else { showToast('Erreur lors de l\'ajout'); }
+    } catch (e) { showToast('Erreur réseau'); }
+}
+
+function delTreatment(id) {
+    const doDelete = async () => {
+        try {
+            const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment/${id}/delete`, {method:'POST', body:new FormData()});
+            if (r.ok) {
+                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
+                renderTreatments(data.treatments);
+                showToast('Traitement supprimé');
+            } else { showToast('Erreur lors de la suppression'); }
+        } catch (e) { showToast('Erreur réseau'); }
+    };
+    if (window.confirmAction) {
+        window.confirmAction('Supprimer ce traitement ?', doDelete);
+    } else {
+        if (confirm('Supprimer ce traitement ?')) doDelete();
+    }
+}
+
+function getToothPos(n) {
+    const X0 = 28;
+    const ui = UPPER.indexOf(n);
+    if (ui >= 0) return {x: X0 + ui*STEP, y: UPPER_Y};
+    return {x: X0 + LOWER.indexOf(n)*STEP, y: LOWER_Y};
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.opacity = 1;
+    setTimeout(() => { t.style.opacity = 0; }, 2500);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+document.addEventListener('DOMContentLoaded', () => {
+    buildChart();
+    switchView('odontogram');
+});
+</script>
+{% endblock %}

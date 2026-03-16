@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Utilisateurs - MyStetho{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Utilisateurs</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Utilisateurs</h2>
+        <p class="subtitle">{{ users|length }} compte{{ 's' if users|length != 1 }} enregistré{{ 's' if users|length != 1 }}</p>
+    </div>
+    <a href="/admin/users/new" class="btn btn-primary">+ Nouvel utilisateur</a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Spécialité</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><strong>{{ u.first_name }} {{ u.last_name }}</strong></td>
+                    <td>{{ u.email }}</td>
+                    <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
+                    <td>{{ u.specialty or '—' }}</td>
+                    <td>
+                        {% if u.is_active %}
+                        <span class="badge badge-success">Actif</span>
+                        {% else %}
+                        <span class="badge badge-error">Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <a href="/admin/users/{{ u.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="POST" action="/admin/users/{{ u.id }}/toggle-active" onsubmit="return confirm('{{ 'Désactiver' if u.is_active else 'Réactiver' }} le compte de {{ u.first_name }} {{ u.last_name }} ?')">
+                                <button type="submit" class="btn btn-sm {{ 'btn-outline' if u.is_active else 'btn-success' }}" style="{{ 'color:var(--danger);' if u.is_active else '' }}">
+                                    {{ 'Désactiver' if u.is_active else 'Réactiver' }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

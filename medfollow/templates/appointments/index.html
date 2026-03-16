@@ -314,6 +314,9 @@ document.addEventListener('DOMContentLoaded', function() {
             ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
             : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
         buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour' },
+        eventSourceFailure: function() {
+            if (window.showToast) window.showToast('Erreur de chargement des rendez-vous', 'error');
+        },
         events: '/appointments/api/events',
         editable: false,
         selectable: true,
@@ -386,25 +389,42 @@ async function updateApptStatus(status) {
     if (!_evId) return;
     const fd = new FormData();
     fd.append('status', status);
-    const res = await fetch(`/appointments/${_evId}/status`, { method: 'POST', body: fd });
-    if (res.ok) {
-        _evStatus = status;
-        document.querySelectorAll('.ev-status-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.status === status);
-        });
-        _calendar.refetchEvents();
-        // Brief visual feedback
-        setTimeout(closeEventModal, 400);
+    try {
+        const res = await fetch(`/appointments/${_evId}/status`, { method: 'POST', body: fd });
+        if (res.ok) {
+            _evStatus = status;
+            document.querySelectorAll('.ev-status-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.status === status);
+            });
+            _calendar.refetchEvents();
+            if (window.showToast) window.showToast('Statut mis à jour');
+            setTimeout(closeEventModal, 400);
+        } else {
+            if (window.showToast) window.showToast('Erreur lors de la mise à jour', 'error');
+        }
+    } catch (e) {
+        if (window.showToast) window.showToast('Erreur réseau', 'error');
     }
 }
 
 function deleteAppt() {
-    if (!_evId || !confirm('Supprimer ce rendez-vous ?')) return;
-    const f = document.createElement('form');
-    f.method = 'POST';
-    f.action = `/appointments/${_evId}/delete`;
-    document.body.appendChild(f);
-    f.submit();
+    if (!_evId) return;
+    if (window.confirmAction) {
+        window.confirmAction('Supprimer ce rendez-vous ?', function() {
+            const f = document.createElement('form');
+            f.method = 'POST';
+            f.action = '/appointments/' + _evId + '/delete';
+            document.body.appendChild(f);
+            f.submit();
+        });
+    } else {
+        if (!confirm('Supprimer ce rendez-vous ?')) return;
+        const f = document.createElement('form');
+        f.method = 'POST';
+        f.action = '/appointments/' + _evId + '/delete';
+        document.body.appendChild(f);
+        f.submit();
+    }
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEventModal(); });

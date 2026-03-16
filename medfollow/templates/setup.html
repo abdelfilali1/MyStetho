@@ -30,7 +30,43 @@
             </div>
             <div class="form-group">
                 <label for="specialty">Spécialité</label>
-                <input type="text" id="specialty" name="specialty" placeholder="Médecine générale">
+                <select id="specialty" name="specialty" required>
+                    <option value="" disabled selected>-- Choisissez votre spécialité --</option>
+                    <optgroup label="Médecine de premier recours">
+                        <option value="Médecine générale">Médecine générale</option>
+                        <option value="Médecine interne">Médecine interne</option>
+                        <option value="Médecine d'urgence">Médecine d'urgence</option>
+                    </optgroup>
+                    <optgroup label="Spécialités chirurgicales">
+                        <option value="Chirurgie générale">Chirurgie générale</option>
+                        <option value="Chirurgie orthopédique">Chirurgie orthopédique</option>
+                        <option value="Chirurgie pédiatrique">Chirurgie pédiatrique</option>
+                        <option value="Neurochirurgie">Neurochirurgie</option>
+                        <option value="Ophtalmologie">Ophtalmologie</option>
+                        <option value="ORL">ORL (Oto-rhino-laryngologie)</option>
+                        <option value="Stomatologie">Stomatologie</option>
+                        <option value="Dentiste">Dentiste / Chirurgie dentaire</option>
+                    </optgroup>
+                    <optgroup label="Spécialités médicales">
+                        <option value="Cardiologie">Cardiologie</option>
+                        <option value="Dermatologie">Dermatologie</option>
+                        <option value="Endocrinologie">Endocrinologie / Diabétologie</option>
+                        <option value="Gastro-entérologie">Gastro-entérologie</option>
+                        <option value="Gynécologie-Obstétrique">Gynécologie / Obstétrique</option>
+                        <option value="Hématologie">Hématologie</option>
+                        <option value="Neurologie">Neurologie</option>
+                        <option value="Oncologie">Oncologie</option>
+                        <option value="Pédiatrie">Pédiatrie</option>
+                        <option value="Pneumologie">Pneumologie</option>
+                        <option value="Psychiatrie">Psychiatrie</option>
+                        <option value="Rhumatologie">Rhumatologie</option>
+                        <option value="Urologie">Urologie</option>
+                    </optgroup>
+                    <optgroup label="Autres">
+                        <option value="Radiologie">Radiologie / Imagerie médicale</option>
+                        <option value="Anesthésiologie">Anesthésiologie</option>
+                    </optgroup>
+                </select>
             </div>
             <div class="form-group">
                 <label for="email">Email</label>
@@ -38,16 +74,71 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="password">Mot de passe</label>
-                    <input type="password" id="password" name="password" required minlength="6" placeholder="********">
+                    <label for="password">Mot de passe <span class="required-star">*</span></label>
+                    <input type="password" id="password" name="password" required minlength="10" placeholder="Min. 10 caractères">
+                    <div class="password-strength" id="pw-strength">
+                        <div class="password-strength-bar" id="pw-bar-1"></div>
+                        <div class="password-strength-bar" id="pw-bar-2"></div>
+                        <div class="password-strength-bar" id="pw-bar-3"></div>
+                        <div class="password-strength-bar" id="pw-bar-4"></div>
+                    </div>
+                    <div class="password-strength-label" id="pw-label"></div>
                 </div>
                 <div class="form-group">
-                    <label for="password_confirm">Confirmer</label>
-                    <input type="password" id="password_confirm" name="password_confirm" required minlength="6" placeholder="********">
+                    <label for="password_confirm">Confirmer <span class="required-star">*</span></label>
+                    <input type="password" id="password_confirm" name="password_confirm" required minlength="10" placeholder="Retapez le mot de passe">
+                    <div class="form-error" id="pw-match-error" style="display:none;">Les mots de passe ne correspondent pas</div>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-full">Créer le compte et démarrer</button>
+            <button type="submit" class="btn btn-primary btn-full" id="setup-submit">Créer le compte et démarrer</button>
         </form>
+        <script>
+        (function(){
+            const pw = document.getElementById('password');
+            const pwc = document.getElementById('password_confirm');
+            const bars = [document.getElementById('pw-bar-1'),document.getElementById('pw-bar-2'),document.getElementById('pw-bar-3'),document.getElementById('pw-bar-4')];
+            const label = document.getElementById('pw-label');
+            const matchErr = document.getElementById('pw-match-error');
+            const form = pw.closest('form');
+
+            function checkStrength(v) {
+                let score = 0;
+                if (v.length >= 10) score++;
+                if (v.length >= 14) score++;
+                if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+                if (/[0-9]/.test(v) && /[^a-zA-Z0-9]/.test(v)) score++;
+                const levels = ['','Faible','Moyen','Bon','Fort'];
+                const cls = ['','active-weak','active-medium','active-strong','active-strong'];
+                const colors = ['','var(--danger)','var(--warning)','var(--success)','var(--success)'];
+                bars.forEach((b,i) => { b.className = 'password-strength-bar'; if(i < score) b.classList.add(cls[score]); });
+                label.textContent = v ? levels[score] : '';
+                label.style.color = colors[score] || '';
+            }
+
+            pw.addEventListener('input', () => checkStrength(pw.value));
+
+            function checkMatch() {
+                if (pwc.value && pw.value !== pwc.value) {
+                    matchErr.style.display = 'block';
+                    pwc.parentElement.classList.add('has-error');
+                } else {
+                    matchErr.style.display = 'none';
+                    pwc.parentElement.classList.remove('has-error');
+                }
+            }
+            pwc.addEventListener('input', checkMatch);
+            pw.addEventListener('input', () => { if(pwc.value) checkMatch(); });
+
+            form.addEventListener('submit', function(e) {
+                if (pw.value !== pwc.value) {
+                    e.preventDefault();
+                    matchErr.style.display = 'block';
+                    pwc.parentElement.classList.add('has-error');
+                    pwc.focus();
+                }
+            });
+        })();
+        </script>
     </div>
 </div>
 {% endblock %}

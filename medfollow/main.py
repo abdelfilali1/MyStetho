@@ -9,10 +9,11 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
+from datetime import date
 from config import HOST, PORT
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental
 
 
 @asynccontextmanager
@@ -31,6 +32,18 @@ app = FastAPI(title="MyStetho", lifespan=lifespan)
 async def health():
     return {"status": "ok"}
 
+
+# Add global template variables
+from fastapi.templating import Jinja2Templates
+from config import TEMPLATES_DIR
+_global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
+_global_templates.env.globals["now_year"] = date.today().year
+
+# Patch all router template envs to include now_year
+for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental]:
+    if hasattr(mod, 'templates'):
+        mod.templates.env.globals["now_year"] = date.today().year
+
 # Static files
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
@@ -44,6 +57,7 @@ app.include_router(prescriptions.router)
 app.include_router(documents.router)
 app.include_router(messages.router)
 app.include_router(invoices.router)
+app.include_router(dental.router)
 
 
 if __name__ == "__main__":

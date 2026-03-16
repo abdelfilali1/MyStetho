@@ -1,16 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Patients — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Patients</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
         <h2>Patients</h2>
-        <p class="subtitle">{{ patients|length }} patient{{ 's' if patients|length != 1 }} enregistré{{ 's' if patients|length != 1 }}</p>
+        <p class="subtitle">{{ total_count if total_count is defined else patients|length }} patient{{ 's' if (total_count if total_count is defined else patients|length) != 1 }} enregistré{{ 's' if (total_count if total_count is defined else patients|length) != 1 }}</p>
     </div>
     <a href="/patients/new" class="btn btn-primary">+ Nouveau patient</a>
 </div>
 
-<div class="card">
+<div class="card mobile-cards">
     <div class="card-header">
         <form method="GET" action="/patients" class="search-form">
             <input type="text" name="q" value="{{ search }}" placeholder="Rechercher par nom, téléphone, n° sécu..." class="search-input">
@@ -27,6 +34,7 @@
                 <tr>
                     <th>Patient</th>
                     <th>Date de naissance</th>
+                    <th>Âge</th>
                     <th>Téléphone</th>
                     <th>Ville</th>
                     <th>N° Sécu</th>
@@ -42,12 +50,20 @@
                             <div>
                                 <a href="/patients/{{ p.id }}" class="patient-link">{{ p.last_name | upper }} {{ p.first_name }}</a>
                                 {% if p.gender %}
-                                <span class="gender-badge">{{ p.gender }}</span>
+                                <span class="gender-badge">{{ 'H' if p.gender == 'M' else 'F' if p.gender == 'F' else p.gender }}</span>
                                 {% endif %}
                             </div>
                         </div>
                     </td>
                     <td>{{ p.date_of_birth }}</td>
+                    <td>
+                        {% if p.date_of_birth %}
+                        {% set birth_parts = p.date_of_birth.split('-') %}
+                        {% if birth_parts|length == 3 %}
+                        {{ now_year - birth_parts[0]|int }} ans
+                        {% endif %}
+                        {% endif %}
+                    </td>
                     <td>{{ p.phone or '—' }}</td>
                     <td>{{ p.city or '—' }}</td>
                     <td>{{ p.social_security_number or '—' }}</td>
@@ -58,6 +74,42 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Mobile cards -->
+        <div class="mobile-card-list">
+            {% for p in patients %}
+            <div class="mobile-card">
+                <div class="mobile-card-header">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="list-avatar">{{ p.first_name[0] }}{{ p.last_name[0] }}</div>
+                        <span class="mobile-card-title">{{ p.last_name | upper }} {{ p.first_name }}</span>
+                    </div>
+                    {% if p.gender %}<span class="badge badge-{{ 'planifie' if p.gender == 'M' else 'annule' }}">{{ p.gender }}</span>{% endif %}
+                </div>
+                <div class="mobile-card-row"><span class="mobile-card-label">Naissance</span> {{ p.date_of_birth or '—' }}</div>
+                <div class="mobile-card-row"><span class="mobile-card-label">Tél.</span> {{ p.phone or '—' }}</div>
+                <div class="mobile-card-actions">
+                    <a href="/patients/{{ p.id }}" class="btn btn-outline btn-sm" style="flex:1;">Voir le dossier</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="pagination">
+            <a href="/patients?q={{ search }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            {% for p_num in range(1, total_pages + 1) %}
+                {% if p_num == page %}
+                <span class="active">{{ p_num }}</span>
+                {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
+                <a href="/patients?q={{ search }}&page={{ p_num }}">{{ p_num }}</a>
+                {% elif p_num == 4 or p_num == total_pages - 2 %}
+                <span>…</span>
+                {% endif %}
+            {% endfor %}
+            <a href="/patients?q={{ search }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+        </div>
+        {% endif %}
         {% else %}
         <p class="empty-state">
             {% if search %}
@@ -70,4 +122,3 @@
     </div>
 </div>
 {% endblock %}
-

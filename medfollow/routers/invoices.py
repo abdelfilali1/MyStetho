@@ -21,27 +21,67 @@ def _generate_invoice_number(year: int, count: int) -> str:
 async def list_invoices(
     request: Request,
     status: Optional[str] = None,
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    query = """SELECT i.*, p.first_name || ' ' || p.last_name AS patient_name, u.first_name || ' ' || u.last_name AS doctor_name FROM invoices i JOIN patients p ON i.patient_id = p.id JOIN users u ON i.doctor_id = u.id"""
-    params = []
-    if status:
-        query += " WHERE i.status = ? "
-        params.append(status)
-    query += " ORDER BY i.invoice_date DESC LIMIT 50"
+    uid = user["sub"]
+    per_page = 20
+    offset = (page - 1) * per_page
 
-    cursor = await db.execute(query, params)
+    base_where = "WHERE i.doctor_id = ?"
+    params: list = [uid]
+
+    if status:
+        base_where += " AND i.status = ?"
+        params.append(status)
+
+    if date_from:
+        base_where += " AND i.invoice_date >= ?"
+        params.append(date_from)
+
+    if date_to:
+        base_where += " AND i.invoice_date <= ?"
+        params.append(date_to)
+
+    count_query = f"""SELECT COUNT(*) FROM invoices i {base_where}"""
+    count_cursor = await db.execute(count_query, params)
+    total_count = (await count_cursor.fetchone())[0]
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+
+    query = f"""SELECT i.*, p.first_name || ' ' || p.last_name AS patient_name,
+                       u.first_name || ' ' || u.last_name AS doctor_name
+                FROM invoices i
+                JOIN patients p ON i.patient_id = p.id
+                JOIN users u ON i.doctor_id = u.id
+                {base_where} ORDER BY i.invoice_date DESC LIMIT ? OFFSET ?"""
+
+    cursor = await db.execute(query, params + [per_page, offset])
     invoices = [dict(r) for r in await cursor.fetchall()]
 
     # Summary stats
-    cursor = await db.execute("SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE status != 'annulee'")
+    cursor = await db.execute("SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE doctor_id = ? AND status != 'annulee'", (uid,))
     total_ca = (await cursor.fetchone())[0]
-    cursor = await db.execute("SELECT COALESCE(SUM(paid_amount), 0) FROM invoices WHERE status != 'annulee'")
+    cursor = await db.execute("SELECT COALESCE(SUM(paid_amount), 0) FROM invoices WHERE doctor_id = ? AND status != 'annulee'", (uid,))
     total_paid = (await cursor.fetchone())[0]
+
+    today = date.today()
+    cursor = await db.execute(
+        "SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE doctor_id = ? AND status != 'annulee' AND strftime('%Y', invoice_date) = ?",
+        (uid, str(today.year)),
+    )
+    ca_annual = (await cursor.fetchone())[0]
+
+    cursor = await db.execute(
+        "SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE doctor_id = ? AND status != 'annulee' AND strftime('%Y-%m', invoice_date) = ?",
+        (uid, today.strftime("%Y-%m")),
+    )
+    ca_monthly = (await cursor.fetchone())[0]
 
     return templates.TemplateResponse(
         "invoices/list.html",
@@ -49,6 +89,9 @@ async def list_invoices(
             "request": request, "user": user, "active": "invoices",
             "invoices": invoices, "selected_status": status,
             "total_ca": total_ca, "total_paid": total_paid, "total_unpaid": total_ca - total_paid,
+            "ca_annual": ca_annual, "ca_monthly": ca_monthly,
+            "date_from": date_from, "date_to": date_to,
+            "page": page, "total_pages": total_pages, "total_count": total_count,
         },
     )
 
@@ -63,7 +106,10 @@ async def new_invoice_form(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
+    uid = user["sub"]
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,)
+    )
     patients = [dict(r) for r in await cursor.fetchall()]
 
     cursor = await db.execute("SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') ORDER BY last_name")

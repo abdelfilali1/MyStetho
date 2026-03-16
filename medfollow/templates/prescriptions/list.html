@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Ordonnances — MyStetho{% endblock %}
 
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Ordonnances</span>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
         <h2>Ordonnances</h2>
-        <p class="subtitle">{{ prescriptions|length }} ordonnance{{ 's' if prescriptions|length != 1 }}</p>
+        <p class="subtitle">{{ total_count if total_count is defined else prescriptions|length }} ordonnance{{ 's' if (total_count if total_count is defined else prescriptions|length) != 1 }}</p>
     </div>
     <a href="/prescriptions/new" class="btn btn-primary">+ Nouvelle ordonnance</a>
 </div>
@@ -35,17 +42,37 @@
                     <td>{{ p.item_count }} médicament{{ 's' if p.item_count != 1 }}</td>
                     <td><span class="badge badge-{{ 'confirme' if p.status == 'active' else 'termine' }}">{{ p.status }}</span></td>
                     <td>
-                        <a href="/prescriptions/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
-                        <a href="/prescriptions/{{ p.id }}/pdf" class="btn btn-outline btn-sm" target="_blank">PDF</a>
+                        <div style="display:flex;gap:4px;">
+                            <a href="/prescriptions/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
+                            {% if p.status == 'active' %}
+                            <a href="/prescriptions/{{ p.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+                            {% endif %}
+                            <a href="/prescriptions/{{ p.id }}/pdf" class="btn btn-outline btn-sm" target="_blank">PDF</a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if total_pages is defined and total_pages > 1 %}
+        <div class="pagination">
+            <a href="/prescriptions?page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            {% for p_num in range(1, total_pages + 1) %}
+                {% if p_num == page %}
+                <span class="active">{{ p_num }}</span>
+                {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
+                <a href="/prescriptions?page={{ p_num }}">{{ p_num }}</a>
+                {% elif p_num == 4 or p_num == total_pages - 2 %}
+                <span>…</span>
+                {% endif %}
+            {% endfor %}
+            <a href="/prescriptions?page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+        </div>
+        {% endif %}
         {% else %}
         <p class="empty-state">Aucune ordonnance. <a href="/prescriptions/new">Créer une ordonnance</a></p>
         {% endif %}
     </div>
 </div>
 {% endblock %}
-
