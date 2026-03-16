@@ -1514,11 +1514,12 @@ tr.unread td {
 .tooltip-trigger:hover::after { opacity: 1; }
 
 /* ===== MOBILE TABLE CARDS ===== */
+.mobile-card-list { display: none; }
+
 @media (max-width: 860px) {
     .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
     .mobile-cards .table { display: none; }
-    .mobile-card-list { display: none; }
 
     .mobile-cards .mobile-card-list {
         display: flex;
