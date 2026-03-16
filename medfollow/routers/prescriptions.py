@@ -65,7 +65,15 @@ async def new_prescription_form(
     cursor = await db.execute("SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') ORDER BY last_name")
     doctors = [dict(r) for r in await cursor.fetchall()]
 
-    cursor = await db.execute("SELECT id, name, common_dosages FROM medications ORDER BY name")
+    # Filter medications by specialty: dentists get dental meds, others get general
+    user_specialty = user.get("specialty", "") or ""
+    if "dent" in user_specialty.lower():
+        med_filter = "dentiste"
+    else:
+        med_filter = "general"
+    cursor = await db.execute(
+        "SELECT id, name, common_dosages FROM medications WHERE specialty = ? ORDER BY name", (med_filter,)
+    )
     medications = [dict(r) for r in await cursor.fetchall()]
 
     return templates.TemplateResponse(
@@ -203,7 +211,14 @@ async def edit_prescription_form(request: Request, prescription_id: int, db: aio
     cursor = await db.execute("SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') ORDER BY last_name")
     doctors = [dict(r) for r in await cursor.fetchall()]
 
-    cursor = await db.execute("SELECT id, name, common_dosages FROM medications ORDER BY name")
+    user_specialty = user.get("specialty", "") or ""
+    if "dent" in user_specialty.lower():
+        med_filter = "dentiste"
+    else:
+        med_filter = "general"
+    cursor = await db.execute(
+        "SELECT id, name, common_dosages FROM medications WHERE specialty = ? ORDER BY name", (med_filter,)
+    )
     medications = [dict(r) for r in await cursor.fetchall()]
 
     return templates.TemplateResponse(

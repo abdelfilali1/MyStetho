@@ -32,25 +32,50 @@
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;">
                                 <label>Médicament *</label>
-                                <input type="text" name="med_name_{{ loop.index0 }}" required value="{{ item.medication_name }}" list="med-suggestions">
+                                <select name="med_name_{{ loop.index0 }}" required>
+                                    <option value="">— Sélectionner —</option>
+                                    {% for m in medications %}
+                                    <option value="{{ m.name }}" {{ 'selected' if m.name == item.medication_name }}>{{ m.name }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Posologie *</label>
-                                <input type="text" name="med_dosage_{{ loop.index0 }}" required value="{{ item.dosage }}">
+                                <select name="med_dosage_{{ loop.index0 }}" required>
+                                    <option value="">— Choisir —</option>
+                                    {% for d in ['1 comprimé', '2 comprimés', '1/2 comprimé', '1 gélule', '2 gélules', '1 sachet', '1 cuillère à café', '1 cuillère à soupe', '1 application', '1 bain de bouche', '5 ml', '10 ml'] %}
+                                    <option value="{{ d }}" {{ 'selected' if item.dosage == d }}>{{ d }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Fréquence *</label>
-                                <input type="text" name="med_frequency_{{ loop.index0 }}" required value="{{ item.frequency }}">
+                                <select name="med_frequency_{{ loop.index0 }}" required>
+                                    <option value="">— Choisir —</option>
+                                    {% for f in ['1 fois/jour', '2 fois/jour', '3 fois/jour', '4 fois/jour', 'Matin et soir', 'Le matin', 'Le soir', 'Au coucher', 'Toutes les 6h', 'Toutes les 8h', 'Toutes les 12h', 'Si douleur', 'Si besoin'] %}
+                                    <option value="{{ f }}" {{ 'selected' if item.frequency == f }}>{{ f }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Durée</label>
-                                <input type="text" name="med_duration_{{ loop.index0 }}" value="{{ item.duration or '' }}">
+                                <select name="med_duration_{{ loop.index0 }}">
+                                    <option value="">— Choisir —</option>
+                                    {% for du in ['3 jours', '5 jours', '7 jours', '10 jours', '14 jours', '21 jours', '1 mois', '2 mois', '3 mois', '6 mois', 'Jusqu\'à amélioration', 'Traitement continu'] %}
+                                    <option value="{{ du }}" {{ 'selected' if item.duration == du }}>{{ du }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Quantité</label>
-                                <input type="number" name="med_quantity_{{ loop.index0 }}" value="{{ item.quantity or '' }}">
+                                <select name="med_quantity_{{ loop.index0 }}">
+                                    <option value="">—</option>
+                                    {% for q in range(1, 11) %}
+                                    <option value="{{ q }}" {{ 'selected' if item.quantity == q }}>{{ q }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         <div class="form-group">
@@ -65,25 +90,50 @@
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;">
                                 <label>Médicament *</label>
-                                <input type="text" name="med_name_0" required placeholder="Paracétamol 1000mg" list="med-suggestions">
+                                <select name="med_name_0" required>
+                                    <option value="">— Sélectionner —</option>
+                                    {% for m in medications %}
+                                    <option value="{{ m.name }}">{{ m.name }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Posologie *</label>
-                                <input type="text" name="med_dosage_0" required placeholder="1 comprimé">
+                                <select name="med_dosage_0" required>
+                                    <option value="">— Choisir —</option>
+                                    {% for d in ['1 comprimé', '2 comprimés', '1/2 comprimé', '1 gélule', '2 gélules', '1 sachet', '1 cuillère à café', '1 cuillère à soupe', '1 application', '1 bain de bouche', '5 ml', '10 ml'] %}
+                                    <option value="{{ d }}">{{ d }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Fréquence *</label>
-                                <input type="text" name="med_frequency_0" required placeholder="3 fois/jour">
+                                <select name="med_frequency_0" required>
+                                    <option value="">— Choisir —</option>
+                                    {% for f in ['1 fois/jour', '2 fois/jour', '3 fois/jour', '4 fois/jour', 'Matin et soir', 'Le matin', 'Le soir', 'Au coucher', 'Toutes les 6h', 'Toutes les 8h', 'Toutes les 12h', 'Si douleur', 'Si besoin'] %}
+                                    <option value="{{ f }}">{{ f }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Durée</label>
-                                <input type="text" name="med_duration_0" placeholder="7 jours">
+                                <select name="med_duration_0">
+                                    <option value="">— Choisir —</option>
+                                    {% for du in ['3 jours', '5 jours', '7 jours', '10 jours', '14 jours', '21 jours', '1 mois', '2 mois', '3 mois', '6 mois', 'Jusqu\'à amélioration', 'Traitement continu'] %}
+                                    <option value="{{ du }}">{{ du }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Quantité</label>
-                                <input type="number" name="med_quantity_0" placeholder="2">
+                                <select name="med_quantity_0">
+                                    <option value="">—</option>
+                                    {% for q in range(1, 11) %}
+                                    <option value="{{ q }}">{{ q }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                         <div class="form-group">
@@ -95,11 +145,7 @@
                     {% endif %}
                 </div>
                 <button type="button" class="btn btn-outline btn-sm" onclick="addMedication()">+ Ajouter un médicament</button>
-                <datalist id="med-suggestions">
-                    {% for m in medications %}
-                    <option value="{{ m.name }}">
-                    {% endfor %}
-                </datalist>
+                <script id="med-options-data" type="application/json">{{ medications | tojson }}</script>
             </div>
         </div>
 
@@ -149,6 +195,13 @@
 {% block scripts %}
 <script>
 let medIndex = {{ items|length if items else 1 }};
+const medData = JSON.parse(document.getElementById('med-options-data').textContent);
+const medOptions = medData.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+const dosageOptions = ['1 comprimé','2 comprimés','1/2 comprimé','1 gélule','2 gélules','1 sachet','1 cuillère à café','1 cuillère à soupe','1 application','1 bain de bouche','5 ml','10 ml'].map(d => `<option value="${d}">${d}</option>`).join('');
+const freqOptions = ['1 fois/jour','2 fois/jour','3 fois/jour','4 fois/jour','Matin et soir','Le matin','Le soir','Au coucher','Toutes les 6h','Toutes les 8h','Toutes les 12h','Si douleur','Si besoin'].map(f => `<option value="${f}">${f}</option>`).join('');
+const durationOptions = ['3 jours','5 jours','7 jours','10 jours','14 jours','21 jours','1 mois','2 mois','3 mois','6 mois',"Jusqu'à amélioration",'Traitement continu'].map(d => `<option value="${d}">${d}</option>`).join('');
+const qtyOptions = Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+
 function addMedication() {
     const list = document.getElementById('medications-list');
     const html = `
@@ -159,25 +212,40 @@ function addMedication() {
         <div class="form-row">
             <div class="form-group" style="flex: 2;">
                 <label>Médicament *</label>
-                <input type="text" name="med_name_${medIndex}" required placeholder="Nom du médicament" list="med-suggestions">
+                <select name="med_name_${medIndex}" required>
+                    <option value="">— Sélectionner —</option>
+                    ${medOptions}
+                </select>
             </div>
             <div class="form-group">
                 <label>Posologie *</label>
-                <input type="text" name="med_dosage_${medIndex}" required placeholder="1 comprimé">
+                <select name="med_dosage_${medIndex}" required>
+                    <option value="">— Choisir —</option>
+                    ${dosageOptions}
+                </select>
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Fréquence *</label>
-                <input type="text" name="med_frequency_${medIndex}" required placeholder="3 fois/jour">
+                <select name="med_frequency_${medIndex}" required>
+                    <option value="">— Choisir —</option>
+                    ${freqOptions}
+                </select>
             </div>
             <div class="form-group">
                 <label>Durée</label>
-                <input type="text" name="med_duration_${medIndex}" placeholder="7 jours">
+                <select name="med_duration_${medIndex}">
+                    <option value="">— Choisir —</option>
+                    ${durationOptions}
+                </select>
             </div>
             <div class="form-group">
                 <label>Quantité</label>
-                <input type="number" name="med_quantity_${medIndex}" placeholder="2">
+                <select name="med_quantity_${medIndex}">
+                    <option value="">—</option>
+                    ${qtyOptions}
+                </select>
             </div>
         </div>
         <div class="form-group">

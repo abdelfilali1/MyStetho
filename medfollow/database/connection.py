@@ -307,6 +307,13 @@ async def init_db():
     except Exception:
         pass  # Column already exists
 
+    # Add specialty column to medications if missing
+    try:
+        await db.execute("ALTER TABLE medications ADD COLUMN specialty TEXT DEFAULT 'general'")
+        await db.commit()
+    except Exception:
+        pass  # Column already exists
+
     # Dental tables migration
     await db.executescript("""
         CREATE TABLE IF NOT EXISTS dental_teeth (
