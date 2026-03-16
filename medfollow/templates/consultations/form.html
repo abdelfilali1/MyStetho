@@ -44,35 +44,130 @@
                 <input type="hidden" name="appointment_id" value="{{ selected_appointment_id }}">
                 {% endif %}
 
+                {% set is_dentist = user.specialty and 'dent' in user.specialty|lower %}
+
+                {% if is_dentist %}
+                {# ── Dental consultation fields ── #}
                 <div class="form-group" style="margin-top: 12px;">
                     <label>Motif de consultation</label>
-                    <input type="text" name="reason" value="{{ consultation.reason if consultation and consultation.reason else '' }}" placeholder="Douleur au genou droit">
+                    <select name="reason">
+                        <option value="">— Sélectionner —</option>
+                        {% for r in ['Douleur dentaire', 'Contrôle / Détartrage', 'Carie', 'Extraction', 'Prothèse', 'Implant', 'Orthodontie', 'Endodontie (dévitalisation)', 'Chirurgie buccale', 'Parodontologie', 'Urgence dentaire', 'Blanchiment', 'Esthétique dentaire', 'Autre'] %}
+                        <option value="{{ r }}" {{ 'selected' if consultation and consultation.reason == r }}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Dent(s) concernée(s)</label>
+                        <input type="hidden" name="symptoms" id="dental-teeth-hidden" value="{{ consultation.symptoms if consultation and consultation.symptoms else '' }}">
+                        <div id="dental-teeth-dropdown" style="position: relative;">
+                            <button type="button" id="dental-teeth-toggle" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1px solid var(--gray-300); border-radius:14px; background:#fff; color:var(--gray-700); font-size:16px; cursor:pointer;">
+                                <span id="dental-teeth-label">Sélectionner les dents...</span>
+                                <span aria-hidden="true">▾</span>
+                            </button>
+                            <div id="dental-teeth-menu" hidden style="position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:50; max-height:260px; overflow:auto; padding:8px; border:1px solid var(--gray-300); border-radius:14px; background:#fff; box-shadow:0 12px 30px rgba(15, 23, 42, 0.12);">
+                                <label style="display:flex; align-items:center; gap:8px; margin:0 0 8px 0; padding:8px 10px; border-radius:10px; font-size:14px; color:var(--gray-700); cursor:pointer;">
+                                    <input type="checkbox" id="dental-teeth-all">
+                                    Toutes les dents
+                                </label>
+                                <div style="height:1px; background:var(--gray-200); margin: 0 0 8px 0;"></div>
+                                <div id="dental-teeth-options" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px;"></div>
+                            </div>
+                        </div>
+                        <span id="dental-teeth-count" style="display:block; margin-top:8px; font-size:13px; color: var(--gray-500);">Aucune dent sélectionnée</span>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Symptômes</label>
-                    <textarea name="symptoms" rows="3" placeholder="Décrivez les symptômes...">{{ consultation.symptoms if consultation and consultation.symptoms else '' }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label>Examen clinique</label>
-                    <textarea name="clinical_exam" rows="3" placeholder="Résultats de l'examen...">{{ consultation.clinical_exam if consultation and consultation.clinical_exam else '' }}</textarea>
+                    <label>Examen endo-buccal</label>
+                    <textarea name="clinical_exam" rows="3">{{ consultation.clinical_exam if consultation and consultation.clinical_exam else '' }}</textarea>
                 </div>
                 <div class="form-group">
                     <label>Diagnostic</label>
-                    <textarea name="diagnosis" rows="2" placeholder="Diagnostic...">{{ consultation.diagnosis if consultation and consultation.diagnosis else '' }}</textarea>
+                    <textarea name="diagnosis" rows="2">{{ consultation.diagnosis if consultation and consultation.diagnosis else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Actes réalisés</label>
+                    <textarea name="treatment_plan" rows="3">{{ consultation.treatment_plan if consultation and consultation.treatment_plan else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Notes / Suivi</label>
+                    <textarea name="notes" rows="2">{{ consultation.notes if consultation and consultation.notes else '' }}</textarea>
+                </div>
+                {% else %}
+                {# ── General consultation fields ── #}
+                <div class="form-group" style="margin-top: 12px;">
+                    <label>Motif de consultation</label>
+                    <input type="text" name="reason" value="{{ consultation.reason if consultation and consultation.reason else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Symptômes</label>
+                    <textarea name="symptoms" rows="3">{{ consultation.symptoms if consultation and consultation.symptoms else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Examen clinique</label>
+                    <textarea name="clinical_exam" rows="3">{{ consultation.clinical_exam if consultation and consultation.clinical_exam else '' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Diagnostic</label>
+                    <textarea name="diagnosis" rows="2">{{ consultation.diagnosis if consultation and consultation.diagnosis else '' }}</textarea>
                 </div>
                 <div class="form-group">
                     <label>Plan de traitement</label>
-                    <textarea name="treatment_plan" rows="3" placeholder="Traitement prescrit...">{{ consultation.treatment_plan if consultation and consultation.treatment_plan else '' }}</textarea>
+                    <textarea name="treatment_plan" rows="3">{{ consultation.treatment_plan if consultation and consultation.treatment_plan else '' }}</textarea>
                 </div>
                 <div class="form-group">
                     <label>Notes</label>
-                    <textarea name="notes" rows="2" placeholder="Notes complémentaires...">{{ consultation.notes if consultation and consultation.notes else '' }}</textarea>
+                    <textarea name="notes" rows="2">{{ consultation.notes if consultation and consultation.notes else '' }}</textarea>
                 </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Right: vitals -->
+        <!-- Right sidebar -->
         <div>
+            {% if is_dentist %}
+            <div class="card">
+                <div class="card-header"><h3>Examen extra-buccal</h3></div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>TA Sys (mmHg)</label>
+                            <input type="number" name="blood_pressure_sys" value="{{ consultation.v_blood_pressure_sys if consultation and consultation.v_blood_pressure_sys else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>TA Dia (mmHg)</label>
+                            <input type="number" name="blood_pressure_dia" value="{{ consultation.v_blood_pressure_dia if consultation and consultation.v_blood_pressure_dia else '' }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Antécédents médicaux relevants</label>
+                        <select name="dental_medical_history" id="dental-med-history">
+                            <option value="" {{ 'selected' if not selected_dental_history }}>— Aucun —</option>
+                            {% for a in dental_history_options %}
+                            <option value="{{ a }}" {{ 'selected' if selected_dental_history and selected_dental_history == a }}>{{ a }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Allergies connues</label>
+                        <input type="text" name="dental_allergies" value="{{ selected_dental_allergies }}">
+                    </div>
+                </div>
+            </div>
+
+            {% if consultation and consultation.patient_id %}
+            <div class="card" style="margin-top: 16px;">
+                <div class="card-header">
+                    <h3>Schéma dentaire</h3>
+                </div>
+                <div class="card-body" style="text-align:center;">
+                    <a href="/dental/{{ consultation.patient_id }}" class="btn btn-outline btn-sm" target="_blank">Ouvrir l'odontogramme</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% else %}
             <div class="card">
                 <div class="card-header"><h3>Constantes vitales</h3></div>
                 <div class="card-body">
@@ -113,6 +208,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             <div class="form-actions" style="margin-top: 16px; border: none; padding: 0;">
                 <a href="/consultations" class="btn btn-outline">Annuler</a>
@@ -126,9 +222,12 @@
 {% block scripts %}
 <script>
 function calcBMI() {
-    const w = parseFloat(document.getElementById('v-weight').value);
-    const h = parseFloat(document.getElementById('v-height').value);
+    const weightEl = document.getElementById('v-weight');
+    const heightEl = document.getElementById('v-height');
     const el = document.getElementById('bmi-display');
+    if (!weightEl || !heightEl || !el) return;
+    const w = parseFloat(weightEl.value);
+    const h = parseFloat(heightEl.value);
     if (w > 0 && h > 0) {
         const hm = h / 100;
         const bmi = (w / (hm * hm)).toFixed(1);
@@ -143,7 +242,278 @@ function calcBMI() {
         el.classList.remove('visible');
     }
 }
+
+const patientSelect = document.getElementById('sel-patient-c');
+const historySelect = document.getElementById('dental-med-history');
+const historyPresets = {{ dental_history_presets_json|safe if dental_history_presets_json else '[]' }};
+let historyRequestToken = 0;
+
+function normalizeHistoryItems(items) {
+    const seen = new Set();
+    const output = [];
+    for (const raw of items || []) {
+        const value = String(raw || '').trim();
+        if (!value) continue;
+        const key = value.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        output.push(value);
+    }
+    return output;
+}
+
+function rebuildHistoryOptions(patientItems, preferredValue, allowCustomSelected) {
+    if (!historySelect) return;
+
+    const merged = normalizeHistoryItems([...(patientItems || []), ...(historyPresets || [])]);
+    const selectedValue = String(preferredValue || '').trim();
+    let selectedFound = false;
+
+    historySelect.innerHTML = '';
+
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = '— Aucun —';
+    historySelect.appendChild(emptyOption);
+
+    for (const item of merged) {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        if (selectedValue && item.toLowerCase() === selectedValue.toLowerCase()) {
+            option.selected = true;
+            selectedFound = true;
+        }
+        historySelect.appendChild(option);
+    }
+
+    if (allowCustomSelected && selectedValue && !selectedFound) {
+        const customOption = document.createElement('option');
+        customOption.value = selectedValue;
+        customOption.textContent = selectedValue;
+        customOption.selected = true;
+        historySelect.appendChild(customOption);
+    }
+}
+
+async function refreshPatientHistoryOptions(allowCustomSelected) {
+    if (!patientSelect || !historySelect) return;
+
+    const patientId = (patientSelect.value || '').trim();
+    const selectedBefore = historySelect.value;
+
+    if (!patientId) {
+        rebuildHistoryOptions([], '', false);
+        return;
+    }
+
+    const requestToken = ++historyRequestToken;
+    try {
+        const response = await fetch(`/consultations/patient/${encodeURIComponent(patientId)}/history`, {
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (requestToken !== historyRequestToken) return;
+        const patientItems = Array.isArray(payload.items) ? payload.items : [];
+        rebuildHistoryOptions(patientItems, selectedBefore, !!allowCustomSelected);
+    } catch (error) {
+        console.error('Impossible de charger les antécédents du patient:', error);
+        if (requestToken !== historyRequestToken) return;
+        rebuildHistoryOptions([], selectedBefore, !!allowCustomSelected);
+    }
+}
+
+if (patientSelect && historySelect) {
+    patientSelect.addEventListener('change', () => refreshPatientHistoryOptions(false));
+    if ((patientSelect.value || '').trim()) {
+        refreshPatientHistoryOptions(true);
+    }
+}
+
+const teethDropdown = document.getElementById('dental-teeth-dropdown');
+const teethToggle = document.getElementById('dental-teeth-toggle');
+const teethLabel = document.getElementById('dental-teeth-label');
+const teethMenu = document.getElementById('dental-teeth-menu');
+const teethOptions = document.getElementById('dental-teeth-options');
+const teethHiddenInput = document.getElementById('dental-teeth-hidden');
+const teethAllCheckbox = document.getElementById('dental-teeth-all');
+const teethCount = document.getElementById('dental-teeth-count');
+const dentalTeethFdi = [
+    '18', '17', '16', '15', '14', '13', '12', '11',
+    '21', '22', '23', '24', '25', '26', '27', '28',
+    '48', '47', '46', '45', '44', '43', '42', '41',
+    '31', '32', '33', '34', '35', '36', '37', '38'
+];
+
+function updateTeethCountLabel(selectedCount) {
+    if (!teethCount) return;
+    if (selectedCount === 0) {
+        teethCount.textContent = 'Aucune dent sélectionnée';
+        return;
+    }
+    if (selectedCount === dentalTeethFdi.length) {
+        teethCount.textContent = 'Toutes les dents sélectionnées';
+        return;
+    }
+    teethCount.textContent = `${selectedCount} dent(s) sélectionnée(s)`;
+}
+
+function getTeethCheckboxes() {
+    if (!teethOptions) return [];
+    return Array.from(teethOptions.querySelectorAll('input[type="checkbox"][data-tooth]'));
+}
+
+function getSelectedTeethValues() {
+    return getTeethCheckboxes().filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+}
+
+function updateTeethDropdownLabel(selected) {
+    if (!teethLabel) return;
+    if (selected.length === 0) {
+        teethLabel.textContent = 'Sélectionner les dents...';
+        return;
+    }
+    if (selected.length === dentalTeethFdi.length) {
+        teethLabel.textContent = 'Toutes les dents';
+        return;
+    }
+    if (selected.length <= 4) {
+        teethLabel.textContent = selected.join(', ');
+        return;
+    }
+    teethLabel.textContent = `${selected.length} dents sélectionnées`;
+}
+
+function syncHiddenTeethValue() {
+    if (!teethHiddenInput) return;
+    const selected = getSelectedTeethValues();
+    const allSelected = selected.length === dentalTeethFdi.length;
+    if (teethAllCheckbox) {
+        teethAllCheckbox.indeterminate = selected.length > 0 && !allSelected;
+        teethAllCheckbox.checked = allSelected;
+    }
+    teethHiddenInput.value = allSelected ? 'Tous' : selected.join(', ');
+    updateTeethCountLabel(selected.length);
+    updateTeethDropdownLabel(selected);
+}
+
+function parseExistingTeeth(rawValue) {
+    const raw = String(rawValue || '').trim();
+    if (!raw) {
+        return [];
+    }
+    const normalizedRaw = raw.toLowerCase();
+    if (normalizedRaw === 'tous' || normalizedRaw === 'toutes' || normalizedRaw === 'all') {
+        return [...dentalTeethFdi];
+    }
+
+    const tokenSet = new Set(
+        raw
+            .split(/[^0-9]+/)
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+    );
+    return dentalTeethFdi.filter((code) => tokenSet.has(code));
+}
+
+function setTeethSelection(selectedValues) {
+    const selectedSet = new Set(selectedValues);
+    for (const checkbox of getTeethCheckboxes()) {
+        checkbox.checked = selectedSet.has(checkbox.value);
+    }
+    syncHiddenTeethValue();
+}
+
+function buildTeethOptions() {
+    if (!teethOptions) return;
+    teethOptions.innerHTML = '';
+    for (const code of dentalTeethFdi) {
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '8px';
+        label.style.margin = '0';
+        label.style.padding = '7px 10px';
+        label.style.borderRadius = '10px';
+        label.style.fontSize = '14px';
+        label.style.color = 'var(--gray-700)';
+        label.style.cursor = 'pointer';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = code;
+        checkbox.setAttribute('data-tooth', code);
+        checkbox.addEventListener('change', syncHiddenTeethValue);
+
+        const text = document.createElement('span');
+        text.textContent = `Dent ${code}`;
+
+        label.appendChild(checkbox);
+        label.appendChild(text);
+        teethOptions.appendChild(label);
+    }
+}
+
+function setTeethMenuOpen(isOpen) {
+    if (!teethMenu || !teethToggle) return;
+    teethMenu.hidden = !isOpen;
+    teethToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+function initDentalTeethSelector() {
+    if (!teethHiddenInput || !teethToggle || !teethMenu || !teethDropdown || !teethOptions) return;
+
+    buildTeethOptions();
+
+    const initialSelected = parseExistingTeeth(teethHiddenInput.value);
+    if (initialSelected.length > 0) {
+        setTeethSelection(initialSelected);
+    } else {
+        updateTeethCountLabel(0);
+        updateTeethDropdownLabel([]);
+    }
+
+    teethToggle.addEventListener('click', () => {
+        setTeethMenuOpen(teethMenu.hidden);
+    });
+
+    if (teethAllCheckbox) {
+        teethAllCheckbox.addEventListener('change', () => {
+            const checked = teethAllCheckbox.checked;
+            const selected = checked ? [...dentalTeethFdi] : [];
+            setTeethSelection(selected);
+        });
+    }
+
+    document.addEventListener('click', (event) => {
+        if (!teethDropdown.contains(event.target)) {
+            setTeethMenuOpen(false);
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            setTeethMenuOpen(false);
+        }
+    });
+
+    if (teethOptions) {
+        teethOptions.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                setTeethMenuOpen(false);
+            }
+        });
+    }
+}
+
+initDentalTeethSelector();
 calcBMI();
 </script>
 {% endblock %}
+
 
