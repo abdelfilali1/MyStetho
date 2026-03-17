@@ -60,25 +60,24 @@ async def search_medications(
     is_dentist = "dent" in user_specialty.lower()
     term = q.strip().lower()
     if is_dentist:
-        # Dentists see all medications; dental ones ranked first
         cursor = await db.execute(
             """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
-                      CASE WHEN specialty='dentiste' THEN 0 ELSE 1 END as spec_rank,
-                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as name_rank
+                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as starts_rank,
+                      CASE WHEN specialty='dentiste' THEN 0 ELSE 1 END as spec_rank
                FROM medications
                WHERE LOWER(name) LIKE ?
-               ORDER BY spec_rank, name_rank, name
+               ORDER BY starts_rank, spec_rank, name
                LIMIT 100""",
             (f"{term}%", f"%{term}%"),
         )
     else:
         cursor = await db.execute(
             """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
-                      0 as spec_rank,
-                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as name_rank
+                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as starts_rank,
+                      0 as spec_rank
                FROM medications
                WHERE specialty = 'general' AND LOWER(name) LIKE ?
-               ORDER BY name_rank, name
+               ORDER BY starts_rank, name
                LIMIT 100""",
             (f"{term}%", f"%{term}%"),
         )
