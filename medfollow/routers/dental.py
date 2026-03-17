@@ -95,7 +95,11 @@ async def get_tooth_data(request: Request, patient_id: int, tooth_number: int, d
     row = await cursor.fetchone()
     tooth = dict(row) if row else {"tooth_number": tooth_number, "condition": "sain", "notes": ""}
     cursor = await db.execute(
-        "SELECT * FROM dental_treatments WHERE patient_id = ? AND tooth_number = ? ORDER BY treatment_date DESC",
+        """SELECT dt.*, a.status as appt_status, a.start_datetime as appt_datetime, a.id as appt_id
+           FROM dental_treatments dt
+           LEFT JOIN appointments a ON dt.appointment_id = a.id
+           WHERE dt.patient_id = ? AND dt.tooth_number = ?
+           ORDER BY dt.treatment_date DESC""",
         (patient_id, tooth_number)
     )
     treatments = [dict(r) for r in await cursor.fetchall()]
@@ -125,19 +129,43 @@ async def update_tooth_condition(
     return JSONResponse(content={"ok": True})
 
 
+APPT_TYPE_MAP = {
+    "Extraction": "intervention", "Traitement endodontique": "intervention",
+    "Implant": "intervention", "Bridge": "intervention",
+    "Couronne": "intervention", "Couronne provisoire": "intervention",
+    "Prothèse partielle": "intervention", "Prothèse totale": "intervention",
+}
+
 @router.post("/{patient_id}/tooth/{tooth_number}/treatment")
 async def add_treatment(
     request: Request, patient_id: int, tooth_number: int,
-    treatment_type: str = Form(...), description: str = Form(""), treatment_date: str = Form(""),
+    treatment_type: str = Form(...), description: str = Form(""),
+    treatment_date: str = Form(""), start_time: str = Form("09:00"),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     tdate = treatment_date or date.today().isoformat()
+    stime = start_time or "09:00"
+
+    # Create linked appointment
+    appt_title = f"{treatment_type} - Dent {tooth_number}"
+    appt_type = APPT_TYPE_MAP.get(treatment_type, "consultation")
+    start_dt = f"{tdate} {stime}:00" if len(stime) == 5 else f"{tdate} {stime}"
+    end_dt = f"{tdate} {stime}:30" if len(stime) == 5 else f"{tdate} {stime}"
+    cursor = await db.execute(
+        """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, start_datetime, end_datetime, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?, 'planifie', ?)""",
+        (patient_id, user["sub"], appt_title, appt_type, start_dt, end_dt, description or None)
+    )
+    appointment_id = cursor.lastrowid
+
     await db.execute(
-        "INSERT INTO dental_treatments (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id) VALUES (?, ?, ?, ?, ?, ?)",
-        (patient_id, tooth_number, treatment_type, description or None, tdate, user["sub"])
+        """INSERT INTO dental_treatments
+           (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, tooth_number, treatment_type, description or None, tdate, user["sub"], appointment_id)
     )
     await db.commit()
     return JSONResponse(content={"ok": True})
@@ -151,6 +179,17 @@ async def delete_treatment(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    # Cancel linked appointment if it's still planifie/confirme
+    cursor = await db.execute(
+        "SELECT appointment_id FROM dental_treatments WHERE id = ? AND patient_id = ?",
+        (treatment_id, patient_id)
+    )
+    row = await cursor.fetchone()
+    if row and row["appointment_id"]:
+        await db.execute(
+            "UPDATE appointments SET status='annule' WHERE id = ? AND status IN ('planifie','confirme')",
+            (row["appointment_id"],)
+        )
     await db.execute("DELETE FROM dental_treatments WHERE id = ? AND patient_id = ?", (treatment_id, patient_id))
     await db.commit()
     return JSONResponse(content={"ok": True})

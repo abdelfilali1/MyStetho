@@ -387,4 +387,11 @@ async def init_db():
     except Exception:
         pass  # Column already exists
 
+    # Migration: add appointment_id to dental_treatments if missing
+    try:
+        await db.execute("ALTER TABLE dental_treatments ADD COLUMN appointment_id INTEGER REFERENCES appointments(id)")
+        await db.commit()
+    except Exception:
+        pass  # Column already exists
+
     await db.close()

@@ -554,6 +554,26 @@
     .endo-grid { grid-template-columns: repeat(4, 1fr); }
     .endo-tooth-btn { min-height: 48px; }
 }
+.appt-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; margin-top: 4px;
+}
+.appt-badge.planifie  { background:#f1f5f9; color:#475569; }
+.appt-badge.confirme  { background:#dbeafe; color:#1d4ed8; }
+.appt-badge.en_cours  { background:#fef3c7; color:#b45309; }
+.appt-badge.termine   { background:#dcfce7; color:#15803d; }
+.appt-badge.annule    { background:#fee2e2; color:#b91c1c; }
+.appt-badge.absent    { background:#fce7f3; color:#9d174d; }
+.treatment-card.is-done {
+    background: #f8fafc;
+    border-left: 3px solid #22c55e;
+    opacity: 0.85;
+}
+.treatment-card.is-done .treatment-type {
+    text-decoration: line-through;
+    color: #64748b;
+}
 </style>
 {% endblock %}
 
@@ -770,7 +790,10 @@
                 <option value="Radiographie">Radiographie</option>
                 <option value="Autre">Autre</option>
             </select>
-            <input type="date" id="new-t-date" class="panel-select" style="margin-bottom:8px;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="date" id="new-t-date" class="panel-select" style="flex:1;margin-bottom:0;">
+                <input type="time" id="new-t-time" class="panel-select" value="09:00" style="width:100px;margin-bottom:0;">
+            </div>
             <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
             <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
         </div>
@@ -1141,21 +1164,42 @@ function closePanel() {
     currentTooth = null;
 }
 
+const APPT_STATUS_LABELS = {
+    planifie: 'Planifié', confirme: 'Confirmé', en_cours: 'En cours',
+    termine: 'Terminé', annule: 'Annulé', absent: 'Absent'
+};
+
 function renderTreatments(list) {
     const el = document.getElementById('p-treatments');
     if (!list || list.length === 0) {
         el.innerHTML = '<p style="padding:10px 0;color:#94a3b8;font-size:13px;text-align:center;">Aucun traitement enregistré</p>';
         return;
     }
-    el.innerHTML = list.map(t => `
-        <div class="treatment-card">
-            <div>
+    const active = list.filter(t => !t.appt_status || t.appt_status !== 'termine');
+    const done   = list.filter(t => t.appt_status === 'termine');
+
+    const renderCard = t => {
+        const isDone = t.appt_status === 'termine';
+        const apptHtml = t.appt_status ? `<span class="appt-badge ${t.appt_status}">${APPT_STATUS_LABELS[t.appt_status] || t.appt_status}</span>` : '';
+        const dtLabel = t.appt_datetime ? t.appt_datetime.substring(0,16).replace('T',' ') : t.treatment_date;
+        return `
+        <div class="treatment-card${isDone ? ' is-done' : ''}">
+            <div style="flex:1;min-width:0;">
                 <div class="treatment-type">${escapeHtml(t.treatment_type)}</div>
                 ${t.description ? `<div class="treatment-desc">${escapeHtml(t.description)}</div>` : ''}
-                <div class="treatment-date">📅 ${escapeHtml(t.treatment_date)}</div>
+                <div class="treatment-date">📅 ${escapeHtml(dtLabel)}</div>
+                ${apptHtml}
             </div>
             <button onclick="delTreatment(${t.id})" class="treatment-del">✕</button>
-        </div>`).join('');
+        </div>`;
+    };
+
+    let html = active.map(renderCard).join('');
+    if (done.length > 0) {
+        html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);margin:12px 0 6px;padding-top:10px;border-top:1px solid var(--border);">Historique (${done.length})</div>`;
+        html += done.map(renderCard).join('');
+    }
+    el.innerHTML = html;
 }
 
 function escapeHtml(str) {
@@ -1191,6 +1235,7 @@ async function addTreatment() {
     fd.append('treatment_type', document.getElementById('new-t-type').value);
     fd.append('description',    document.getElementById('new-t-desc').value);
     fd.append('treatment_date', document.getElementById('new-t-date').value);
+    fd.append('start_time',     document.getElementById('new-t-time').value || '09:00');
     try {
         const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
         if (r.ok) {
