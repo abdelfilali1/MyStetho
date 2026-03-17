@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import json
@@ -43,6 +43,30 @@ async def list_prescriptions(request: Request, page: int = 1, db: aiosqlite.Conn
             "page": page, "total_pages": total_pages, "total_count": total_count,
         },
     )
+
+
+@router.get("/medications/search")
+async def search_medications(
+    request: Request,
+    q: str = "",
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content=[])
+    if not q or len(q.strip()) < 2:
+        return JSONResponse(content=[])
+    user_specialty = user.get("specialty", "") or ""
+    med_filter = "dentiste" if "dent" in user_specialty.lower() else "general"
+    cursor = await db.execute(
+        """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab
+           FROM medications
+           WHERE specialty = ? AND name LIKE ?
+           ORDER BY name LIMIT 20""",
+        (med_filter, f"%{q.strip()}%"),
+    )
+    rows = await cursor.fetchall()
+    return JSONResponse(content=[dict(r) for r in rows])
 
 
 @router.get("/new", response_class=HTMLResponse)

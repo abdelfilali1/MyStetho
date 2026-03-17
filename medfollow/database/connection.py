@@ -394,4 +394,16 @@ async def init_db():
     except Exception:
         pass  # Column already exists
 
+    # Migration: add form and lab columns to medications if missing
+    try:
+        await db.execute("ALTER TABLE medications ADD COLUMN form TEXT")
+        await db.commit()
+    except Exception:
+        pass
+    try:
+        await db.execute("ALTER TABLE medications ADD COLUMN lab TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     await db.close()
