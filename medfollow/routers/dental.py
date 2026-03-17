@@ -265,3 +265,23 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
 
     await db.commit()
     return JSONResponse(content={"ok": True})
+
+
+@router.post("/{patient_id}/endo/history/{hist_id}/correct")
+async def correct_endo_history(
+    request: Request, patient_id: int, hist_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    body = await request.json()
+    corrected_value = body.get("corrected_value", "")
+
+    await db.execute(
+        "UPDATE endo_history SET corrected_value = ? WHERE id = ? AND patient_id = ?",
+        (corrected_value or None, hist_id, patient_id)
+    )
+    await db.commit()
+    return JSONResponse(content={"ok": True})

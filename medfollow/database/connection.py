@@ -361,6 +361,7 @@ async def init_db():
             field TEXT NOT NULL,
             old_value TEXT,
             new_value TEXT,
+            corrected_value TEXT,
             changed_by INTEGER,
             changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES patients(id),
@@ -378,5 +379,12 @@ async def init_db():
         );
     """)
     await db.commit()
+
+    # Migration: add corrected_value to endo_history if missing
+    try:
+        await db.execute("ALTER TABLE endo_history ADD COLUMN corrected_value TEXT")
+        await db.commit()
+    except Exception:
+        pass  # Column already exists
 
     await db.close()

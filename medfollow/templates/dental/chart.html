@@ -342,12 +342,11 @@
     gap: 4px;
     margin-bottom: 8px;
 }
-.endo-grid::before {
-    content: 'Maxillaire';
+.endo-arch-label {
     grid-column: 1 / -1;
     font-size: 11px;
     font-weight: 700;
-    color: var(--gray-400);
+    color: var(--gray-500);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 4px 0;
@@ -394,17 +393,7 @@
     grid-column: 1 / -1;
     height: 1px;
     background: var(--gray-200);
-    margin: 4px 0;
-}
-.endo-separator::after {
-    content: 'Mandibulaire';
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 8px 0 4px;
+    margin: 6px 0 2px;
 }
 .endo-legend {
     display: flex;
@@ -530,34 +519,21 @@
 .endo-status-badge.st-prepare { background: #ede9fe; color: #7c3aed; }
 .endo-status-badge.st-obture { background: #dcfce7; color: #16a34a; }
 
-.endo-history-list {
-    max-height: 200px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+.endo-history-section .endo-table tbody tr.editing td {
+    background: rgba(28,140,248,0.05);
 }
-.endo-history-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: var(--gray-50, #f8fafc);
-    border-radius: 8px;
+.endo-history-section .endo-table input[type="text"] {
+    width: 90px;
+    padding: 4px 8px;
+    border: 1px solid var(--primary);
+    border-radius: 6px;
     font-size: 12px;
-    gap: 12px;
 }
-.endo-history-item .endo-h-desc {
-    color: var(--gray-700);
-    flex: 1;
-}
-.endo-history-item .endo-h-desc strong {
-    color: var(--primary);
-}
-.endo-history-item .endo-h-date {
+.endo-history-correction {
+    font-size: 10px;
     color: var(--gray-400);
-    white-space: nowrap;
-    font-size: 11px;
+    font-style: italic;
+    display: block;
 }
 .endo-modal-footer {
     display: flex;
@@ -690,8 +666,25 @@
 
                 <!-- History -->
                 <div class="endo-history-section">
-                    <h4 style="margin:0 0 8px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Historique des modifications</h4>
-                    <div id="endo-history-list" class="endo-history-list"></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <h4 style="margin:0;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Historique des mesures</h4>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="endo-table" id="endo-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Canal</th>
+                                    <th>Champ</th>
+                                    <th>Ancienne valeur</th>
+                                    <th>Nouvelle valeur</th>
+                                    <th>Par</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="endo-history-tbody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -900,6 +893,10 @@ function switchView(view) {
     document.getElementById('btn-layout').classList.toggle('active', isLayout);
     document.getElementById('btn-odontogram').classList.toggle('active', !isLayout && !isEndo);
     document.getElementById('btn-endo').classList.toggle('active', isEndo);
+
+    // Hide odontogram legend in endo mode
+    const legend = document.querySelector('.odo-legend');
+    if (legend) legend.style.display = isEndo ? 'none' : '';
 
     if (isEndo) {
         buildEndoGrid();
@@ -1283,20 +1280,28 @@ function buildEndoGrid() {
     const grid = document.getElementById('endo-grid');
     grid.innerHTML = '';
 
-    // Upper jaw
-    UPPER.forEach(n => {
-        grid.appendChild(createEndoToothBtn(n));
-    });
+    // Maxillary label
+    const lblUpper = document.createElement('div');
+    lblUpper.className = 'endo-arch-label';
+    lblUpper.textContent = 'Maxillaire';
+    grid.appendChild(lblUpper);
 
-    // Separator
+    // Upper jaw
+    UPPER.forEach(n => grid.appendChild(createEndoToothBtn(n)));
+
+    // Separator line
     const sep = document.createElement('div');
     sep.className = 'endo-separator';
     grid.appendChild(sep);
 
+    // Mandibular label
+    const lblLower = document.createElement('div');
+    lblLower.className = 'endo-arch-label';
+    lblLower.textContent = 'Mandibulaire';
+    grid.appendChild(lblLower);
+
     // Lower jaw
-    LOWER.forEach(n => {
-        grid.appendChild(createEndoToothBtn(n));
-    });
+    LOWER.forEach(n => grid.appendChild(createEndoToothBtn(n)));
 
     endoGridBuilt = true;
 }
@@ -1436,22 +1441,87 @@ function renderEndoCanalTable() {
 }
 
 function renderEndoHistory() {
-    const list = document.getElementById('endo-history-list');
+    const tbody = document.getElementById('endo-history-tbody');
+    if (!tbody) return;
     const history = endoData.history || [];
     if (history.length === 0) {
-        list.innerHTML = '<p style="font-size:12px;color:var(--gray-400);padding:8px 0;">Aucune modification enregistrée</p>';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gray-400);font-size:12px;padding:16px;">Aucune modification enregistrée</td></tr>`;
         return;
     }
-    list.innerHTML = history.map(h => {
-        const old = h.old_value || '—';
-        const nw = h.new_value || '—';
-        const dt = h.changed_at ? h.changed_at.substring(0, 16).replace('T', ' ') : '';
-        const by = h.changed_by_name || '';
-        return `<div class="endo-history-item">
-            <span class="endo-h-desc"><strong>${h.canal_name}</strong> – ${h.field} : ${old} → ${nw}${by ? ' · ' + by : ''}</span>
-            <span class="endo-h-date">${dt}</span>
-        </div>`;
-    }).join('');
+    tbody.innerHTML = '';
+    history.forEach((h, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.histId = h.id || i;
+        tr.dataset.histIdx = i;
+        const dt = h.changed_at ? h.changed_at.substring(0, 16).replace('T', ' ') : '—';
+        const by = h.changed_by_name || '—';
+        const hasCorrection = h.corrected_value != null;
+        const displayNew = hasCorrection
+            ? `${h.new_value} <span class="endo-history-correction">→ corrigé : ${h.corrected_value}</span>`
+            : (h.new_value || '—');
+
+        tr.innerHTML = `
+            <td style="font-size:11px;color:var(--gray-400);white-space:nowrap;">${dt}</td>
+            <td><strong style="color:var(--primary);">${h.canal_name}</strong></td>
+            <td style="font-size:12px;">${h.field}</td>
+            <td style="font-size:12px;color:var(--gray-500);">${h.old_value || '—'}</td>
+            <td style="font-size:12px;" class="hist-new-cell">${displayNew}</td>
+            <td style="font-size:11px;color:var(--gray-400);">${by}</td>
+            <td><button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="startEditHistoryRow(${i})">Corriger</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function startEditHistoryRow(idx) {
+    const history = endoData.history || [];
+    const h = history[idx];
+    if (!h) return;
+
+    const tr = document.querySelector(`#endo-history-tbody tr[data-hist-idx="${idx}"]`);
+    if (!tr) return;
+
+    // Replace the "new value" cell with an input
+    const cell = tr.querySelector('.hist-new-cell');
+    const currentVal = h.corrected_value != null ? h.corrected_value : (h.new_value || '');
+    cell.innerHTML = `<input type="text" value="${currentVal}" id="hist-edit-input-${idx}" style="width:90px;" placeholder="Valeur corrigée">`;
+
+    // Replace action button
+    const btn = tr.querySelector('td:last-child');
+    btn.innerHTML = `
+        <div style="display:flex;gap:4px;">
+            <button type="button" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px;" onclick="saveHistoryCorrection(${idx}, ${h.id || 'null'})">✓</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="renderEndoHistory()">✕</button>
+        </div>
+    `;
+    tr.classList.add('editing');
+    document.getElementById(`hist-edit-input-${idx}`)?.focus();
+}
+
+async function saveHistoryCorrection(idx, histId) {
+    const input = document.getElementById(`hist-edit-input-${idx}`);
+    if (!input) return;
+    const newVal = input.value.trim();
+    if (!newVal) return;
+
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/history/${histId}/correct`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ corrected_value: newVal })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+
+        // Update local data
+        if (endoData.history && endoData.history[idx]) {
+            endoData.history[idx].corrected_value = newVal;
+        }
+        renderEndoHistory();
+        showToast('Correction enregistrée');
+    } catch (e) {
+        console.error(e);
+        showToast('Erreur lors de la correction');
+    }
 }
 
 function highlightSVGCanal(index, on) {
