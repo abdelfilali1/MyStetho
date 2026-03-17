@@ -784,6 +784,7 @@
 // ===== DATA =====
 const PATIENT_ID = {{ patient.id }};
 const teethData = {{ teeth_data_json | safe }};
+const endoSummary = {{ endo_summary_json | safe }};
 
 const UPPER = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
 const LOWER = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
@@ -1313,10 +1314,14 @@ function createEndoToothBtn(n) {
     btn.onclick = () => openEndoModal(n);
 
     const canals = ENDO_CANALS_MAP[n] || ['Canal unique'];
+    const initialStatus = endoSummary[String(n)];
+    const dotColor = initialStatus ? (ENDO_STATUS[initialStatus]?.color || '#e2e8f0') : '#e2e8f0';
+    const hasData = initialStatus && initialStatus !== 'non_localise';
+    if (hasData) btn.classList.add('has-data');
     btn.innerHTML = `
         <span class="endo-t-num">${n}</span>
         <span class="endo-t-canals">${canals.length} can.</span>
-        <span class="endo-t-dot" style="background:#e2e8f0;"></span>
+        <span class="endo-t-dot" style="background:${dotColor};"></span>
     `;
     return btn;
 }
@@ -1568,6 +1573,11 @@ async function saveEndoData() {
         }
         showToast('Données endodontiques enregistrées');
         updateEndoBtn(endoCurrentTooth, canals);
+        // Keep in-memory summary in sync
+        const priority = ['non_localise','localise','mesure','prepare','obture'];
+        let bestIdx = 0;
+        canals.forEach(c => { const i = priority.indexOf(c.status || 'non_localise'); if (i > bestIdx) bestIdx = i; });
+        endoSummary[String(endoCurrentTooth)] = priority[bestIdx];
         // Reload data to get fresh history
         const res2 = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}`);
         if (res2.ok) endoData = await res2.json();

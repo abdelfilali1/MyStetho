@@ -64,9 +64,25 @@ async def dental_chart(request: Request, patient_id: int, db: aiosqlite.Connecti
     cursor = await db.execute("SELECT * FROM dental_teeth WHERE patient_id = ?", (patient_id,))
     teeth_rows = await cursor.fetchall()
     teeth_data = {str(r["tooth_number"]): dict(r) for r in teeth_rows}
+
+    # Endo summary: best (highest-priority) status per tooth
+    cursor = await db.execute(
+        "SELECT tooth_number, status FROM endo_canals WHERE patient_id = ?", (patient_id,)
+    )
+    endo_rows = await cursor.fetchall()
+    status_priority = ["non_localise", "localise", "mesure", "prepare", "obture"]
+    endo_summary: dict = {}
+    for er in endo_rows:
+        tn = str(er["tooth_number"])
+        st = er["status"] or "non_localise"
+        cur = endo_summary.get(tn, "non_localise")
+        if status_priority.index(st) > status_priority.index(cur):
+            endo_summary[tn] = st
+
     return templates.TemplateResponse("dental/chart.html", {
         "request": request, "user": user, "active": "patients",
         "patient": patient, "teeth_data_json": json.dumps(teeth_data),
+        "endo_summary_json": json.dumps(endo_summary),
     })
 
 
