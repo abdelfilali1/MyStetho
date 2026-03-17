@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from typing import Optional
 import aiosqlite
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
@@ -152,8 +152,9 @@ async def add_treatment(
     # Create linked appointment
     appt_title = f"{treatment_type} - Dent {tooth_number}"
     appt_type = APPT_TYPE_MAP.get(treatment_type, "consultation")
-    start_dt = f"{tdate} {stime}:00" if len(stime) == 5 else f"{tdate} {stime}"
-    end_dt = f"{tdate} {stime}:30" if len(stime) == 5 else f"{tdate} {stime}"
+    start_dt_obj = datetime.strptime(f"{tdate} {stime}", "%Y-%m-%d %H:%M")
+    start_dt = start_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+    end_dt = (start_dt_obj + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
     cursor = await db.execute(
         """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, start_datetime, end_datetime, status, notes)
            VALUES (?, ?, ?, ?, ?, ?, 'planifie', ?)""",
