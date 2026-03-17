@@ -57,18 +57,31 @@ async def search_medications(
     if not q or len(q.strip()) < 1:
         return JSONResponse(content=[])
     user_specialty = user.get("specialty", "") or ""
-    med_filter = "dentiste" if "dent" in user_specialty.lower() else "general"
+    is_dentist = "dent" in user_specialty.lower()
     term = q.strip().lower()
-    # Two queries: starts-with first (ranked higher), then contains
-    cursor = await db.execute(
-        """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
-                  CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as rank
-           FROM medications
-           WHERE specialty = ? AND LOWER(name) LIKE ?
-           ORDER BY rank, name
-           LIMIT 100""",
-        (f"{term}%", med_filter, f"%{term}%"),
-    )
+    if is_dentist:
+        # Dentists see all medications; dental ones ranked first
+        cursor = await db.execute(
+            """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
+                      CASE WHEN specialty='dentiste' THEN 0 ELSE 1 END as spec_rank,
+                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as name_rank
+               FROM medications
+               WHERE LOWER(name) LIKE ?
+               ORDER BY spec_rank, name_rank, name
+               LIMIT 100""",
+            (f"{term}%", f"%{term}%"),
+        )
+    else:
+        cursor = await db.execute(
+            """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
+                      0 as spec_rank,
+                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as name_rank
+               FROM medications
+               WHERE specialty = 'general' AND LOWER(name) LIKE ?
+               ORDER BY name_rank, name
+               LIMIT 100""",
+            (f"{term}%", f"%{term}%"),
+        )
     rows = await cursor.fetchall()
     return JSONResponse(content=[dict(r) for r in rows])
 
