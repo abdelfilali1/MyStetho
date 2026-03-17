@@ -334,6 +334,250 @@
         font-size: 11px;
     }
 }
+
+/* ===== ENDODONTIC VIEW ===== */
+.endo-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.endo-grid::before {
+    content: 'Maxillaire';
+    grid-column: 1 / -1;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 0;
+}
+.endo-tooth-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 2px;
+    border: 1.5px solid var(--gray-300);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: 56px;
+}
+.endo-tooth-btn:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(28,140,248,0.12);
+    transform: translateY(-1px);
+}
+.endo-tooth-btn .endo-t-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+.endo-tooth-btn .endo-t-canals {
+    font-size: 9px;
+    color: var(--gray-400);
+    margin-top: 2px;
+}
+.endo-tooth-btn .endo-t-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+}
+.endo-tooth-btn.has-data {
+    border-color: var(--primary);
+    background: rgba(28,140,248,0.04);
+}
+.endo-separator {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: var(--gray-200);
+    margin: 4px 0;
+}
+.endo-separator::after {
+    content: 'Mandibulaire';
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 0 4px;
+}
+.endo-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 0;
+}
+
+/* Endo Modal */
+.endo-modal {
+    background: #fff;
+    border-radius: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+.endo-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--gray-200);
+}
+.endo-modal-tooth-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary);
+    margin-right: 10px;
+}
+.endo-modal-tooth-name {
+    font-size: 14px;
+    color: var(--gray-600);
+}
+.endo-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.endo-main-grid {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+.endo-diagram-card {
+    flex-shrink: 0;
+    padding: 16px;
+    border: 1px solid var(--gray-200);
+    border-radius: 14px;
+    background: var(--gray-50, #f8fafc);
+    text-align: center;
+}
+.endo-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+}
+.endo-table th {
+    text-align: left;
+    padding: 8px 10px;
+    background: var(--gray-50, #f8fafc);
+    border-bottom: 2px solid var(--gray-200);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+.endo-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: middle;
+}
+.endo-table tr:hover td {
+    background: rgba(28,140,248,0.03);
+}
+.endo-table tr.canal-highlight td {
+    background: rgba(28,140,248,0.08);
+}
+.endo-table input[type="number"] {
+    width: 72px;
+    padding: 5px 8px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: right;
+}
+.endo-table input[type="number"]:disabled {
+    background: transparent;
+    border-color: transparent;
+    color: var(--gray-700);
+}
+.endo-table select {
+    padding: 5px 8px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    font-size: 12px;
+    min-width: 110px;
+}
+.endo-table select:disabled {
+    background: transparent;
+    border-color: transparent;
+    color: var(--gray-700);
+    appearance: none;
+    -webkit-appearance: none;
+}
+.endo-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.endo-status-badge.st-non_localise { background: #f1f5f9; color: #64748b; }
+.endo-status-badge.st-localise { background: #dbeafe; color: #2563eb; }
+.endo-status-badge.st-mesure { background: #fef3c7; color: #d97706; }
+.endo-status-badge.st-prepare { background: #ede9fe; color: #7c3aed; }
+.endo-status-badge.st-obture { background: #dcfce7; color: #16a34a; }
+
+.endo-history-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.endo-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--gray-50, #f8fafc);
+    border-radius: 8px;
+    font-size: 12px;
+    gap: 12px;
+}
+.endo-history-item .endo-h-desc {
+    color: var(--gray-700);
+    flex: 1;
+}
+.endo-history-item .endo-h-desc strong {
+    color: var(--primary);
+}
+.endo-history-item .endo-h-date {
+    color: var(--gray-400);
+    white-space: nowrap;
+    font-size: 11px;
+}
+.endo-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--gray-200);
+}
+
+@media (max-width: 700px) {
+    .endo-grid { grid-template-columns: repeat(8, 1fr); }
+    .endo-main-grid { flex-direction: column; }
+    .endo-diagram-card { align-self: center; }
+    .endo-modal { border-radius: 14px; margin: 0 4px; }
+    .endo-modal-body { padding: 16px; }
+}
+@media (max-width: 480px) {
+    .endo-grid { grid-template-columns: repeat(4, 1fr); }
+    .endo-tooth-btn { min-height: 48px; }
+}
 </style>
 {% endblock %}
 
@@ -366,6 +610,10 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                 Odontogramme
             </button>
+            <button class="view-btn" id="btn-endo" onclick="switchView('endo')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v6m0 4v10M8 22c0-6 1-10 4-14M16 22c0-6-1-10-4-14"/><circle cx="12" cy="5" r="3"/></svg>
+                Endodontie
+            </button>
         </div>
     </div>
 
@@ -379,6 +627,79 @@
     <!-- React Odontogram View -->
     <div id="view-odontogram">
         <div id="react-odo-root"></div>
+    </div>
+
+    <!-- Endodontic View -->
+    <div id="view-endo" style="display:none;">
+        <div class="endo-grid" id="endo-grid"></div>
+        <div class="endo-legend">
+            <span class="legend-pill"><span class="legend-dot" style="background:#94a3b8;"></span>Non localisé</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Localisé</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Mesuré</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Préparé</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#22c55e;"></span>Obturé</span>
+        </div>
+    </div>
+
+    <!-- Endo Modal -->
+    <div id="endo-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.55);z-index:4000;overflow-y:auto;padding:20px;" onclick="if(event.target===this)closeEndoModal()">
+        <div class="endo-modal">
+            <div class="endo-modal-header">
+                <div>
+                    <span class="endo-modal-tooth-num" id="endo-m-num"></span>
+                    <span class="endo-modal-tooth-name" id="endo-m-name"></span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button id="endo-mode-toggle" class="btn btn-outline btn-sm" onclick="toggleEndoMode()">Modifier</button>
+                    <button onclick="closeEndoModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);line-height:1;">✕</button>
+                </div>
+            </div>
+
+            <div class="endo-modal-body">
+                <!-- Tooth diagram + Canal table -->
+                <div class="endo-main-grid">
+                    <div class="endo-diagram-card">
+                        <h4 style="margin:0 0 12px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Schéma de la dent</h4>
+                        <svg id="endo-tooth-svg" viewBox="0 0 200 320" width="200" height="320"></svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <h4 style="margin:0 0 12px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Canaux radiculaires</h4>
+                        <div style="overflow-x:auto;">
+                            <table class="endo-table" id="endo-canal-table">
+                                <thead>
+                                    <tr>
+                                        <th>Canal</th>
+                                        <th>Estimée (mm)</th>
+                                        <th>Travail (mm)</th>
+                                        <th>Finale (mm)</th>
+                                        <th>Statut</th>
+                                        <th>Mis à jour</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="endo-canal-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="endo-notes-section">
+                    <h4 style="margin:0 0 8px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Notes cliniques</h4>
+                    <textarea id="endo-general-notes" rows="3" class="panel-textarea" placeholder="Notes endodontiques..." disabled></textarea>
+                </div>
+
+                <!-- History -->
+                <div class="endo-history-section">
+                    <h4 style="margin:0 0 8px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Historique des modifications</h4>
+                    <div id="endo-history-list" class="endo-history-list"></div>
+                </div>
+            </div>
+
+            <div class="endo-modal-footer" id="endo-footer-edit" style="display:none;">
+                <button onclick="closeEndoModal()" class="btn btn-outline">Annuler</button>
+                <button onclick="saveEndoData()" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </div>
     </div>
 
     <!-- Legend -->
@@ -561,16 +882,28 @@ function buildTeethConditions() {
 
 // ===== VIEW TOGGLE =====
 function switchView(view) {
+    const isEndo = view === 'endo';
     const isLayout = view === 'layout';
     currentReactLayout = isLayout ? 'square' : 'circle';
     const root = document.getElementById('react-odo-root');
     if (root) root.dataset.layout = currentReactLayout;
-    document.getElementById('view-layout').style.display     = 'none';
-    document.getElementById('view-odontogram').style.display = 'block';
-    document.getElementById('btn-layout').classList.toggle('active', isLayout);
-    document.getElementById('btn-odontogram').classList.toggle('active', !isLayout);
 
-    if (!reactOdoMounted) {
+    document.getElementById('view-layout').style.display     = isEndo ? 'none' : 'none';
+    document.getElementById('view-odontogram').style.display  = isEndo ? 'none' : 'block';
+    document.getElementById('view-endo').style.display        = isEndo ? 'block' : 'none';
+
+    if (!isEndo) {
+        document.getElementById('view-layout').style.display = 'none';
+        document.getElementById('view-odontogram').style.display = 'block';
+    }
+
+    document.getElementById('btn-layout').classList.toggle('active', isLayout);
+    document.getElementById('btn-odontogram').classList.toggle('active', !isLayout && !isEndo);
+    document.getElementById('btn-endo').classList.toggle('active', isEndo);
+
+    if (isEndo) {
+        buildEndoGrid();
+    } else if (!reactOdoMounted) {
         mountReactOdontogram();
     } else {
         if (_setReactLayout) _setReactLayout(currentReactLayout);
@@ -902,10 +1235,403 @@ function showToast(msg) {
     setTimeout(() => { t.style.opacity = 0; }, 2500);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closePanel();
+        closeEndoModal();
+    }
+});
 document.addEventListener('DOMContentLoaded', () => {
     buildChart();
     switchView('odontogram');
 });
+
+// ===== ENDODONTIC VIEW =====
+
+const ENDO_CANALS_MAP = {
+    11:["Canal unique"],12:["Canal unique"],13:["Canal unique"],
+    14:["Vestibulaire","Palatin"],15:["Canal unique"],
+    16:["MV1","MV2","DV","Palatin"],17:["MV","DV","Palatin"],18:["MV","DV","Palatin"],
+    21:["Canal unique"],22:["Canal unique"],23:["Canal unique"],
+    24:["Vestibulaire","Palatin"],25:["Canal unique"],
+    26:["MV1","MV2","DV","Palatin"],27:["MV","DV","Palatin"],28:["MV","DV","Palatin"],
+    31:["Canal unique"],32:["Canal unique"],33:["Canal unique"],
+    34:["Canal unique"],35:["Canal unique"],
+    36:["MV","ML","Distal"],37:["MV","ML","Distal"],38:["MV","ML","Distal"],
+    41:["Canal unique"],42:["Canal unique"],43:["Canal unique"],
+    44:["Canal unique"],45:["Canal unique"],
+    46:["MV","ML","Distal"],47:["MV","ML","Distal"],48:["MV","ML","Distal"],
+};
+
+const ENDO_STATUS = {
+    non_localise: {label:'Non localisé', color:'#94a3b8'},
+    localise:     {label:'Localisé',     color:'#3b82f6'},
+    mesure:       {label:'Mesuré',       color:'#f59e0b'},
+    prepare:      {label:'Préparé',      color:'#8b5cf6'},
+    obture:       {label:'Obturé',       color:'#22c55e'},
+};
+
+let endoCurrentTooth = null;
+let endoData = {};
+let endoEditMode = false;
+let endoGridBuilt = false;
+// Track which teeth have endo data (loaded lazily)
+let endoTeethWithData = {};
+
+function buildEndoGrid() {
+    if (endoGridBuilt) return;
+    const grid = document.getElementById('endo-grid');
+    grid.innerHTML = '';
+
+    // Upper jaw
+    UPPER.forEach(n => {
+        grid.appendChild(createEndoToothBtn(n));
+    });
+
+    // Separator
+    const sep = document.createElement('div');
+    sep.className = 'endo-separator';
+    grid.appendChild(sep);
+
+    // Lower jaw
+    LOWER.forEach(n => {
+        grid.appendChild(createEndoToothBtn(n));
+    });
+
+    endoGridBuilt = true;
+}
+
+function createEndoToothBtn(n) {
+    const btn = document.createElement('button');
+    btn.className = 'endo-tooth-btn';
+    btn.id = `endo-btn-${n}`;
+    btn.onclick = () => openEndoModal(n);
+
+    const canals = ENDO_CANALS_MAP[n] || ['Canal unique'];
+    btn.innerHTML = `
+        <span class="endo-t-num">${n}</span>
+        <span class="endo-t-canals">${canals.length} can.</span>
+        <span class="endo-t-dot" style="background:#e2e8f0;"></span>
+    `;
+    return btn;
+}
+
+function updateEndoBtn(n, canals) {
+    const btn = document.getElementById(`endo-btn-${n}`);
+    if (!btn) return;
+    const dot = btn.querySelector('.endo-t-dot');
+    if (!canals || canals.length === 0) {
+        dot.style.background = '#e2e8f0';
+        btn.classList.remove('has-data');
+        return;
+    }
+    // Use the "worst" status as the dot color
+    const priority = ['non_localise','localise','mesure','prepare','obture'];
+    let best = 0;
+    canals.forEach(c => {
+        const idx = priority.indexOf(c.status || 'non_localise');
+        if (idx > best) best = idx;
+    });
+    const hasReal = canals.some(c => c.status && c.status !== 'non_localise');
+    const statusKey = priority[best];
+    dot.style.background = ENDO_STATUS[statusKey]?.color || '#e2e8f0';
+    btn.classList.toggle('has-data', hasReal);
+}
+
+async function openEndoModal(toothNum) {
+    endoCurrentTooth = toothNum;
+    endoEditMode = false;
+    document.getElementById('endo-m-num').textContent = toothNum;
+    document.getElementById('endo-m-name').textContent = TOOTH_NAMES[toothNum] || `Dent ${toothNum}`;
+    document.getElementById('endo-mode-toggle').textContent = 'Modifier';
+    document.getElementById('endo-footer-edit').style.display = 'none';
+    document.getElementById('endo-modal-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+
+    // Load data
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/${toothNum}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        endoData = await res.json();
+    } catch (e) {
+        console.error(e);
+        endoData = {
+            canals: (ENDO_CANALS_MAP[toothNum] || ['Canal unique']).map(n => ({
+                canal_name: n, estimated_length: null, working_length: null,
+                final_length: null, status: 'non_localise', notes: '', updated_at: null
+            })),
+            history: [],
+            general_notes: '',
+        };
+    }
+
+    renderEndoModal();
+    drawEndoToothSVG(toothNum, endoData.canals);
+}
+
+function closeEndoModal() {
+    document.getElementById('endo-modal-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    endoCurrentTooth = null;
+}
+
+function toggleEndoMode() {
+    endoEditMode = !endoEditMode;
+    document.getElementById('endo-mode-toggle').textContent = endoEditMode ? 'Lecture' : 'Modifier';
+    document.getElementById('endo-footer-edit').style.display = endoEditMode ? 'flex' : 'none';
+    renderEndoCanalTable();
+    document.getElementById('endo-general-notes').disabled = !endoEditMode;
+}
+
+function renderEndoModal() {
+    renderEndoCanalTable();
+    renderEndoHistory();
+    const notesEl = document.getElementById('endo-general-notes');
+    notesEl.value = endoData.general_notes || '';
+    notesEl.disabled = !endoEditMode;
+}
+
+function renderEndoCanalTable() {
+    const tbody = document.getElementById('endo-canal-tbody');
+    const canals = endoData.canals || [];
+    tbody.innerHTML = '';
+
+    canals.forEach((c, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.canalIndex = i;
+        tr.addEventListener('mouseenter', () => highlightSVGCanal(i, true));
+        tr.addEventListener('mouseleave', () => highlightSVGCanal(i, false));
+
+        const statusInfo = ENDO_STATUS[c.status] || ENDO_STATUS.non_localise;
+        const updated = c.updated_at ? c.updated_at.substring(0, 16).replace('T', ' ') : '—';
+
+        if (endoEditMode) {
+            tr.innerHTML = `
+                <td><strong>${c.canal_name}</strong></td>
+                <td><input type="number" step="0.5" min="0" max="40" value="${c.estimated_length ?? ''}" data-field="estimated_length" data-idx="${i}"></td>
+                <td><input type="number" step="0.5" min="0" max="40" value="${c.working_length ?? ''}" data-field="working_length" data-idx="${i}"></td>
+                <td><input type="number" step="0.5" min="0" max="40" value="${c.final_length ?? ''}" data-field="final_length" data-idx="${i}"></td>
+                <td>
+                    <select data-field="status" data-idx="${i}">
+                        ${Object.entries(ENDO_STATUS).map(([k,v]) =>
+                            `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v.label}</option>`
+                        ).join('')}
+                    </select>
+                </td>
+                <td style="font-size:11px;color:var(--gray-400);">${updated}</td>
+            `;
+        } else {
+            const fmtLen = v => v != null ? `${v} mm` : '—';
+            tr.innerHTML = `
+                <td><strong>${c.canal_name}</strong></td>
+                <td>${fmtLen(c.estimated_length)}</td>
+                <td>${fmtLen(c.working_length)}</td>
+                <td>${fmtLen(c.final_length)}</td>
+                <td><span class="endo-status-badge st-${c.status || 'non_localise'}">${statusInfo.label}</span></td>
+                <td style="font-size:11px;color:var(--gray-400);">${updated}</td>
+            `;
+        }
+        tbody.appendChild(tr);
+    });
+}
+
+function renderEndoHistory() {
+    const list = document.getElementById('endo-history-list');
+    const history = endoData.history || [];
+    if (history.length === 0) {
+        list.innerHTML = '<p style="font-size:12px;color:var(--gray-400);padding:8px 0;">Aucune modification enregistrée</p>';
+        return;
+    }
+    list.innerHTML = history.map(h => {
+        const old = h.old_value || '—';
+        const nw = h.new_value || '—';
+        const dt = h.changed_at ? h.changed_at.substring(0, 16).replace('T', ' ') : '';
+        const by = h.changed_by_name || '';
+        return `<div class="endo-history-item">
+            <span class="endo-h-desc"><strong>${h.canal_name}</strong> – ${h.field} : ${old} → ${nw}${by ? ' · ' + by : ''}</span>
+            <span class="endo-h-date">${dt}</span>
+        </div>`;
+    }).join('');
+}
+
+function highlightSVGCanal(index, on) {
+    const svg = document.getElementById('endo-tooth-svg');
+    svg.querySelectorAll('.canal-path').forEach((p, i) => {
+        p.style.strokeWidth = (on && i === index) ? '4' : '2.5';
+        p.style.filter = (on && i === index) ? 'drop-shadow(0 0 4px rgba(28,140,248,0.5))' : 'none';
+    });
+    const row = document.querySelector(`#endo-canal-tbody tr[data-canal-index="${index}"]`);
+    if (row) row.classList.toggle('canal-highlight', on);
+}
+
+async function saveEndoData() {
+    if (!endoCurrentTooth) return;
+    const canals = endoData.canals.map((c, i) => {
+        const row = document.querySelector(`#endo-canal-tbody tr[data-canal-index="${i}"]`);
+        if (!row) return c;
+        const inputs = row.querySelectorAll('input, select');
+        const updated = { ...c };
+        inputs.forEach(inp => {
+            const field = inp.dataset.field;
+            if (!field) return;
+            if (inp.type === 'number') {
+                updated[field] = inp.value !== '' ? parseFloat(inp.value) : null;
+            } else {
+                updated[field] = inp.value;
+            }
+        });
+        return updated;
+    });
+
+    const generalNotes = document.getElementById('endo-general-notes').value;
+
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ canals, general_notes: generalNotes })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            showToast(err.error || 'Erreur');
+            return;
+        }
+        showToast('Données endodontiques enregistrées');
+        updateEndoBtn(endoCurrentTooth, canals);
+        // Reload data to get fresh history
+        const res2 = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}`);
+        if (res2.ok) endoData = await res2.json();
+        endoEditMode = false;
+        document.getElementById('endo-mode-toggle').textContent = 'Modifier';
+        document.getElementById('endo-footer-edit').style.display = 'none';
+        renderEndoModal();
+        drawEndoToothSVG(endoCurrentTooth, endoData.canals);
+    } catch (e) {
+        console.error(e);
+        showToast('Erreur réseau');
+    }
+}
+
+// ===== TOOTH SVG DIAGRAM =====
+function drawEndoToothSVG(toothNum, canals) {
+    const svg = document.getElementById('endo-tooth-svg');
+    svg.innerHTML = '';
+    const ns = 'http://www.w3.org/2000/svg';
+
+    const digit = toothNum % 10;
+    const isUpper = toothNum < 30;
+    const isMolar = digit >= 6;
+    const isPremolar = digit >= 4 && digit <= 5;
+    const numCanals = canals ? canals.length : 1;
+
+    // Crown
+    const crownY = isUpper ? 20 : 200;
+    const crownH = 80;
+    const crownW = isMolar ? 80 : isPremolar ? 60 : 40;
+    const cx = 100;
+
+    // Crown shape
+    const crown = document.createElementNS(ns, 'rect');
+    crown.setAttribute('x', cx - crownW/2);
+    crown.setAttribute('y', crownY);
+    crown.setAttribute('width', crownW);
+    crown.setAttribute('height', crownH);
+    crown.setAttribute('rx', isMolar ? 12 : 16);
+    crown.setAttribute('fill', '#f1f5f9');
+    crown.setAttribute('stroke', '#94a3b8');
+    crown.setAttribute('stroke-width', '1.5');
+    svg.appendChild(crown);
+
+    // Crown label
+    const crownTxt = document.createElementNS(ns, 'text');
+    crownTxt.setAttribute('x', cx);
+    crownTxt.setAttribute('y', crownY + crownH/2 + 5);
+    crownTxt.setAttribute('text-anchor', 'middle');
+    crownTxt.setAttribute('font-size', '14');
+    crownTxt.setAttribute('font-weight', '700');
+    crownTxt.setAttribute('fill', '#475569');
+    crownTxt.textContent = toothNum;
+    svg.appendChild(crownTxt);
+
+    // Root(s) and canal(s)
+    const rootStartY = isUpper ? crownY + crownH : crownY;
+    const rootDir = isUpper ? 1 : -1;
+    const rootLen = 140;
+
+    const canalColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e'];
+
+    if (numCanals === 1) {
+        // Single root
+        drawRoot(svg, ns, cx, rootStartY, rootDir, rootLen, 20);
+        drawCanal(svg, ns, cx, rootStartY, rootDir, rootLen, canalColors[0], 0, canals?.[0]?.status);
+    } else {
+        // Multiple roots spread out
+        const spread = Math.min(crownW * 0.7, numCanals * 25);
+        const startX = cx - spread/2;
+        const step = spread / (numCanals - 1);
+
+        for (let i = 0; i < numCanals; i++) {
+            const rx = startX + step * i;
+            const rl = rootLen - Math.abs(i - (numCanals-1)/2) * 12;
+            drawRoot(svg, ns, rx, rootStartY, rootDir, rl, 12);
+            drawCanal(svg, ns, rx, rootStartY, rootDir, rl, canalColors[i % canalColors.length], i, canals?.[i]?.status);
+        }
+    }
+
+    // Canal name labels
+    if (canals) {
+        const labelY = isUpper ? 310 : 10;
+        canals.forEach((c, i) => {
+            const lbl = document.createElementNS(ns, 'text');
+            const spread = Math.min(crownW * 0.7, numCanals * 25);
+            const startX = numCanals === 1 ? cx : cx - spread/2;
+            const step = numCanals === 1 ? 0 : spread / (numCanals - 1);
+            lbl.setAttribute('x', startX + step * i);
+            lbl.setAttribute('y', labelY);
+            lbl.setAttribute('text-anchor', 'middle');
+            lbl.setAttribute('font-size', '10');
+            lbl.setAttribute('fill', canalColors[i % canalColors.length]);
+            lbl.setAttribute('font-weight', '600');
+            lbl.textContent = c.canal_name;
+            svg.appendChild(lbl);
+        });
+    }
+}
+
+function drawRoot(svg, ns, x, startY, dir, length, width) {
+    const endY = startY + dir * length;
+    const path = document.createElementNS(ns, 'path');
+    const hw = width / 2;
+    path.setAttribute('d', `M${x-hw},${startY} Q${x-hw*0.8},${startY + dir*length*0.6} ${x},${endY} Q${x+hw*0.8},${startY + dir*length*0.6} ${x+hw},${startY} Z`);
+    path.setAttribute('fill', '#e8dcc8');
+    path.setAttribute('stroke', '#c4a882');
+    path.setAttribute('stroke-width', '1');
+    svg.appendChild(path);
+}
+
+function drawCanal(svg, ns, x, startY, dir, length, color, index, status) {
+    const endY = startY + dir * (length - 10);
+    const path = document.createElementNS(ns, 'path');
+    const curve = dir * length * 0.4;
+    path.setAttribute('d', `M${x},${startY + dir*10} Q${x + (index % 2 === 0 ? -3 : 3)},${startY + curve} ${x},${endY}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', '2.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.classList.add('canal-path');
+    path.style.transition = 'stroke-width 0.15s, filter 0.15s';
+
+    // Status-based opacity
+    const statusInfo = ENDO_STATUS[status] || ENDO_STATUS.non_localise;
+    if (status === 'obture') {
+        path.setAttribute('stroke', '#22c55e');
+        path.setAttribute('stroke-width', '4');
+    } else if (status === 'non_localise') {
+        path.setAttribute('stroke-dasharray', '4,4');
+        path.setAttribute('opacity', '0.5');
+    }
+
+    svg.appendChild(path);
+}
 </script>
 {% endblock %}

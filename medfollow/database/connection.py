@@ -338,6 +338,44 @@ async def init_db():
             FOREIGN KEY (patient_id) REFERENCES patients(id),
             FOREIGN KEY (doctor_id) REFERENCES users(id)
         );
+        CREATE TABLE IF NOT EXISTS endo_canals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            tooth_number INTEGER NOT NULL,
+            canal_name TEXT NOT NULL,
+            estimated_length REAL,
+            working_length REAL,
+            final_length REAL,
+            status TEXT CHECK(status IN ('non_localise', 'localise', 'mesure', 'prepare', 'obture')) DEFAULT 'non_localise',
+            notes TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            UNIQUE(patient_id, tooth_number, canal_name)
+        );
+
+        CREATE TABLE IF NOT EXISTS endo_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            tooth_number INTEGER NOT NULL,
+            canal_name TEXT NOT NULL,
+            field TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_by INTEGER,
+            changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            FOREIGN KEY (changed_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS endo_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            tooth_number INTEGER NOT NULL,
+            general_notes TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES patients(id),
+            UNIQUE(patient_id, tooth_number)
+        );
     """)
     await db.commit()
 
