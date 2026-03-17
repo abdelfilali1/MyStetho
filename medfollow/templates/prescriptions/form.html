@@ -292,7 +292,7 @@ async function doMedSearch(inp) {
     const q = inp.value.trim();
     const box = inp.nextElementSibling;
     if (!box) return;
-    if (q.length < 2) { box.style.display = 'none'; return; }
+    if (q.length < 1) { box.style.display = 'none'; return; }
     try {
         const res = await fetch(`/prescriptions/medications/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();

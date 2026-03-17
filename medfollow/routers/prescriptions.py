@@ -54,16 +54,20 @@ async def search_medications(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content=[])
-    if not q or len(q.strip()) < 2:
+    if not q or len(q.strip()) < 1:
         return JSONResponse(content=[])
     user_specialty = user.get("specialty", "") or ""
     med_filter = "dentiste" if "dent" in user_specialty.lower() else "general"
+    term = q.strip().lower()
+    # Two queries: starts-with first (ranked higher), then contains
     cursor = await db.execute(
-        """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab
+        """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
+                  CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as rank
            FROM medications
-           WHERE specialty = ? AND name LIKE ?
-           ORDER BY name LIMIT 20""",
-        (med_filter, f"%{q.strip()}%"),
+           WHERE specialty = ? AND LOWER(name) LIKE ?
+           ORDER BY rank, name
+           LIMIT 100""",
+        (f"{term}%", med_filter, f"%{term}%"),
     )
     rows = await cursor.fetchall()
     return JSONResponse(content=[dict(r) for r in rows])
