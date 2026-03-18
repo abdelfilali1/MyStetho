@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import aiosqlite
+import json
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
@@ -177,23 +178,52 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
         return RedirectResponse(url="/patients", status_code=302)
     patient = dict(row)
 
-    # Medical history
     cursor = await db.execute(
         "SELECT * FROM medical_history WHERE patient_id = ? ORDER BY date_recorded DESC", (patient_id,)
     )
     history = [dict(r) for r in await cursor.fetchall()]
 
-    # Recent appointments
     cursor = await db.execute(
         "SELECT * FROM appointments WHERE patient_id = ? ORDER BY start_datetime DESC LIMIT 10", (patient_id,)
     )
     appointments = [dict(r) for r in await cursor.fetchall()]
 
-    # Recent consultations
     cursor = await db.execute(
         "SELECT * FROM consultations WHERE patient_id = ? ORDER BY consultation_date DESC LIMIT 10", (patient_id,)
     )
     consultations = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT * FROM prescriptions WHERE patient_id = ? ORDER BY prescription_date DESC", (patient_id,)
+    )
+    prescriptions = [dict(r) for r in await cursor.fetchall()]
+
+    from datetime import datetime
+    now_year = datetime.now().year
+    user_specialty = user.get("specialty", "") or ""
+    is_dentist = "dent" in user_specialty.lower()
+
+    teeth_data_json = "{}"
+    endo_summary_json = "{}"
+    if is_dentist:
+        cursor = await db.execute("SELECT * FROM dental_teeth WHERE patient_id = ?", (patient_id,))
+        teeth_rows = await cursor.fetchall()
+        teeth_data = {str(r["tooth_number"]): dict(r) for r in teeth_rows}
+        teeth_data_json = json.dumps(teeth_data)
+
+        cursor = await db.execute(
+            "SELECT tooth_number, status FROM endo_canals WHERE patient_id = ?", (patient_id,)
+        )
+        endo_rows = await cursor.fetchall()
+        status_priority = ["non_localise", "localise", "mesure", "prepare", "obture"]
+        endo_summary: dict = {}
+        for er in endo_rows:
+            tn = str(er["tooth_number"])
+            st = er["status"] or "non_localise"
+            cur_st = endo_summary.get(tn, "non_localise")
+            if status_priority.index(st) > status_priority.index(cur_st):
+                endo_summary[tn] = st
+        endo_summary_json = json.dumps(endo_summary)
 
     return templates.TemplateResponse(
         "patients/detail.html",
@@ -201,6 +231,10 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
             "request": request, "user": user, "active": "patients",
             "patient": patient, "history": history,
             "appointments": appointments, "consultations": consultations,
+            "prescriptions": prescriptions,
+            "now_year": now_year, "is_dentist": is_dentist,
+            "teeth_data_json": teeth_data_json,
+            "endo_summary_json": endo_summary_json,
         },
     )
 

@@ -79,10 +79,14 @@ async def dental_chart(request: Request, patient_id: int, db: aiosqlite.Connecti
         if status_priority.index(st) > status_priority.index(cur):
             endo_summary[tn] = st
 
+    embed = request.query_params.get("embed") == "1"
+    base_template = "base_embed.html" if embed else "base.html"
+
     return templates.TemplateResponse("dental/chart.html", {
         "request": request, "user": user, "active": "patients",
         "patient": patient, "teeth_data_json": json.dumps(teeth_data),
         "endo_summary_json": json.dumps(endo_summary),
+        "base_template": base_template,
     })
 
 

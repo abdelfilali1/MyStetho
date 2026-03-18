@@ -151,11 +151,12 @@ body.mobile-nav-open {
 }
 
 .sidebar .brand-logo {
-    width: 168px;
-    height: 168px;
-    object-fit: contain;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
     border-radius: 20px;
-    padding: 12px;
+    padding: 0;
     border: 1px solid rgba(150, 211, 250, 0.34);
     background: rgba(5, 28, 50, 0.48);
 }

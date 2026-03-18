@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ patient.last_name | upper }} {{ patient.first_name }} — MyStetho{% endblock %}
+{% block title %}{{ patient.last_name | upper }} {{ patient.first_name }} — Doctivo{% endblock %}
 
 {% block breadcrumb %}
 <div class="breadcrumb no-print">
@@ -9,21 +9,183 @@
 </div>
 {% endblock %}
 
+{% block head %}
+{% if is_dentist %}
+<link rel="stylesheet" href="/static/js/odontogram-view.iife.css?v=20260316-12">
+<style>
+/* ===== CSS copié exactement depuis dental/chart.html ===== */
+.view-toggle-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+}
+.view-segmented {
+    display: flex; gap: 0;
+    background: var(--gray-100); border-radius: 11px;
+    padding: 4px; border: 1px solid var(--gray-200);
+    flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
+}
+.view-btn {
+    padding: 6px 14px; border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    color: var(--gray-500); background: transparent;
+    transition: all 0.18s; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+}
+.view-btn.active {
+    background: white; color: var(--gray-900);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+}
+.view-btn-sep {
+    width: 1px; background: var(--gray-300); margin: 4px 2px; align-self: stretch;
+}
+.odo-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 8px;
+}
+.stat-kpi {
+    background: var(--panel-strong); border: 1px solid var(--stroke);
+    border-radius: 12px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: var(--shadow-soft);
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.stat-kpi:hover { box-shadow: var(--shadow-medium); transform: translateY(-1px); }
+.stat-kpi-icon {
+    width: 30px; height: 30px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+}
+.stat-kpi-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stat-kpi-num { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.stat-kpi-label { font-size: 10px; color: var(--gray-500); margin-top: 1px; font-weight: 500; }
+.odonto-box {
+    background: linear-gradient(165deg, #0c1829 0%, #0f172a 50%, #0a1528 100%);
+    border-radius: 14px; padding: 12px 12px 10px;
+    margin-bottom: 8px; position: relative; overflow: visible;
+    box-shadow: 0 24px 56px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.odonto-box::before {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 55%; height: 55%;
+    background: radial-gradient(ellipse, rgba(28,140,248,0.05) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+}
+#svg-chart { position: relative; z-index: 1; width: 100%; height: auto; display: block; }
+.tooth-g { cursor: pointer; transition: filter 0.18s ease; }
+.tooth-g:hover { filter: drop-shadow(0 0 7px rgba(251,191,36,0.85)) brightness(1.1); }
+.tooth-g:active { filter: drop-shadow(0 0 12px rgba(251,191,36,1)) brightness(1.2); }
+.tooth-g.selected { filter: drop-shadow(0 0 10px rgba(251,191,36,0.95)) brightness(1.12); }
+.odo-react-wrap {
+    background: var(--panel-strong); border: 1px solid var(--stroke);
+    border-radius: 14px; padding: 8px 10px; margin-bottom: 8px; box-shadow: var(--shadow-soft);
+}
+.react-odo-root { display: flex; justify-content: center; overflow-x: hidden; }
+.react-odo-root .odontogram-container { font-family: 'Manrope', sans-serif !important; }
+.react-odo-root svg { cursor: pointer; }
+.react-odo-root .Odontogram { width: 100%; flex: 0 0 auto; }
+.react-odo-root[data-layout="circle"] .Odontogram svg { width: 216px !important; max-width: 100%; height: auto !important; display: block; margin: 0 auto; }
+.react-odo-root[data-layout="square"] .Odontogram svg { width: 560px !important; max-width: 100%; height: auto !important; display: block; margin: 0 auto; }
+.odo-legend {
+    background: var(--panel-strong); border: 1px solid var(--stroke);
+    border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow-soft);
+}
+.odo-legend-title { font-size: 10px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.odo-legend-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.legend-pill { display: flex; align-items: center; gap: 6px; background: transparent; border: none; border-radius: 0; padding: 0; font-size: 11px; color: var(--gray-700); font-weight: 500; white-space: normal; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.08); }
+#panel {
+    position: fixed; top: 0; right: -460px; width: 430px; height: 100vh; background: #fff;
+    box-shadow: -12px 0 48px rgba(0,0,0,0.15), -1px 0 0 rgba(0,0,0,0.05);
+    z-index: 2000; transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+}
+#panel.open { right: 0; }
+.panel-hdr { display: flex; align-items: center; justify-content: space-between; padding: 22px 22px 18px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: linear-gradient(135deg, #0f172a, #1e3a5f); color: white; }
+.panel-hdr-tooth { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.03em; }
+.panel-hdr-name { font-size: 12px; color: rgba(148,163,184,0.9); margin-top: 3px; }
+.panel-close-btn { background: rgba(255,255,255,0.1); border: none; cursor: pointer; width: 36px; height: 36px; border-radius: 9px; font-size: 16px; color: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.panel-close-btn:hover { background: rgba(255,255,255,0.2); }
+.panel-body { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.panel-section-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 10px; }
+.panel-select { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13px; color: #0f172a; background: white; margin-bottom: 10px; appearance: auto; transition: border-color 0.15s; }
+.panel-select:focus { border-color: #1c8cf8; outline: none; }
+.panel-textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13px; color: #0f172a; resize: vertical; box-sizing: border-box; font-family: inherit; margin-bottom: 10px; transition: border-color 0.15s; }
+.panel-textarea:focus { border-color: #1c8cf8; outline: none; }
+.panel-btn-primary { width: 100%; padding: 11px; background: #1c8cf8; color: white; border: none; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.panel-btn-primary:hover { background: #0f76d9; }
+.panel-add-box { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+.panel-btn-dark { width: 100%; padding: 10px; background: #0f172a; color: white; border: none; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.panel-btn-dark:hover { background: #1e293b; }
+.treatment-card { background: white; border-radius: 10px; padding: 11px 14px; margin-bottom: 8px; border: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.treatment-type { font-weight: 700; font-size: 13px; color: #1e293b; }
+.treatment-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+.treatment-date { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+.treatment-del { background: #fef2f2; border: none; cursor: pointer; width: 28px; height: 28px; border-radius: 7px; font-size: 13px; color: #ef4444; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.treatment-del:hover { background: #fee2e2; }
+#overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1999; backdrop-filter: blur(2px); }
+#overlay.open { display: block; }
+#toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 22px; border-radius: 50px; font-size: 13px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.endo-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px; margin-bottom: 8px; }
+.endo-arch-label { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 0; }
+.endo-tooth-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 2px; border: 1.5px solid var(--gray-300); border-radius: 10px; background: #fff; cursor: pointer; transition: all 0.15s; min-height: 56px; }
+.endo-tooth-btn:hover { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(28,140,248,0.12); transform: translateY(-1px); }
+.endo-tooth-btn .endo-t-num { font-size: 13px; font-weight: 700; color: var(--gray-700); }
+.endo-tooth-btn .endo-t-canals { font-size: 9px; color: var(--gray-400); margin-top: 2px; }
+.endo-tooth-btn .endo-t-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; }
+.endo-tooth-btn.has-data { border-color: var(--primary); background: rgba(28,140,248,0.04); }
+.endo-separator { grid-column: 1 / -1; height: 1px; background: var(--gray-200); margin: 6px 0 2px; }
+.endo-legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+.endo-modal { background: #fff; border-radius: 20px; max-width: 900px; margin: 0 auto; box-shadow: 0 24px 64px rgba(0,0,0,0.25); overflow: hidden; }
+.endo-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--gray-200); }
+.endo-modal-tooth-num { font-size: 22px; font-weight: 800; color: var(--primary); margin-right: 10px; }
+.endo-modal-tooth-name { font-size: 14px; color: var(--gray-600); }
+.endo-modal-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; max-height: 70vh; overflow-y: auto; }
+.endo-main-grid { display: flex; gap: 24px; align-items: flex-start; }
+.endo-diagram-card { flex-shrink: 0; padding: 16px; border: 1px solid var(--gray-200); border-radius: 14px; background: var(--gray-50, #f8fafc); text-align: center; }
+.endo-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.endo-table th { text-align: left; padding: 8px 10px; background: var(--gray-50, #f8fafc); border-bottom: 2px solid var(--gray-200); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--gray-500); white-space: nowrap; }
+.endo-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+.endo-table tr:hover td { background: rgba(28,140,248,0.03); }
+.endo-table tr.canal-highlight td { background: rgba(28,140,248,0.08); }
+.endo-table input[type="number"] { width: 72px; padding: 5px 8px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 13px; text-align: right; }
+.endo-table input[type="number"]:disabled { background: transparent; border-color: transparent; color: var(--gray-700); }
+.endo-table select { padding: 5px 8px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 12px; min-width: 110px; }
+.endo-table select:disabled { background: transparent; border-color: transparent; color: var(--gray-700); appearance: none; -webkit-appearance: none; }
+.endo-status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.endo-status-badge.st-non_localise { background: #f1f5f9; color: #64748b; }
+.endo-status-badge.st-localise { background: #dbeafe; color: #2563eb; }
+.endo-status-badge.st-mesure { background: #fef3c7; color: #d97706; }
+.endo-status-badge.st-prepare { background: #ede9fe; color: #7c3aed; }
+.endo-status-badge.st-obture { background: #dcfce7; color: #16a34a; }
+.endo-history-section .endo-table tbody tr.editing td { background: rgba(28,140,248,0.05); }
+.endo-history-section .endo-table input[type="text"] { width: 90px; padding: 4px 8px; border: 1px solid var(--primary); border-radius: 6px; font-size: 12px; }
+.endo-history-correction { font-size: 10px; color: var(--gray-400); font-style: italic; display: block; }
+.endo-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--gray-200); }
+.appt-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; margin-top: 4px; }
+.appt-badge.planifie  { background:#f1f5f9; color:#475569; }
+.appt-badge.confirme  { background:#dbeafe; color:#1d4ed8; }
+.appt-badge.en_cours  { background:#fef3c7; color:#b45309; }
+.appt-badge.termine   { background:#dcfce7; color:#15803d; }
+.appt-badge.annule    { background:#fee2e2; color:#b91c1c; }
+.appt-badge.absent    { background:#fce7f3; color:#9d174d; }
+.treatment-card.is-done { background: #f8fafc; border-left: 3px solid #22c55e; opacity: 0.85; }
+.treatment-card.is-done .treatment-type { text-decoration: line-through; color: #64748b; }
+@media (max-width: 900px) { .odo-legend-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .endo-grid { grid-template-columns: repeat(8, 1fr); } .endo-main-grid { flex-direction: column; } .endo-diagram-card { align-self: center; } .endo-modal { border-radius: 14px; margin: 0 4px; } .endo-modal-body { padding: 16px; } }
+@media (max-width: 600px) { #panel { width: 100vw; right: -100vw; } .odo-legend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .endo-grid { grid-template-columns: repeat(4, 1fr); } .endo-tooth-btn { min-height: 48px; } }
+@media (max-width: 420px) { .odo-stats { grid-template-columns: 1fr; } .view-btn { padding: 6px 10px; font-size: 11px; } }
+</style>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
         <h2>{{ patient.last_name | upper }} {{ patient.first_name }}</h2>
         <p class="subtitle">Dossier patient #{{ patient.id }}</p>
     </div>
-    <div style="display: flex; gap: 8px;" class="no-print">
-        {% if user.specialty == 'Dentiste' %}
-        <a href="/dental/{{ patient.id }}?ui=20260316-12" class="btn btn-primary" style="gap:6px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.5 3 1 4l1 8c.2 1 1 2 2 2h4c1 0 1.8-1 2-2l1-8c.5-1 1-2.5 1-4 0-2.5-2.5-5-6-5z"/>
-            </svg>
-            Odontogramme
-        </a>
-        {% endif %}
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;" class="no-print">
         <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
         <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline">Modifier</a>
         <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer le patient {{ patient.last_name | upper }} {{ patient.first_name }} ? Cette action est irréversible.')">
@@ -32,8 +194,38 @@
     </div>
 </div>
 
-<div class="detail-grid">
-    <!-- Info card -->
+<!-- Barre d'onglets -->
+<div class="view-toggle-bar no-print" style="margin-bottom:20px;">
+    <div class="view-segmented">
+        <button class="view-btn active" id="btn-info"    onclick="switchTab('info')">Informations</button>
+        <button class="view-btn"         id="btn-hist"   onclick="switchTab('hist')">Antécédents</button>
+        <button class="view-btn"         id="btn-appts"  onclick="switchTab('appts')">Rendez-vous</button>
+        <button class="view-btn"         id="btn-consult" onclick="switchTab('consult')">Consultations</button>
+        <div class="view-btn-sep"></div>
+        <button class="view-btn" id="btn-ordonnance" onclick="switchTab('ordonnance')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Ordonnances
+        </button>
+        {% if is_dentist %}
+        <div class="view-btn-sep"></div>
+        <button class="view-btn" id="btn-layout" onclick="switchTab('layout')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Disposition
+        </button>
+        <button class="view-btn" id="btn-odontogram" onclick="switchTab('odontogram')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            Odontogramme
+        </button>
+        <button class="view-btn" id="btn-endo" onclick="switchTab('endo')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v6m0 4v10M8 22c0-6 1-10 4-14M16 22c0-6-1-10-4-14"/><circle cx="12" cy="5" r="3"/></svg>
+            Endodontie
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ===== ONGLET : INFORMATIONS ===== -->
+<div id="view-info">
     <div class="card">
         <div class="card-header"><h3>Informations personnelles</h3></div>
         <div class="card-body">
@@ -87,12 +279,12 @@
             {% endif %}
         </div>
     </div>
+</div>
 
-    <!-- Medical history -->
+<!-- ===== ONGLET : ANTÉCÉDENTS ===== -->
+<div id="view-hist" style="display:none;">
     <div class="card">
-        <div class="card-header">
-            <h3>Antécédents médicaux</h3>
-        </div>
+        <div class="card-header"><h3>Antécédents médicaux</h3></div>
         <div class="card-body">
             {% if history %}
             <ul class="list">
@@ -109,7 +301,6 @@
             {% else %}
             <p class="empty-state" style="padding: 16px;">Aucun antécédent enregistré</p>
             {% endif %}
-
             <form method="POST" action="/patients/{{ patient.id }}/history" class="history-form">
                 <h4 style="margin: 16px 0 8px; font-size: 14px; color: var(--gray-600);">Ajouter un antécédent</h4>
                 <div class="form-row">
@@ -134,8 +325,8 @@
     </div>
 </div>
 
-<!-- Appointments & Consultations -->
-<div class="detail-grid" style="margin-top: 20px;">
+<!-- ===== ONGLET : RENDEZ-VOUS ===== -->
+<div id="view-appts" style="display:none;">
     <div class="card">
         <div class="card-header"><h3>Derniers rendez-vous</h3></div>
         <div class="card-body">
@@ -159,7 +350,10 @@
             {% endif %}
         </div>
     </div>
+</div>
 
+<!-- ===== ONGLET : CONSULTATIONS ===== -->
+<div id="view-consult" style="display:none;">
     <div class="card">
         <div class="card-header"><h3>Dernières consultations</h3></div>
         <div class="card-body">
@@ -184,5 +378,834 @@
         </div>
     </div>
 </div>
+
+<!-- ===== ONGLET : ORDONNANCES ===== -->
+<div id="view-ordonnance" style="display:none;">
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Ordonnances</h3>
+            <a href="/prescriptions/new?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Ajouter une ordonnance</a>
+        </div>
+        <div class="card-body">
+            {% if prescriptions %}
+            <table class="table">
+                <thead>
+                    <tr><th>Date</th><th>Statut</th><th>Notes</th><th>Renouvelable</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for p in prescriptions %}
+                    <tr>
+                        <td>{{ p.prescription_date[:10] if p.prescription_date else '—' }}</td>
+                        <td><span class="badge badge-{{ p.status or 'actif' }}">{{ p.status or 'actif' }}</span></td>
+                        <td>{{ p.notes or '—' }}</td>
+                        <td>{{ 'Oui' if p.is_renewable else 'Non' }}</td>
+                        <td><a href="/prescriptions/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucune ordonnance enregistrée</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if is_dentist %}
+<!-- ===== ONGLET : DISPOSITION (React Square) ===== -->
+<div id="view-layout" style="display:none;">
+    <div class="odo-stats" id="stats-row-layout"></div>
+    <div class="odo-react-wrap">
+        <div id="react-odo-root-layout" class="react-odo-root"></div>
+    </div>
+    <div class="odo-legend">
+        <div class="odo-legend-title">Légende des conditions</div>
+        <div class="odo-legend-grid">
+            <span class="legend-pill"><span class="legend-dot" style="background:#e2e8f0;"></span>Sain</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ef4444;"></span>Carie</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Obturation composite</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#64748b;"></span>Amalgame</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Couronne</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#fbbf24;"></span>Couronne provisoire</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#374151;"></span>Absent / Extrait</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Implant</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#92400e;"></span>Dévitalisé (RCT)</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ea580c;"></span>Bridge</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#dc2626;"></span>Fracture</span>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ONGLET : ODONTOGRAMME (React Circle) ===== -->
+<div id="view-odontogram" style="display:none;">
+    <div class="odo-stats" id="stats-row-odo"></div>
+    <div class="odo-react-wrap">
+        <div id="react-odo-root-odo" class="react-odo-root"></div>
+    </div>
+    <div class="odo-legend">
+        <div class="odo-legend-title">Légende des conditions</div>
+        <div class="odo-legend-grid">
+            <span class="legend-pill"><span class="legend-dot" style="background:#e2e8f0;"></span>Sain</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ef4444;"></span>Carie</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Obturation composite</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#64748b;"></span>Amalgame</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Couronne</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#fbbf24;"></span>Couronne provisoire</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#374151;"></span>Absent / Extrait</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Implant</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#92400e;"></span>Dévitalisé (RCT)</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#ea580c;"></span>Bridge</span>
+            <span class="legend-pill"><span class="legend-dot" style="background:#dc2626;"></span>Fracture</span>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ONGLET : ENDODONTIE — copié depuis chart.html ===== -->
+<div id="view-endo" style="display:none;">
+    <div class="endo-grid" id="endo-grid"></div>
+    <div class="endo-legend">
+        <span class="legend-pill"><span class="legend-dot" style="background:#94a3b8;"></span>Non localisé</span>
+        <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Localisé</span>
+        <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Mesuré</span>
+        <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Préparé</span>
+        <span class="legend-pill"><span class="legend-dot" style="background:#22c55e;"></span>Obturé</span>
+    </div>
+</div>
+
+<!-- Endo Modal — copié depuis chart.html -->
+<div id="endo-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.55);z-index:4000;overflow-y:auto;padding:20px;" onclick="if(event.target===this)closeEndoModal()">
+    <div class="endo-modal">
+        <div class="endo-modal-header">
+            <div>
+                <span class="endo-modal-tooth-num" id="endo-m-num"></span>
+                <span class="endo-modal-tooth-name" id="endo-m-name"></span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button id="endo-mode-toggle" class="btn btn-outline btn-sm" onclick="toggleEndoMode()">Modifier</button>
+                <button onclick="closeEndoModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);line-height:1;">✕</button>
+            </div>
+        </div>
+        <div class="endo-modal-body">
+            <div class="endo-main-grid">
+                <div class="endo-diagram-card">
+                    <h4 style="margin:0 0 12px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Schéma de la dent</h4>
+                    <svg id="endo-tooth-svg" viewBox="0 0 200 320" width="200" height="320"></svg>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <h4 style="margin:0 0 12px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Canaux radiculaires</h4>
+                    <div style="overflow-x:auto;">
+                        <table class="endo-table" id="endo-canal-table">
+                            <thead>
+                                <tr><th>Canal</th><th>Estimée (mm)</th><th>Travail (mm)</th><th>Finale (mm)</th><th>Statut</th><th>Mis à jour</th></tr>
+                            </thead>
+                            <tbody id="endo-canal-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="endo-notes-section">
+                <h4 style="margin:0 0 8px;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Notes cliniques</h4>
+                <textarea id="endo-general-notes" rows="3" class="panel-textarea" placeholder="Notes endodontiques..." disabled></textarea>
+            </div>
+            <div class="endo-history-section">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <h4 style="margin:0;font-size:13px;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Historique des mesures</h4>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="endo-table" id="endo-history-table">
+                        <thead>
+                            <tr><th>Date</th><th>Canal</th><th>Champ</th><th>Ancienne valeur</th><th>Nouvelle valeur</th><th>Par</th><th></th></tr>
+                        </thead>
+                        <tbody id="endo-history-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="endo-modal-footer" id="endo-footer-edit" style="display:none;">
+            <button onclick="closeEndoModal()" class="btn btn-outline">Annuler</button>
+            <button onclick="saveEndoData()" class="btn btn-primary">Enregistrer</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
+{% block scripts %}
+{% if is_dentist %}
+<div id="overlay" onclick="closePanel()"></div>
+<div id="panel">
+    <div class="panel-hdr">
+        <div>
+            <div id="p-num" class="panel-hdr-tooth"></div>
+            <div id="p-name" class="panel-hdr-name"></div>
+        </div>
+        <button onclick="closePanel()" class="panel-close-btn">✕</button>
+    </div>
+    <div class="panel-body">
+        <div>
+            <div class="panel-section-label">Condition de la dent</div>
+            <select id="p-cond" class="panel-select">
+                <option value="sain">Sain</option>
+                <option value="carie">Carie</option>
+                <option value="obturation">Obturation composite</option>
+                <option value="obturation_amalgame">Amalgame</option>
+                <option value="couronne">Couronne</option>
+                <option value="couronne_provisoire">Couronne provisoire</option>
+                <option value="extraction">Absent / Extrait</option>
+                <option value="implant">Implant</option>
+                <option value="devitalise">Dévitalisé (RCT)</option>
+                <option value="bridge">Bridge</option>
+                <option value="fracture">Fracture</option>
+            </select>
+            <textarea id="p-notes" rows="3" placeholder="Notes cliniques..." class="panel-textarea"></textarea>
+            <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
+        </div>
+        <div>
+            <div class="panel-section-label">Traitements</div>
+            <div id="p-treatments"></div>
+        </div>
+        <div class="panel-add-box">
+            <div class="panel-section-label">Ajouter un traitement</div>
+            <select id="new-t-type" class="panel-select">
+                <option value="Examen">Examen</option>
+                <option value="Détartrage">Détartrage</option>
+                <option value="Extraction">Extraction</option>
+                <option value="Obturation composite">Obturation composite</option>
+                <option value="Amalgame">Amalgame</option>
+                <option value="Traitement endodontique">Traitement endodontique</option>
+                <option value="Couronne">Couronne</option>
+                <option value="Couronne provisoire">Couronne provisoire</option>
+                <option value="Bridge">Bridge</option>
+                <option value="Implant">Implant</option>
+                <option value="Prothèse partielle">Prothèse partielle</option>
+                <option value="Prothèse totale">Prothèse totale</option>
+                <option value="Blanchiment">Blanchiment</option>
+                <option value="Orthodontie">Orthodontie</option>
+                <option value="Radiographie">Radiographie</option>
+                <option value="Autre">Autre</option>
+            </select>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="date" id="new-t-date" class="panel-select" style="flex:1;margin-bottom:0;">
+                <input type="time" id="new-t-time" class="panel-select" value="09:00" style="width:100px;margin-bottom:0;">
+            </div>
+            <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
+            <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
+        </div>
+    </div>
+</div>
+<div id="toast"></div>
+
+<script src="/static/js/odontogram-view.iife.js?v=20260316-12"></script>
+<script>
+// ===== ONGLETS PATIENT =====
+const PATIENT_TABS = ['info','hist','appts','consult','ordonnance'];
+const DENTAL_TABS  = ['layout','odontogram','endo'];
+const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
+let reactLayoutMounted = false, reactOdoMounted = false, endoGridBuilt = false;
+
+function switchTab(tab) {
+    ALL_TABS.forEach(t => {
+        const el  = document.getElementById('view-' + t);
+        const btn = document.getElementById('btn-' + t);
+        if (el)  el.style.display  = (t === tab) ? '' : 'none';
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'layout'     && !reactLayoutMounted) { buildStats('stats-row-layout'); mountReactOdontogram('react-odo-root-layout', 'square'); reactLayoutMounted = true; }
+    if (tab === 'odontogram' && !reactOdoMounted)    { buildStats('stats-row-odo');    mountReactOdontogram('react-odo-root-odo', 'circle');  reactOdoMounted = true; }
+    if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
+}
+
+// ===== DONNÉES (copié depuis chart.html) =====
+const PATIENT_ID = {{ patient.id }};
+const teethData  = {{ teeth_data_json | safe }};
+const endoSummary = {{ endo_summary_json | safe }};
+
+const UPPER = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
+const LOWER = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
+
+const TOOTH_NAMES = {
+    11:"Inc. centrale sup. droite", 12:"Inc. latérale sup. droite",
+    13:"Canine sup. droite", 14:"1ère prémo. sup. droite",
+    15:"2ème prémo. sup. droite", 16:"1ère molaire sup. droite",
+    17:"2ème molaire sup. droite", 18:"Sagesse sup. droite",
+    21:"Inc. centrale sup. gauche", 22:"Inc. latérale sup. gauche",
+    23:"Canine sup. gauche", 24:"1ère prémo. sup. gauche",
+    25:"2ème prémo. sup. gauche", 26:"1ère molaire sup. gauche",
+    27:"2ème molaire sup. gauche", 28:"Sagesse sup. gauche",
+    31:"Inc. centrale inf. gauche", 32:"Inc. latérale inf. gauche",
+    33:"Canine inf. gauche", 34:"1ère prémo. inf. gauche",
+    35:"2ème prémo. inf. gauche", 36:"1ère molaire inf. gauche",
+    37:"2ème molaire inf. gauche", 38:"Sagesse inf. gauche",
+    41:"Inc. centrale inf. droite", 42:"Inc. latérale inf. droite",
+    43:"Canine inf. droite", 44:"1ère prémo. inf. droite",
+    45:"2ème prémo. inf. droite", 46:"1ère molaire inf. droite",
+    47:"2ème molaire inf. droite", 48:"Sagesse inf. droite"
+};
+
+const CONDS = {
+    sain:               {label:"Sain",                color:"#e2e8f0"},
+    carie:              {label:"Carie",               color:"#ef4444"},
+    obturation:         {label:"Obturation composite",color:"#3b82f6"},
+    obturation_amalgame:{label:"Amalgame",            color:"#64748b"},
+    couronne:           {label:"Couronne",            color:"#f59e0b"},
+    couronne_provisoire:{label:"Couronne provisoire", color:"#fbbf24"},
+    extraction:         {label:"Absent / Extrait",    color:"#374151"},
+    implant:            {label:"Implant",             color:"#8b5cf6"},
+    devitalise:         {label:"Dévitalisé (RCT)",    color:"#92400e"},
+    bridge:             {label:"Bridge",              color:"#ea580c"},
+    fracture:           {label:"Fracture",            color:"#dc2626"},
+};
+
+const COND_REACT = {
+    carie:              ['#fca5a5', '#dc2626'],
+    obturation:         ['#bfdbfe', '#2563eb'],
+    obturation_amalgame:['#cbd5e1', '#475569'],
+    couronne:           ['#fde68a', '#d97706'],
+    couronne_provisoire:['#fef3c7', '#f59e0b'],
+    extraction:         ['#6b7280', '#374151'],
+    implant:            ['#ddd6fe', '#6d28d9'],
+    devitalise:         ['#fed7aa', '#92400e'],
+    bridge:             ['#fdba74', '#ea580c'],
+    fracture:           ['#fecaca', '#b91c1c'],
+};
+
+const COND_GRADIENT = {
+    sain:               ['#ffffff', '#e8dcc8'],
+    carie:              ['#fca5a5', '#dc2626'],
+    obturation:         ['#bfdbfe', '#2563eb'],
+    obturation_amalgame:['#cbd5e1', '#475569'],
+    couronne:           ['#fde68a', '#d97706'],
+    couronne_provisoire:['#fef3c7', '#f59e0b'],
+    extraction:         ['#374151', '#111827'],
+    implant:            ['#ddd6fe', '#6d28d9'],
+    devitalise:         ['#fed7aa', '#92400e'],
+    bridge:             ['#fed7aa', '#ea580c'],
+    fracture:           ['#fecaca', '#b91c1c'],
+};
+
+let currentTooth = null;
+let selectedTooth = null;
+const _odoBridges = {};  // keyed by rootId
+let _setReactConditions = null;
+let _setReactSelectedTooth = null;
+
+function buildTeethConditions() {
+    const groups = {};
+    Object.entries(teethData).forEach(([num, data]) => {
+        const cond = data.condition || 'sain';
+        if (cond === 'sain') return;
+        if (!groups[cond]) groups[cond] = [];
+        groups[cond].push('teeth-' + num);
+    });
+    return Object.entries(groups).map(([cond, teeth]) => {
+        const colors = COND_REACT[cond] || ['#e2e8f0', '#94a3b8'];
+        return { label: CONDS[cond]?.label || cond, teeth, fillColor: colors[0], outlineColor: colors[1] };
+    });
+}
+
+// ===== MOUNT REACT ODONTOGRAM =====
+function mountReactOdontogram(rootId, layout) {
+    try {
+        const mountOdontogram = window.OdontoNpm && window.OdontoNpm.mountOdontogram;
+        if (!mountOdontogram) throw new Error('window.OdontoNpm.mountOdontogram unavailable');
+        const root = document.getElementById(rootId);
+        if (!root) return;
+        root.dataset.layout = layout;
+        const bridge = mountOdontogram(root, {
+            initialConditions: buildTeethConditions(),
+            initialSelectedTooth: selectedTooth,
+            onSelect: (fdiNum) => openPanel(fdiNum),
+            layout,
+        });
+        _odoBridges[rootId] = bridge;
+        _setReactConditions = (nextConditions) => {
+            Object.values(_odoBridges).forEach(b => { if (b && b.updateConditions) b.updateConditions(nextConditions); });
+        };
+        _setReactSelectedTooth = (toothNum) => {
+            Object.values(_odoBridges).forEach(b => { if (b && b.updateSelectedTooth) b.updateSelectedTooth(toothNum); });
+        };
+    } catch (err) {
+        console.error('React odontogram load failed:', err);
+        const root = document.getElementById(rootId);
+        if (root) root.innerHTML = '<div style="padding:14px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;font-size:13px;">Erreur de chargement de la vue npm react-odontogram.</div>';
+        showToast('Erreur react-odontogram (npm)');
+    }
+}
+
+// ===== SVG LAYOUT VIEW (copié depuis chart.html) =====
+const TW = 44, TH = 44, STEP = 48;
+const UPPER_Y = 55, LOWER_Y = 175;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function mkEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+}
+function isAnterior(n) { return n % 10 <= 3; }
+function setSelectedTooth(toothNum) {
+    selectedTooth = toothNum;
+    document.querySelectorAll('#svg-chart .tooth-g.selected').forEach(el => el.classList.remove('selected'));
+    if (toothNum === null || toothNum === undefined) return;
+    const target = document.querySelector(`#svg-chart .tooth-g[data-tooth="${toothNum}"]`);
+    if (target) target.classList.add('selected');
+}
+
+function drawTooth(svg, n, x, y) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.classList.add('tooth-g');
+    if (selectedTooth === n) g.classList.add('selected');
+    g.dataset.tooth = n;
+    const d = teethData[String(n)];
+    const cond = d ? d.condition : 'sain';
+    const gradColors = COND_GRADIENT[cond] || COND_GRADIENT.sain;
+    const strokeColor = gradColors[1];
+    let defs = svg.querySelector('defs');
+    const gradId = `grad-${n}`;
+    const grad = document.createElementNS(SVG_NS, 'linearGradient');
+    grad.setAttribute('id', gradId); grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+    grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+    const s1 = document.createElementNS(SVG_NS, 'stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', gradColors[0]);
+    const s2 = document.createElementNS(SVG_NS, 'stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', gradColors[1]);
+    grad.appendChild(s1); grad.appendChild(s2);
+    const oldGrad = defs.querySelector(`#${gradId}`);
+    if (oldGrad) oldGrad.remove();
+    defs.appendChild(grad);
+    if (cond === 'extraction') {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:8, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('line', {x1:x+8,    y1:y+8,    x2:x+TW-8, y2:y+TH-8, stroke:'#ef4444','stroke-width':2.5,'stroke-linecap':'round'}));
+        g.appendChild(mkEl('line', {x1:x+TW-8, y1:y+8,    x2:x+8,    y2:y+TH-8, stroke:'#ef4444','stroke-width':2.5,'stroke-linecap':'round'}));
+    } else if (isAnterior(n)) {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:16, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, 'stroke-opacity':0.6, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('rect', {x:x+4, y:y+2, width:TW-8, height:4, rx:3, fill:'rgba(255,255,255,0.6)'}));
+    } else {
+        g.appendChild(mkEl('rect', {x, y, width:TW, height:TH, rx:8, fill:`url(#${gradId})`, stroke:strokeColor, 'stroke-width':1.5, 'stroke-opacity':0.6, filter:'url(#tooth-shadow)'}));
+        g.appendChild(mkEl('polygon', {points:`${x},${y} ${x+TW},${y} ${x+TW-13},${y+13} ${x+13},${y+13}`, fill:'rgba(255,255,255,0.15)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x+13},${y+TH-13} ${x+TW-13},${y+TH-13} ${x+TW},${y+TH} ${x},${y+TH}`, fill:'rgba(0,0,0,0.12)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x},${y} ${x+13},${y+13} ${x+13},${y+TH-13} ${x},${y+TH}`, fill:'rgba(255,255,255,0.08)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('polygon', {points:`${x+TW-13},${y+13} ${x+TW},${y} ${x+TW},${y+TH} ${x+TW-13},${y+TH-13}`, fill:'rgba(0,0,0,0.08)', stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        const occlusalFill = cond === 'sain' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)';
+        g.appendChild(mkEl('rect', {x:x+13, y:y+13, width:TW-26, height:TH-26, fill:occlusalFill, stroke:'rgba(0,0,0,0.1)','stroke-width':0.5}));
+        g.appendChild(mkEl('rect', {x:x+4, y:y+2, width:TW-8, height:4, rx:3, fill:'rgba(255,255,255,0.6)'}));
+    }
+    const isUpper = UPPER.includes(n);
+    const lbl = document.createElementNS(SVG_NS, 'text');
+    lbl.setAttribute('x', x + TW/2); lbl.setAttribute('y', isUpper ? y-6 : y+TH+14);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '9');
+    lbl.setAttribute('fill', '#94a3b8'); lbl.setAttribute('font-family', 'monospace');
+    lbl.textContent = n;
+    g.appendChild(lbl);
+    g.style.cursor = 'pointer';
+    g.onclick = function() { openPanel(n); };
+    g.onmouseenter = function() { g.style.filter = 'url(#tooth-glow) brightness(1.08)'; };
+    g.onmouseleave = function() { g.style.filter = ''; };
+    svg.appendChild(g);
+}
+
+function buildStats(targetId) {
+    const stats = {sain:0, traite:0, carie:0, absent:0};
+    [...UPPER, ...LOWER].forEach(n => {
+        const d = teethData[String(n)];
+        const c = d ? d.condition : 'sain';
+        if (c === 'sain') stats.sain++;
+        else if (c === 'extraction') stats.absent++;
+        else if (c === 'carie' || c === 'fracture') stats.carie++;
+        else stats.traite++;
+    });
+    const row = document.getElementById(targetId || 'stats-row-layout');
+    if (!row) return;
+    row.innerHTML = `
+        <div class="stat-kpi"><div class="stat-kpi-icon" style="background:rgba(34,197,94,0.12);color:#16a34a;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.5 3 1 4l1 8c.2 1 1 2 2 2h4c1 0 1.8-1 2-2l1-8c.5-1 1-2.5 1-4 0-2.5-2.5-5-6-5z"/></svg></div><div><div class="stat-kpi-num" style="color:#16a34a;">${stats.sain}</div><div class="stat-kpi-label">Saines</div></div></div>
+        <div class="stat-kpi"><div class="stat-kpi-icon" style="background:rgba(59,130,246,0.12);color:#2563eb;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></div><div><div class="stat-kpi-num" style="color:#2563eb;">${stats.traite}</div><div class="stat-kpi-label">Traitées</div></div></div>
+        <div class="stat-kpi"><div class="stat-kpi-icon" style="background:rgba(239,68,68,0.12);color:#dc2626;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0z"/></svg></div><div><div class="stat-kpi-num" style="color:#dc2626;">${stats.carie}</div><div class="stat-kpi-label">À traiter</div></div></div>
+        <div class="stat-kpi"><div class="stat-kpi-icon" style="background:rgba(100,116,139,0.12);color:#64748b;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></div><div><div class="stat-kpi-num" style="color:#64748b;">${stats.absent}</div><div class="stat-kpi-label">Absentes</div></div></div>`;
+}
+
+function buildChart() {
+    const svg = document.getElementById('svg-chart');
+    if (!svg) return;
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.innerHTML = `
+        <filter id="tooth-shadow" x="-25%" y="-25%" width="150%" height="150%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.35"/>
+        </filter>
+        <filter id="tooth-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feFlood flood-color="#fbbf24" flood-opacity="0.6" result="color"/>
+            <feComposite in="color" in2="blur" operator="in" result="glow"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>`;
+    svg.appendChild(defs);
+    const X0 = 28;
+    const divX = X0 + 7*STEP + TW + 2;
+    svg.appendChild(mkEl('line', {x1:divX, y1:18, x2:divX, y2:272, stroke:'rgba(148,163,184,0.18)', 'stroke-width':1, 'stroke-dasharray':'4 3'}));
+    function addLabel(text, x, y, anchor) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', x); t.setAttribute('y', y);
+        t.setAttribute('fill', 'rgba(148,163,184,0.55)');
+        t.setAttribute('font-size', '10'); t.setAttribute('font-family', 'sans-serif');
+        t.setAttribute('text-anchor', anchor || 'start');
+        t.textContent = text;
+        svg.appendChild(t);
+    }
+    addLabel('MAXILLAIRE SUPÉRIEUR', X0, 22);
+    addLabel('MANDIBULE INFÉRIEURE', X0, 163);
+    addLabel('◀ Côté Droit', X0, 130);
+    addLabel('Côté Gauche ▶', X0 + 16*STEP - 4, 130, 'end');
+    UPPER.forEach((n, i) => drawTooth(svg, n, X0 + i*STEP, UPPER_Y));
+    LOWER.forEach((n, i) => drawTooth(svg, n, X0 + i*STEP, LOWER_Y));
+    buildStats();
+}
+
+// ===== PANEL (copié depuis chart.html) =====
+function openPanel(toothNum) {
+    currentTooth = toothNum;
+    setSelectedTooth(toothNum);
+    document.getElementById('p-num').textContent  = 'Dent ' + toothNum;
+    document.getElementById('p-name').textContent = TOOTH_NAMES[toothNum] || '';
+    const d = teethData[String(toothNum)] || {};
+    document.getElementById('p-cond').value  = d.condition || 'sain';
+    document.getElementById('p-notes').value = d.notes || '';
+    document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#94a3b8;font-size:13px;text-align:center;">Chargement...</div>';
+    document.getElementById('panel').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    fetch(`/dental/${PATIENT_ID}/tooth/${toothNum}/data`)
+        .then(r => r.json())
+        .then(data => { renderTreatments(data.treatments); document.getElementById('new-t-date').value = new Date().toISOString().split('T')[0]; })
+        .catch(() => { document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13px;">Erreur de chargement</div>'; });
+}
+
+function closePanel() {
+    document.getElementById('panel').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    currentTooth = null;
+}
+
+const APPT_STATUS_LABELS = {planifie:'Planifié', confirme:'Confirmé', en_cours:'En cours', termine:'Terminé', annule:'Annulé', absent:'Absent'};
+
+function renderTreatments(list) {
+    const el = document.getElementById('p-treatments');
+    if (!list || list.length === 0) { el.innerHTML = '<p style="padding:10px 0;color:#94a3b8;font-size:13px;text-align:center;">Aucun traitement enregistré</p>'; return; }
+    const active = list.filter(t => !t.appt_status || t.appt_status !== 'termine');
+    const done   = list.filter(t => t.appt_status === 'termine');
+    const renderCard = t => {
+        const isDone = t.appt_status === 'termine';
+        const apptHtml = t.appt_status ? `<span class="appt-badge ${t.appt_status}">${APPT_STATUS_LABELS[t.appt_status] || t.appt_status}</span>` : '';
+        const dtLabel = t.appt_datetime ? t.appt_datetime.substring(0,16).replace('T',' ') : t.treatment_date;
+        return `<div class="treatment-card${isDone ? ' is-done' : ''}"><div style="flex:1;min-width:0;"><div class="treatment-type">${escapeHtml(t.treatment_type)}</div>${t.description ? `<div class="treatment-desc">${escapeHtml(t.description)}</div>` : ''}<div class="treatment-date">📅 ${escapeHtml(dtLabel)}</div>${apptHtml}</div><button onclick="delTreatment(${t.id})" class="treatment-del">✕</button></div>`;
+    };
+    let html = active.map(renderCard).join('');
+    if (done.length > 0) {
+        html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);margin:12px 0 6px;padding-top:10px;border-top:1px solid var(--border);">Historique (${done.length})</div>`;
+        html += done.map(renderCard).join('');
+    }
+    el.innerHTML = html;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function saveCondition() {
+    if (!currentTooth) return;
+    const condition = document.getElementById('p-cond').value;
+    const notes     = document.getElementById('p-notes').value;
+    const fd = new FormData();
+    fd.append('condition', condition); fd.append('notes', notes);
+    try {
+        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition`, {method:'POST', body:fd});
+        if (r.ok) {
+            teethData[String(currentTooth)] = {condition, notes};
+            if (_setReactConditions) _setReactConditions(buildTeethConditions());
+            if (document.getElementById('stats-row-layout')) buildStats('stats-row-layout');
+            if (document.getElementById('stats-row-odo'))    buildStats('stats-row-odo');
+            showToast('Condition enregistrée ✓');
+        } else { showToast('Erreur lors de l\'enregistrement'); }
+    } catch (e) { showToast('Erreur réseau'); }
+}
+
+async function addTreatment() {
+    if (!currentTooth) return;
+    const fd = new FormData();
+    fd.append('treatment_type', document.getElementById('new-t-type').value);
+    fd.append('description',    document.getElementById('new-t-desc').value);
+    fd.append('treatment_date', document.getElementById('new-t-date').value);
+    fd.append('start_time',     document.getElementById('new-t-time').value || '09:00');
+    try {
+        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
+        if (r.ok) {
+            const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
+            renderTreatments(data.treatments);
+            document.getElementById('new-t-desc').value = '';
+            showToast('Traitement ajouté ✓');
+        } else { showToast('Erreur lors de l\'ajout'); }
+    } catch (e) { showToast('Erreur réseau'); }
+}
+
+function delTreatment(id) {
+    const doDelete = async () => {
+        try {
+            const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment/${id}/delete`, {method:'POST', body:new FormData()});
+            if (r.ok) {
+                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
+                renderTreatments(data.treatments);
+                showToast('Traitement supprimé');
+            } else { showToast('Erreur lors de la suppression'); }
+        } catch (e) { showToast('Erreur réseau'); }
+    };
+    if (window.confirmAction) { window.confirmAction('Supprimer ce traitement ?', doDelete); }
+    else { if (confirm('Supprimer ce traitement ?')) doDelete(); }
+}
+
+function getToothPos(n) {
+    const X0 = 28;
+    const ui = UPPER.indexOf(n);
+    if (ui >= 0) return {x: X0 + ui*STEP, y: UPPER_Y};
+    return {x: X0 + LOWER.indexOf(n)*STEP, y: LOWER_Y};
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.opacity = 1;
+    setTimeout(() => { t.style.opacity = 0; }, 2500);
+}
+
+// ===== ENDODONTIC VIEW (copié depuis chart.html) =====
+const ENDO_CANALS_MAP = {
+    11:["Canal unique"],12:["Canal unique"],13:["Canal unique"],
+    14:["Vestibulaire","Palatin"],15:["Canal unique"],
+    16:["MV1","MV2","DV","Palatin"],17:["MV","DV","Palatin"],18:["MV","DV","Palatin"],
+    21:["Canal unique"],22:["Canal unique"],23:["Canal unique"],
+    24:["Vestibulaire","Palatin"],25:["Canal unique"],
+    26:["MV1","MV2","DV","Palatin"],27:["MV","DV","Palatin"],28:["MV","DV","Palatin"],
+    31:["Canal unique"],32:["Canal unique"],33:["Canal unique"],
+    34:["Canal unique"],35:["Canal unique"],
+    36:["MV","ML","Distal"],37:["MV","ML","Distal"],38:["MV","ML","Distal"],
+    41:["Canal unique"],42:["Canal unique"],43:["Canal unique"],
+    44:["Canal unique"],45:["Canal unique"],
+    46:["MV","ML","Distal"],47:["MV","ML","Distal"],48:["MV","ML","Distal"],
+};
+
+const ENDO_STATUS = {
+    non_localise: {label:'Non localisé', color:'#94a3b8'},
+    localise:     {label:'Localisé',     color:'#3b82f6'},
+    mesure:       {label:'Mesuré',       color:'#f59e0b'},
+    prepare:      {label:'Préparé',      color:'#8b5cf6'},
+    obture:       {label:'Obturé',       color:'#22c55e'},
+};
+
+let endoCurrentTooth = null;
+let endoData = {};
+let endoEditMode = false;
+
+function buildEndoGrid() {
+    const grid = document.getElementById('endo-grid');
+    grid.innerHTML = '';
+    const lblUpper = document.createElement('div'); lblUpper.className = 'endo-arch-label'; lblUpper.textContent = 'Maxillaire'; grid.appendChild(lblUpper);
+    UPPER.forEach(n => grid.appendChild(createEndoToothBtn(n)));
+    const sep = document.createElement('div'); sep.className = 'endo-separator'; grid.appendChild(sep);
+    const lblLower = document.createElement('div'); lblLower.className = 'endo-arch-label'; lblLower.textContent = 'Mandibulaire'; grid.appendChild(lblLower);
+    LOWER.forEach(n => grid.appendChild(createEndoToothBtn(n)));
+    endoGridBuilt = true;
+}
+
+function createEndoToothBtn(n) {
+    const btn = document.createElement('button');
+    btn.className = 'endo-tooth-btn'; btn.id = `endo-btn-${n}`; btn.onclick = () => openEndoModal(n);
+    const canals = ENDO_CANALS_MAP[n] || ['Canal unique'];
+    const initialStatus = endoSummary[String(n)];
+    const dotColor = initialStatus ? (ENDO_STATUS[initialStatus]?.color || '#e2e8f0') : '#e2e8f0';
+    const hasData = initialStatus && initialStatus !== 'non_localise';
+    if (hasData) btn.classList.add('has-data');
+    btn.innerHTML = `<span class="endo-t-num">${n}</span><span class="endo-t-canals">${canals.length} can.</span><span class="endo-t-dot" style="background:${dotColor};"></span>`;
+    return btn;
+}
+
+function updateEndoBtn(n, canals) {
+    const btn = document.getElementById(`endo-btn-${n}`);
+    if (!btn) return;
+    const dot = btn.querySelector('.endo-t-dot');
+    if (!canals || canals.length === 0) { dot.style.background = '#e2e8f0'; btn.classList.remove('has-data'); return; }
+    const priority = ['non_localise','localise','mesure','prepare','obture'];
+    let best = 0;
+    canals.forEach(c => { const idx = priority.indexOf(c.status || 'non_localise'); if (idx > best) best = idx; });
+    const hasReal = canals.some(c => c.status && c.status !== 'non_localise');
+    dot.style.background = ENDO_STATUS[priority[best]]?.color || '#e2e8f0';
+    btn.classList.toggle('has-data', hasReal);
+}
+
+async function openEndoModal(toothNum) {
+    endoCurrentTooth = toothNum; endoEditMode = false;
+    document.getElementById('endo-m-num').textContent = toothNum;
+    document.getElementById('endo-m-name').textContent = TOOTH_NAMES[toothNum] || `Dent ${toothNum}`;
+    document.getElementById('endo-mode-toggle').textContent = 'Modifier';
+    document.getElementById('endo-footer-edit').style.display = 'none';
+    document.getElementById('endo-modal-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/${toothNum}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        endoData = await res.json();
+    } catch (e) {
+        endoData = { canals: (ENDO_CANALS_MAP[toothNum] || ['Canal unique']).map(n => ({canal_name: n, estimated_length: null, working_length: null, final_length: null, status: 'non_localise', notes: '', updated_at: null})), history: [], general_notes: '' };
+    }
+    renderEndoModal();
+    drawEndoToothSVG(toothNum, endoData.canals);
+}
+
+function closeEndoModal() {
+    document.getElementById('endo-modal-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    endoCurrentTooth = null;
+}
+
+function toggleEndoMode() {
+    endoEditMode = !endoEditMode;
+    document.getElementById('endo-mode-toggle').textContent = endoEditMode ? 'Lecture' : 'Modifier';
+    document.getElementById('endo-footer-edit').style.display = endoEditMode ? 'flex' : 'none';
+    renderEndoCanalTable();
+    document.getElementById('endo-general-notes').disabled = !endoEditMode;
+}
+
+function renderEndoModal() { renderEndoCanalTable(); renderEndoHistory(); const notesEl = document.getElementById('endo-general-notes'); notesEl.value = endoData.general_notes || ''; notesEl.disabled = !endoEditMode; }
+
+function renderEndoCanalTable() {
+    const tbody = document.getElementById('endo-canal-tbody');
+    const canals = endoData.canals || [];
+    tbody.innerHTML = '';
+    canals.forEach((c, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.canalIndex = i;
+        tr.addEventListener('mouseenter', () => highlightSVGCanal(i, true));
+        tr.addEventListener('mouseleave', () => highlightSVGCanal(i, false));
+        const statusInfo = ENDO_STATUS[c.status] || ENDO_STATUS.non_localise;
+        const updated = c.updated_at ? c.updated_at.substring(0, 16).replace('T', ' ') : '—';
+        if (endoEditMode) {
+            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td><input type="number" step="0.5" min="0" max="40" value="${c.estimated_length ?? ''}" data-field="estimated_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.working_length ?? ''}" data-field="working_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.final_length ?? ''}" data-field="final_length" data-idx="${i}"></td><td><select data-field="status" data-idx="${i}">${Object.entries(ENDO_STATUS).map(([k,v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
+        } else {
+            const fmtLen = v => v != null ? `${v} mm` : '—';
+            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td>${fmtLen(c.estimated_length)}</td><td>${fmtLen(c.working_length)}</td><td>${fmtLen(c.final_length)}</td><td><span class="endo-status-badge st-${c.status || 'non_localise'}">${statusInfo.label}</span></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
+        }
+        tbody.appendChild(tr);
+    });
+}
+
+function renderEndoHistory() {
+    const tbody = document.getElementById('endo-history-tbody');
+    if (!tbody) return;
+    const history = endoData.history || [];
+    if (history.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--gray-400);font-size:12px;padding:16px;">Aucune modification enregistrée</td></tr>`; return; }
+    tbody.innerHTML = '';
+    history.forEach((h, i) => {
+        const tr = document.createElement('tr');
+        tr.dataset.histId = h.id || i; tr.dataset.histIdx = i;
+        const dt = h.changed_at ? h.changed_at.substring(0, 16).replace('T', ' ') : '—';
+        const by = h.changed_by_name || '—';
+        const hasCorrection = h.corrected_value != null;
+        const displayNew = hasCorrection ? `${h.new_value} <span class="endo-history-correction">→ corrigé : ${h.corrected_value}</span>` : (h.new_value || '—');
+        tr.innerHTML = `<td style="font-size:11px;color:var(--gray-400);white-space:nowrap;">${dt}</td><td><strong style="color:var(--primary);">${h.canal_name}</strong></td><td style="font-size:12px;">${h.field}</td><td style="font-size:12px;color:var(--gray-500);">${h.old_value || '—'}</td><td style="font-size:12px;" class="hist-new-cell">${displayNew}</td><td style="font-size:11px;color:var(--gray-400);">${by}</td><td><button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="startEditHistoryRow(${i})">Corriger</button></td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function startEditHistoryRow(idx) {
+    const history = endoData.history || [];
+    const h = history[idx]; if (!h) return;
+    const tr = document.querySelector(`#endo-history-tbody tr[data-hist-idx="${idx}"]`); if (!tr) return;
+    const cell = tr.querySelector('.hist-new-cell');
+    const currentVal = h.corrected_value != null ? h.corrected_value : (h.new_value || '');
+    cell.innerHTML = `<input type="text" value="${currentVal}" id="hist-edit-input-${idx}" style="width:90px;" placeholder="Valeur corrigée">`;
+    const btn = tr.querySelector('td:last-child');
+    btn.innerHTML = `<div style="display:flex;gap:4px;"><button type="button" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px;" onclick="saveHistoryCorrection(${idx}, ${h.id || 'null'})">✓</button><button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="renderEndoHistory()">✕</button></div>`;
+    tr.classList.add('editing');
+    document.getElementById(`hist-edit-input-${idx}`)?.focus();
+}
+
+async function saveHistoryCorrection(idx, histId) {
+    const input = document.getElementById(`hist-edit-input-${idx}`); if (!input) return;
+    const newVal = input.value.trim(); if (!newVal) return;
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/history/${histId}/correct`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({corrected_value: newVal})});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (endoData.history && endoData.history[idx]) endoData.history[idx].corrected_value = newVal;
+        renderEndoHistory();
+        showToast('Correction enregistrée');
+    } catch (e) { showToast('Erreur lors de la correction'); }
+}
+
+function highlightSVGCanal(index, on) {
+    const svg = document.getElementById('endo-tooth-svg');
+    svg.querySelectorAll('.canal-path').forEach((p, i) => {
+        p.style.strokeWidth = (on && i === index) ? '4' : '2.5';
+        p.style.filter = (on && i === index) ? 'drop-shadow(0 0 4px rgba(28,140,248,0.5))' : 'none';
+    });
+    const row = document.querySelector(`#endo-canal-tbody tr[data-canal-index="${index}"]`);
+    if (row) row.classList.toggle('canal-highlight', on);
+}
+
+async function saveEndoData() {
+    if (!endoCurrentTooth) return;
+    const canals = endoData.canals.map((c, i) => {
+        const row = document.querySelector(`#endo-canal-tbody tr[data-canal-index="${i}"]`); if (!row) return c;
+        const inputs = row.querySelectorAll('input, select');
+        const updated = {...c};
+        inputs.forEach(inp => { const field = inp.dataset.field; if (!field) return; if (inp.type === 'number') { updated[field] = inp.value !== '' ? parseFloat(inp.value) : null; } else { updated[field] = inp.value; } });
+        return updated;
+    });
+    const generalNotes = document.getElementById('endo-general-notes').value;
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({canals, general_notes: generalNotes})});
+        if (!res.ok) { const err = await res.json(); showToast(err.error || 'Erreur'); return; }
+        showToast('Données endodontiques enregistrées');
+        updateEndoBtn(endoCurrentTooth, canals);
+        const priority = ['non_localise','localise','mesure','prepare','obture'];
+        let bestIdx = 0;
+        canals.forEach(c => { const i = priority.indexOf(c.status || 'non_localise'); if (i > bestIdx) bestIdx = i; });
+        endoSummary[String(endoCurrentTooth)] = priority[bestIdx];
+        const res2 = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}`);
+        if (res2.ok) endoData = await res2.json();
+        endoEditMode = false;
+        document.getElementById('endo-mode-toggle').textContent = 'Modifier';
+        document.getElementById('endo-footer-edit').style.display = 'none';
+        renderEndoModal();
+        drawEndoToothSVG(endoCurrentTooth, endoData.canals);
+    } catch (e) { showToast('Erreur réseau'); }
+}
+
+function drawEndoToothSVG(toothNum, canals) {
+    const svg = document.getElementById('endo-tooth-svg'); svg.innerHTML = '';
+    const ns = 'http://www.w3.org/2000/svg';
+    const digit = toothNum % 10; const isUpper = toothNum < 30; const isMolar = digit >= 6; const isPremolar = digit >= 4 && digit <= 5; const numCanals = canals ? canals.length : 1;
+    const crownY = isUpper ? 20 : 200; const crownH = 80; const crownW = isMolar ? 80 : isPremolar ? 60 : 40; const cx = 100;
+    const crown = document.createElementNS(ns, 'rect'); crown.setAttribute('x', cx - crownW/2); crown.setAttribute('y', crownY); crown.setAttribute('width', crownW); crown.setAttribute('height', crownH); crown.setAttribute('rx', isMolar ? 12 : 16); crown.setAttribute('fill', '#f1f5f9'); crown.setAttribute('stroke', '#94a3b8'); crown.setAttribute('stroke-width', '1.5'); svg.appendChild(crown);
+    const crownTxt = document.createElementNS(ns, 'text'); crownTxt.setAttribute('x', cx); crownTxt.setAttribute('y', crownY + crownH/2 + 5); crownTxt.setAttribute('text-anchor', 'middle'); crownTxt.setAttribute('font-size', '14'); crownTxt.setAttribute('font-weight', '700'); crownTxt.setAttribute('fill', '#475569'); crownTxt.textContent = toothNum; svg.appendChild(crownTxt);
+    const rootStartY = isUpper ? crownY + crownH : crownY; const rootDir = isUpper ? 1 : -1; const rootLen = 140;
+    const canalColors = ['#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#22c55e'];
+    if (numCanals === 1) { drawRoot(svg, ns, cx, rootStartY, rootDir, rootLen, 20); drawCanal(svg, ns, cx, rootStartY, rootDir, rootLen, canalColors[0], 0, canals?.[0]?.status); }
+    else { const spread = Math.min(crownW * 0.7, numCanals * 25); const startX = cx - spread/2; const step = spread / (numCanals - 1); for (let i = 0; i < numCanals; i++) { const rx = startX + step * i; const rl = rootLen - Math.abs(i - (numCanals-1)/2) * 12; drawRoot(svg, ns, rx, rootStartY, rootDir, rl, 12); drawCanal(svg, ns, rx, rootStartY, rootDir, rl, canalColors[i % canalColors.length], i, canals?.[i]?.status); } }
+    if (canals) { const labelY = isUpper ? 310 : 10; canals.forEach((c, i) => { const lbl = document.createElementNS(ns, 'text'); const spread = Math.min(crownW * 0.7, numCanals * 25); const startX = numCanals === 1 ? cx : cx - spread/2; const step = numCanals === 1 ? 0 : spread / (numCanals - 1); lbl.setAttribute('x', startX + step * i); lbl.setAttribute('y', labelY); lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '10'); lbl.setAttribute('fill', canalColors[i % canalColors.length]); lbl.setAttribute('font-weight', '600'); lbl.textContent = c.canal_name; svg.appendChild(lbl); }); }
+}
+
+function drawRoot(svg, ns, x, startY, dir, length, width) {
+    const endY = startY + dir * length; const path = document.createElementNS(ns, 'path'); const hw = width / 2;
+    path.setAttribute('d', `M${x-hw},${startY} Q${x-hw*0.8},${startY + dir*length*0.6} ${x},${endY} Q${x+hw*0.8},${startY + dir*length*0.6} ${x+hw},${startY} Z`);
+    path.setAttribute('fill', '#e8dcc8'); path.setAttribute('stroke', '#c4a882'); path.setAttribute('stroke-width', '1'); svg.appendChild(path);
+}
+
+function drawCanal(svg, ns, x, startY, dir, length, color, index, status) {
+    const endY = startY + dir * (length - 10); const path = document.createElementNS(ns, 'path'); const curve = dir * length * 0.4;
+    path.setAttribute('d', `M${x},${startY + dir*10} Q${x + (index % 2 === 0 ? -3 : 3)},${startY + curve} ${x},${endY}`);
+    path.setAttribute('fill', 'none'); path.setAttribute('stroke', color); path.setAttribute('stroke-width', '2.5'); path.setAttribute('stroke-linecap', 'round'); path.classList.add('canal-path'); path.style.transition = 'stroke-width 0.15s, filter 0.15s';
+    if (status === 'obture') { path.setAttribute('stroke', '#22c55e'); path.setAttribute('stroke-width', '4'); }
+    else if (status === 'non_localise') { path.setAttribute('stroke-dasharray', '4,4'); path.setAttribute('opacity', '0.5'); }
+    svg.appendChild(path);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePanel(); closeEndoModal(); } });
+</script>
+{% endif %}
+{% endblock %}
