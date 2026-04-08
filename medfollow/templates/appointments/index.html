@@ -345,8 +345,30 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.showToast) window.showToast('Erreur de chargement des rendez-vous', 'error');
         },
         events: '/appointments/api/events',
-        editable: false,
+        editable: true,
         selectable: true,
+        eventDrop: async function(info) {
+            const ev = info.event;
+            const start = ev.start ? toInputDateTime(ev.start) : null;
+            const end = ev.end ? toInputDateTime(ev.end) : (start ? toInputDateTime(new Date(ev.start.getTime() + 30*60*1000)) : null);
+            if (!start || !end) { info.revert(); return; }
+            const res = await fetch(`/appointments/${ev.id}/reschedule`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_datetime: start, end_datetime: end }),
+            });
+            if (res.ok) {
+                if (window.showToast) window.showToast('Rendez-vous déplacé ✓');
+            } else if (res.status === 409) {
+                info.revert();
+                const data = await res.json();
+                const labels = (data.suggestions || []).map(s => s.label).join(', ');
+                if (window.showToast) window.showToast('Créneau pris. Disponibles : ' + (labels || 'aucun'), 'error');
+            } else {
+                info.revert();
+                if (window.showToast) window.showToast('Erreur lors du déplacement', 'error');
+            }
+        },
         nowIndicator: true,
         slotMinTime: '07:00:00',
         slotMaxTime: '21:00:00',

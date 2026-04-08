@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-04-08
+
+### A1 — Conflit créneau
+Already fully implemented (backend + frontend). No changes needed.
+
+### A2 — Déplacer RDV depuis l'agenda
+- **File:** `medfollow/templates/appointments/index.html`
+- Enabled `editable: true` on FullCalendar + added `eventDrop` callback calling `/appointments/{id}/reschedule`
+- On conflict: reverts drag and shows toast with available slots
+
+### A4 — Cohérence antécédents
+Already fully implemented. No changes needed.
+
+### A5 — Mutuelle & Assurance
+Already fully implemented. No changes needed.
+
+### A6 — Détartrage 32 dents en un clic
+- **File:** `medfollow/templates/dental/chart.html`
+- Added "🧹 Détartrage 32 dents" button in odontogram header
+- Added `bulkDetartrage()` JS calling existing `/dental/{id}/bulk-treatment` endpoint
+
+### A7 — Historique condition par dent
+- **File:** `medfollow/templates/dental/chart.html`
+- Added toggle button "▶ Historique de la condition" below condition save button
+- Added `toggleConditionHistory()` JS fetching `/dental/{id}/tooth/{n}/condition-history`
+- History loads lazily on first open, resets when panel closes
+
+---
+
 ## 2026-03-23
 
 ### Session: Backlog run (top → bottom)

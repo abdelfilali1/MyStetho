@@ -590,6 +590,9 @@
                 <p class="odo-title-sub">Odontogramme · Schéma dentaire interactif (FDI) · UI v20260316-12</p>
             </div>
         </div>
+        <div class="odo-header-right" style="display:flex;align-items:center;gap:8px;">
+            <button onclick="bulkDetartrage()" class="btn btn-outline btn-sm" style="font-size:12px;">🧹 Détartrage 32 dents</button>
+        </div>
     </div>
 
     <!-- Stats -->
@@ -765,6 +768,10 @@
             </select>
             <textarea id="p-notes" rows="3" placeholder="Notes cliniques..." class="panel-textarea"></textarea>
             <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
+            <div style="margin-top:10px;">
+                <button onclick="toggleConditionHistory()" id="btn-cond-hist" style="background:none;border:none;cursor:pointer;font-size:12px;color:#94a3b8;padding:0;">▶ Historique de la condition</button>
+                <div id="p-cond-history" style="display:none;margin-top:8px;"></div>
+            </div>
         </div>
         <div>
             <div class="panel-section-label">Traitements</div>
@@ -808,6 +815,22 @@
 const PATIENT_ID = {{ patient.id }};
 const teethData = {{ teeth_data_json | safe }};
 const endoSummary = {{ endo_summary_json | safe }};
+
+async function bulkDetartrage() {
+    if (!confirm('Appliquer un Détartrage sur les 32 dents ?')) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await fetch(`/dental/${PATIENT_ID}/bulk-treatment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ treatment_type: 'Détartrage', treatment_date: today, start_time: '09:00' }),
+    });
+    if (res.ok) {
+        showToast('Détartrage appliqué sur 32 dents ✓');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showToast('Erreur lors du détartrage', 'error');
+    }
+}
 
 const UPPER = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
 const LOWER = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
@@ -1162,6 +1185,50 @@ function closePanel() {
     document.getElementById('overlay').classList.remove('open');
     document.body.style.overflow = '';
     currentTooth = null;
+    // Reset history toggle
+    const hist = document.getElementById('p-cond-history');
+    const btn = document.getElementById('btn-cond-hist');
+    if (hist) { hist.style.display = 'none'; hist.innerHTML = ''; }
+    if (btn) btn.textContent = '▶ Historique de la condition';
+}
+
+async function toggleConditionHistory() {
+    const el = document.getElementById('p-cond-history');
+    const btn = document.getElementById('btn-cond-hist');
+    if (!el || !currentTooth) return;
+    if (el.style.display !== 'none') {
+        el.style.display = 'none';
+        btn.textContent = '▶ Historique de la condition';
+        return;
+    }
+    el.style.display = 'block';
+    btn.textContent = '▼ Historique de la condition';
+    if (el.innerHTML !== '') return; // already loaded
+    el.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">Chargement...</div>';
+    try {
+        const res = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition-history`);
+        const data = await res.json();
+        if (!data.history || data.history.length === 0) {
+            el.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">Aucun historique.</div>';
+            return;
+        }
+        const COND_LABELS = {
+            sain:'Sain', carie:'Cariée', obturation_composite:'Composite', obturation_amalgame:'Amalgame',
+            couronne:'Couronne', couronne_provisoire:'Couronne prov.', extraction:'Extrait',
+            implant:'Implant', devitalise:'Dévitalisé', bridge:'Bridge', fracture:'Fracture'
+        };
+        el.innerHTML = data.history.map(h => {
+            const dt = h.changed_at ? h.changed_at.substring(0,16).replace('T',' ') : '';
+            const label = COND_LABELS[h.condition] || h.condition;
+            return `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(148,163,184,0.15);">
+                <span style="color:#e2e8f0;font-weight:600;">${escapeHtml(label)}</span>
+                ${h.notes ? `<span style="color:#94a3b8;"> — ${escapeHtml(h.notes)}</span>` : ''}
+                <div style="color:#64748b;font-size:11px;">${escapeHtml(dt)}${h.doctor_name ? ' · ' + escapeHtml(h.doctor_name) : ''}</div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div style="color:#ef4444;font-size:12px;">Erreur de chargement</div>';
+    }
 }
 
 const APPT_STATUS_LABELS = {
