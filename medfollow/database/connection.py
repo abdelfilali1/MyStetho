@@ -405,5 +405,26 @@ async def init_db():
         await db.commit()
     except Exception:
         pass
+    try:
+        await db.execute("ALTER TABLE patients ADD COLUMN insurance_serial TEXT")
+        await db.commit()
+    except Exception:
+        pass
+    try:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS dental_condition_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                tooth_number INTEGER NOT NULL,
+                condition TEXT NOT NULL,
+                notes TEXT,
+                changed_by INTEGER REFERENCES users(id),
+                changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients(id)
+            )
+        """)
+        await db.commit()
+    except Exception:
+        pass
 
     await db.close()

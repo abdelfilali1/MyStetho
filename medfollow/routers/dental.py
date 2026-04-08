@@ -122,6 +122,15 @@ async def update_tooth_condition(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    # Check previous condition to avoid duplicate consecutive entries
+    cursor = await db.execute(
+        "SELECT condition FROM dental_teeth WHERE patient_id = ? AND tooth_number = ?",
+        (patient_id, tooth_number)
+    )
+    prev = await cursor.fetchone()
+    prev_condition = prev["condition"] if prev else None
+
     await db.execute(
         """INSERT INTO dental_teeth (patient_id, tooth_number, condition, notes, updated_at)
            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -129,8 +138,39 @@ async def update_tooth_condition(
            condition=excluded.condition, notes=excluded.notes, updated_at=excluded.updated_at""",
         (patient_id, tooth_number, condition, notes or None)
     )
+
+    # Log to history only when condition actually changed
+    if condition != prev_condition:
+        await db.execute(
+            """INSERT INTO dental_condition_history (patient_id, tooth_number, condition, notes, changed_by)
+               VALUES (?, ?, ?, ?, ?)""",
+            (patient_id, tooth_number, condition, notes or None, user["sub"])
+        )
+
     await db.commit()
     return JSONResponse(content={"ok": True})
+
+
+@router.get("/{patient_id}/tooth/{tooth_number}/condition-history")
+async def get_tooth_condition_history(
+    request: Request, patient_id: int, tooth_number: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    cursor = await db.execute(
+        """SELECT h.condition, h.notes, h.changed_at,
+                  u.first_name || ' ' || u.last_name AS doctor_name
+           FROM dental_condition_history h
+           LEFT JOIN users u ON h.changed_by = u.id
+           WHERE h.patient_id = ? AND h.tooth_number = ?
+           ORDER BY h.changed_at DESC
+           LIMIT 20""",
+        (patient_id, tooth_number)
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    return JSONResponse(content={"history": rows})
 
 
 APPT_TYPE_MAP = {
@@ -198,6 +238,55 @@ async def delete_treatment(
     await db.execute("DELETE FROM dental_treatments WHERE id = ? AND patient_id = ?", (treatment_id, patient_id))
     await db.commit()
     return JSONResponse(content={"ok": True})
+
+
+ALL_TEETH = list(TOOTH_NAMES.keys())
+
+
+@router.post("/{patient_id}/bulk-treatment")
+async def add_bulk_treatment(
+    request: Request,
+    patient_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Apply one treatment type to all teeth at once (e.g. Détartrage).
+    Creates a single appointment and one treatment record per tooth.
+    Body: { treatment_type, description, treatment_date, start_time }
+    """
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    treatment_type = data.get("treatment_type", "Détartrage")
+    description = data.get("description", "") or None
+    tdate = data.get("treatment_date") or date.today().isoformat()
+    stime = data.get("start_time", "09:00") or "09:00"
+
+    appt_type = APPT_TYPE_MAP.get(treatment_type, "consultation")
+    start_dt_obj = datetime.strptime(f"{tdate} {stime}", "%Y-%m-%d %H:%M")
+    start_dt = start_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+    end_dt = (start_dt_obj + timedelta(minutes=60)).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Create ONE shared appointment
+    cursor = await db.execute(
+        """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, start_datetime, end_datetime, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?, 'planifie', ?)""",
+        (patient_id, user["sub"], treatment_type, appt_type, start_dt, end_dt, description),
+    )
+    appointment_id = cursor.lastrowid
+
+    # Create one treatment per tooth
+    for tooth_number in ALL_TEETH:
+        await db.execute(
+            """INSERT INTO dental_treatments
+               (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (patient_id, tooth_number, treatment_type, description, tdate, user["sub"], appointment_id),
+        )
+
+    await db.commit()
+    return JSONResponse(content={"ok": True, "appointment_id": appointment_id, "teeth_count": len(ALL_TEETH)})
 
 
 # ===== ENDODONTIC ENDPOINTS =====

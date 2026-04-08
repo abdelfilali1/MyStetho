@@ -114,6 +114,18 @@ async def _fetch_patient_history(
     return history
 
 
+async def _fetch_patient_allergies(db: aiosqlite.Connection, patient_id: Optional[int]) -> str:
+    """Return the most recent allergy description for a patient, or empty string."""
+    if not patient_id:
+        return ""
+    cursor = await db.execute(
+        "SELECT description FROM medical_history WHERE patient_id = ? AND type = 'allergy' ORDER BY date_recorded DESC, created_at DESC LIMIT 1",
+        (patient_id,),
+    )
+    row = await cursor.fetchone()
+    return _clean_text(row[0]) if row else ""
+
+
 async def _save_history_item_if_new(
     db: aiosqlite.Connection,
     patient_id: Optional[int],
@@ -259,7 +271,7 @@ async def new_consultation_form(
             "selected_appointment_id": appointment_id,
             "dental_history_options": _merge_history_options(patient_history),
             "selected_dental_history": "",
-            "selected_dental_allergies": "",
+            "selected_dental_allergies": await _fetch_patient_allergies(db, patient_id),
             "dental_history_presets_json": json.dumps(DENTAL_HISTORY_PRESETS, ensure_ascii=False),
             "error": None,
         },
@@ -380,6 +392,8 @@ async def create_consultation(
         )
 
     await _save_history_item_if_new(db, patient_id, dental_medical_history)
+    if dental_allergies:
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}")
 
     if appointment_id:
         await db.execute(
@@ -482,6 +496,9 @@ async def edit_consultation_form(request: Request, consultation_id: int, db: aio
         selected_dental_history = _clean_text(notes_payload.get("dental_medical_history"))
         selected_dental_allergies = _clean_text(notes_payload.get("dental_allergies"))
 
+    if not selected_dental_allergies:
+        selected_dental_allergies = await _fetch_patient_allergies(db, consultation["patient_id"])
+
     cursor = await db.execute(
         "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name",
         (user["sub"],),
@@ -583,6 +600,8 @@ async def update_consultation(
         )
 
     await _save_history_item_if_new(db, patient_id, dental_medical_history)
+    if dental_allergies:
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}")
 
     await db.commit()
     return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)

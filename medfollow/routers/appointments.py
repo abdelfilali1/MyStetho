@@ -90,6 +90,128 @@ async def get_events(
     return JSONResponse(content=events)
 
 
+@router.get("/api/free-slots")
+async def get_free_slots(
+    request: Request,
+    doctor_id: int,
+    date: str,
+    duration: int = 30,
+    exclude_id: int = 0,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Return up to 5 available slots for a given doctor and date."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    # Fetch all non-cancelled appointments for that doctor on that date
+    cursor = await db.execute(
+        """SELECT start_datetime, end_datetime FROM appointments
+           WHERE doctor_id = ? AND date(start_datetime) = ? AND id != ?
+           AND status NOT IN ('annule', 'absent')
+           ORDER BY start_datetime""",
+        (doctor_id, date, exclude_id),
+    )
+    booked = [(row[0], row[1]) for row in await cursor.fetchall()]
+
+    # Generate candidate slots 08:00 – 19:30
+    from datetime import timedelta
+    base = datetime.strptime(f"{date} 08:00", "%Y-%m-%d %H:%M")
+    end_of_day = datetime.strptime(f"{date} 19:30", "%Y-%m-%d %H:%M")
+    slots = []
+    cursor_dt = base
+    while cursor_dt + timedelta(minutes=duration) <= end_of_day and len(slots) < 8:
+        slot_end = cursor_dt + timedelta(minutes=duration)
+        s_str = cursor_dt.strftime("%Y-%m-%dT%H:%M")
+        e_str = slot_end.strftime("%Y-%m-%dT%H:%M")
+        # Check overlap against booked appointments
+        overlap = any(
+            s_str < b_end and e_str > b_start
+            for b_start, b_end in booked
+        )
+        if not overlap:
+            slots.append({"start": s_str, "end": e_str,
+                          "label": cursor_dt.strftime("%H:%M") + " – " + slot_end.strftime("%H:%M")})
+        cursor_dt += timedelta(minutes=30)
+
+    return JSONResponse(content={"slots": slots})
+
+
+@router.post("/api/new")
+async def create_appointment_api(
+    request: Request,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Create appointment via JSON. Returns conflict info if slot is taken."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    patient_id = data.get("patient_id")
+    doctor_id = data.get("doctor_id")
+    title = data.get("title", "")
+    appointment_type = data.get("appointment_type", "consultation")
+    status = data.get("status", "planifie")
+    start_datetime = data.get("start_datetime", "")
+    end_datetime = data.get("end_datetime", "")
+    room = data.get("room", "") or None
+    notes = data.get("notes", "") or None
+    exclude_id = data.get("exclude_id", 0)
+
+    # Conflict check: any non-cancelled appointment for same doctor that overlaps
+    cursor = await db.execute(
+        """SELECT id FROM appointments
+           WHERE doctor_id = ? AND id != ?
+           AND status NOT IN ('annule', 'absent')
+           AND start_datetime < ? AND end_datetime > ?""",
+        (doctor_id, exclude_id, end_datetime, start_datetime),
+    )
+    conflict_row = await cursor.fetchone()
+    if conflict_row:
+        # Return next available slots for same date
+        date_str = start_datetime[:10]
+        from datetime import timedelta
+        base = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
+        end_of_day = datetime.strptime(f"{date_str} 19:30", "%Y-%m-%d %H:%M")
+
+        cursor2 = await db.execute(
+            """SELECT start_datetime, end_datetime FROM appointments
+               WHERE doctor_id = ? AND date(start_datetime) = ?
+               AND status NOT IN ('annule', 'absent')
+               ORDER BY start_datetime""",
+            (doctor_id, date_str),
+        )
+        booked = [(r[0], r[1]) for r in await cursor2.fetchall()]
+
+        duration = int((datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M") -
+                        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")).total_seconds() // 60)
+        duration = max(15, duration)
+
+        suggestions = []
+        cursor_dt = base
+        while cursor_dt + timedelta(minutes=duration) <= end_of_day and len(suggestions) < 4:
+            slot_end = cursor_dt + timedelta(minutes=duration)
+            s_str = cursor_dt.strftime("%Y-%m-%dT%H:%M")
+            e_str = slot_end.strftime("%Y-%m-%dT%H:%M")
+            overlap = any(s_str < b_end and e_str > b_start for b_start, b_end in booked)
+            if not overlap:
+                suggestions.append({"start": s_str, "end": e_str,
+                                    "label": cursor_dt.strftime("%H:%M") + " – " + slot_end.strftime("%H:%M")})
+            cursor_dt += timedelta(minutes=30)
+
+        return JSONResponse(status_code=409, content={"conflict": True, "suggestions": suggestions})
+
+    await db.execute(
+        """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, status,
+           start_datetime, end_datetime, room, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, doctor_id, title, appointment_type, status,
+         start_datetime, end_datetime, room, notes),
+    )
+    await db.commit()
+    return JSONResponse(content={"ok": True})
+
+
 @router.post("/new")
 async def create_appointment(
     request: Request,
@@ -104,6 +226,7 @@ async def create_appointment(
     notes: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    """Fallback form POST (no conflict check — kept for compatibility)."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
@@ -114,6 +237,75 @@ async def create_appointment(
     )
     await db.commit()
     return RedirectResponse(url="/appointments", status_code=302)
+
+
+@router.post("/{appointment_id}/reschedule")
+async def reschedule_appointment(
+    request: Request,
+    appointment_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Reschedule an appointment to a new start/end datetime. Checks for conflicts."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    start_datetime = data.get("start_datetime", "")
+    end_datetime = data.get("end_datetime", "")
+
+    # Fetch doctor_id from the appointment
+    cursor = await db.execute(
+        "SELECT doctor_id FROM appointments WHERE id = ? AND doctor_id = ?",
+        (appointment_id, user["sub"]),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return JSONResponse(status_code=404, content={"error": "RDV introuvable"})
+    doctor_id = row["doctor_id"]
+
+    # Conflict check (exclude self)
+    cursor = await db.execute(
+        """SELECT id FROM appointments
+           WHERE doctor_id = ? AND id != ?
+           AND status NOT IN ('annule', 'absent')
+           AND start_datetime < ? AND end_datetime > ?""",
+        (doctor_id, appointment_id, end_datetime, start_datetime),
+    )
+    if await cursor.fetchone():
+        # Return suggestions
+        date_str = start_datetime[:10]
+        cursor2 = await db.execute(
+            """SELECT start_datetime, end_datetime FROM appointments
+               WHERE doctor_id = ? AND date(start_datetime) = ? AND id != ?
+               AND status NOT IN ('annule', 'absent')
+               ORDER BY start_datetime""",
+            (doctor_id, date_str, appointment_id),
+        )
+        booked = [(r[0], r[1]) for r in await cursor2.fetchall()]
+        duration = int((datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M") -
+                        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")).total_seconds() // 60)
+        duration = max(15, duration)
+        end_of_day = datetime.strptime(f"{date_str} 19:30", "%Y-%m-%d %H:%M")
+        suggestions = []
+        cursor_dt = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
+        while cursor_dt + timedelta(minutes=duration) <= end_of_day and len(suggestions) < 4:
+            slot_end = cursor_dt + timedelta(minutes=duration)
+            s_str = cursor_dt.strftime("%Y-%m-%dT%H:%M")
+            e_str = slot_end.strftime("%Y-%m-%dT%H:%M")
+            overlap = any(s_str < b_end and e_str > b_start for b_start, b_end in booked)
+            if not overlap:
+                suggestions.append({"start": s_str, "end": e_str,
+                                    "label": cursor_dt.strftime("%H:%M") + " – " + slot_end.strftime("%H:%M")})
+            cursor_dt += timedelta(minutes=30)
+        return JSONResponse(status_code=409, content={"conflict": True, "suggestions": suggestions})
+
+    await db.execute(
+        "UPDATE appointments SET start_datetime = ?, end_datetime = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (start_datetime, end_datetime, appointment_id),
+    )
+    await db.commit()
+    return JSONResponse(content={"ok": True})
 
 
 @router.post("/{appointment_id}/status")

@@ -125,7 +125,14 @@
         </div>
 
         {% if patients %}
-        <form method="POST" action="/appointments/new" class="new-apt-form">
+        <!-- Conflict banner (hidden by default) -->
+        <div id="conflict-banner" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+            <div style="font-weight:700;color:#dc2626;font-size:13px;margin-bottom:8px;">⚠️ Ce créneau est déjà pris</div>
+            <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px;">Créneaux disponibles ce jour :</div>
+            <div id="conflict-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+
+        <form id="new-apt-form" class="new-apt-form">
             <div class="form-group">
                 <label>Patient</label>
                 <div style="display:flex;gap:6px;align-items:center;">
@@ -140,7 +147,7 @@
             </div>
             <div class="form-group">
                 <label>Praticien</label>
-                <select name="doctor_id" required>
+                <select name="doctor_id" id="apt_doctor" required>
                     {% for d in doctors %}
                     <option value="{{ d.id }}" {{ 'selected' if d.id == user.sub }}>Dr. {{ d.last_name }}</option>
                     {% endfor %}
@@ -184,7 +191,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeCreateModal()">Annuler</button>
-                <button type="submit" class="btn btn-primary">Créer le RDV</button>
+                <button type="submit" id="apt-submit-btn" class="btn btn-primary">Créer le RDV</button>
             </div>
         </form>
         {% else %}
@@ -223,9 +230,29 @@
                 <button class="ev-status-btn" data-status="absent" onclick="updateApptStatus('absent')">Absent</button>
             </div>
         </div>
+        <!-- Reschedule section -->
+        <div id="reschedule-section" style="padding:0 24px 16px;display:none;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Déplacer le rendez-vous</div>
+            <div id="reschedule-conflict" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#dc2626;">
+                <div style="font-weight:700;margin-bottom:6px;">⚠️ Créneau pris — suggestions :</div>
+                <div id="reschedule-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <div style="flex:1;">
+                    <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Début</label>
+                    <input type="datetime-local" id="reschedule-start" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Fin</label>
+                    <input type="datetime-local" id="reschedule-end" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="confirmReschedule()" style="flex-shrink:0;">Confirmer</button>
+            </div>
+        </div>
         <!-- Footer -->
         <div style="display:flex;gap:8px;padding:14px 24px;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 var(--radius) var(--radius);">
             <a id="ev-consult-link" href="#" class="btn btn-primary btn-sm">+ Créer consultation</a>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-reschedule" onclick="toggleReschedule()">📅 Déplacer</button>
             <div style="flex:1;"></div>
             <button type="button" class="btn btn-sm" onclick="deleteAppt()" style="background:var(--danger-light);color:var(--danger);border:none;">Supprimer</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="closeEventModal()">Fermer</button>
@@ -347,6 +374,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const props = ev.extendedProps;
             _evId = ev.id;
             _evStatus = props.status;
+            _evStart = ev.start;
+            _evEnd = ev.end;
+            document.getElementById('reschedule-section').style.display = 'none';
+            document.getElementById('reschedule-conflict').style.display = 'none';
 
             // Color bar
             document.getElementById('ev-color-bar').style.background = EVT_COLORS[props.type] || '#2563eb';
@@ -429,6 +460,143 @@ function deleteAppt() {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEventModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCreateModal(); });
+
+// ===== CONFLICT-AWARE FORM SUBMIT =====
+const aptForm = document.getElementById('new-apt-form');
+if (aptForm) {
+    aptForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('apt-submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Vérification...';
+
+        const fd = new FormData(aptForm);
+        const payload = {
+            patient_id: parseInt(fd.get('patient_id')),
+            doctor_id: parseInt(fd.get('doctor_id')),
+            title: fd.get('title'),
+            appointment_type: fd.get('appointment_type'),
+            status: fd.get('status'),
+            start_datetime: fd.get('start_datetime'),
+            end_datetime: fd.get('end_datetime'),
+            room: fd.get('room'),
+            notes: fd.get('notes'),
+        };
+
+        try {
+            const res = await fetch('/appointments/api/new', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (res.ok) {
+                _calendar.refetchEvents();
+                closeCreateModal();
+                if (window.showToast) window.showToast('Rendez-vous créé');
+            } else if (res.status === 409) {
+                const data = await res.json();
+                showConflict(data.suggestions || []);
+            } else {
+                if (window.showToast) window.showToast('Erreur lors de la création', 'error');
+            }
+        } catch (err) {
+            if (window.showToast) window.showToast('Erreur réseau', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Créer le RDV';
+        }
+    });
+}
+
+function showConflict(suggestions) {
+    const banner = document.getElementById('conflict-banner');
+    const suggestionsEl = document.getElementById('conflict-suggestions');
+    banner.style.display = 'block';
+    suggestionsEl.innerHTML = '';
+
+    if (suggestions.length === 0) {
+        suggestionsEl.innerHTML = '<span style="font-size:12px;color:#7f1d1d;">Aucun créneau disponible ce jour.</span>';
+        return;
+    }
+
+    suggestions.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm';
+        btn.style.cssText = 'background:#fff;border:1px solid #fca5a5;color:#dc2626;font-size:12px;padding:4px 10px;';
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+            document.getElementById('apt_start').value = s.start;
+            document.getElementById('apt_end').value = s.end;
+            banner.style.display = 'none';
+        });
+        suggestionsEl.appendChild(btn);
+    });
+}
+
+// ===== RESCHEDULE =====
+let _evStart, _evEnd;
+
+function toggleReschedule() {
+    const sec = document.getElementById('reschedule-section');
+    const open = sec.style.display !== 'none';
+    sec.style.display = open ? 'none' : 'block';
+    document.getElementById('reschedule-conflict').style.display = 'none';
+    if (!open && _evStart) {
+        document.getElementById('reschedule-start').value = toInputDateTime(new Date(_evStart));
+        document.getElementById('reschedule-end').value = _evEnd ? toInputDateTime(new Date(_evEnd)) : '';
+    }
+}
+
+async function confirmReschedule() {
+    const start = document.getElementById('reschedule-start').value;
+    const end = document.getElementById('reschedule-end').value;
+    if (!start || !end || !_evId) return;
+    const res = await fetch(`/appointments/${_evId}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_datetime: start, end_datetime: end }),
+    });
+    if (res.ok) {
+        _calendar.refetchEvents();
+        closeEventModal();
+        if (window.showToast) window.showToast('Rendez-vous déplacé ✓');
+    } else if (res.status === 409) {
+        const data = await res.json();
+        showRescheduleSuggestions(data.suggestions || []);
+    } else {
+        if (window.showToast) window.showToast('Erreur lors du déplacement', 'error');
+    }
+}
+
+function showRescheduleSuggestions(suggestions) {
+    const banner = document.getElementById('reschedule-conflict');
+    const sugEl = document.getElementById('reschedule-suggestions');
+    banner.style.display = 'block';
+    sugEl.innerHTML = '';
+    suggestions.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm';
+        btn.style.cssText = 'background:#fff;border:1px solid #fca5a5;color:#dc2626;font-size:12px;padding:4px 10px;';
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+            document.getElementById('reschedule-start').value = s.start;
+            document.getElementById('reschedule-end').value = s.end;
+            banner.style.display = 'none';
+        });
+        sugEl.appendChild(btn);
+    });
+}
+
+// Hide conflict banner when dates change
+['apt_start', 'apt_end'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => {
+        document.getElementById('conflict-banner').style.display = 'none';
+    });
+});
 </script>
 {% endblock %}
 

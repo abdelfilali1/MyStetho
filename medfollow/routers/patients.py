@@ -120,6 +120,7 @@ async def create_patient(
     referring_doctor: str = Form(""),
     insurance_name: str = Form(""),
     insurance_number: str = Form(""),
+    insurance_serial: str = Form(""),
     emergency_contact_name: str = Form(""),
     emergency_contact_phone: str = Form(""),
     notes: str = Form(""),
@@ -132,7 +133,7 @@ async def create_patient(
 
     try:
         cur = await db.execute(
-            """INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth, gender, social_security_number, email, phone, address, city, postal_code, blood_type, referring_doctor, insurance_name, insurance_number, emergency_contact_name, emergency_contact_phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth, gender, social_security_number, email, phone, address, city, postal_code, blood_type, referring_doctor, insurance_name, insurance_number, insurance_serial, emergency_contact_name, emergency_contact_phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 user["sub"],
                 first_name, last_name, date_of_birth,
@@ -140,6 +141,7 @@ async def create_patient(
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
                 referring_doctor or None, insurance_name or None, insurance_number or None,
+                insurance_serial or None,
                 emergency_contact_name or None, emergency_contact_phone or None, notes or None,
             ),
         )
@@ -157,7 +159,8 @@ async def create_patient(
             "email": email, "phone": phone, "address": address, "city": city,
             "postal_code": postal_code, "blood_type": blood_type,
             "referring_doctor": referring_doctor, "insurance_name": insurance_name,
-            "insurance_number": insurance_number, "emergency_contact_name": emergency_contact_name,
+            "insurance_number": insurance_number, "insurance_serial": insurance_serial,
+            "emergency_contact_name": emergency_contact_name,
             "emergency_contact_phone": emergency_contact_phone, "notes": notes,
         }
         return templates.TemplateResponse(
@@ -274,6 +277,7 @@ async def update_patient(
     referring_doctor: str = Form(""),
     insurance_name: str = Form(""),
     insurance_number: str = Form(""),
+    insurance_serial: str = Form(""),
     emergency_contact_name: str = Form(""),
     emergency_contact_phone: str = Form(""),
     notes: str = Form(""),
@@ -285,13 +289,14 @@ async def update_patient(
 
     try:
         await db.execute(
-            """UPDATE patients SET first_name= ?, last_name= ?, date_of_birth= ?, gender= ?, social_security_number= ?, email= ?, phone= ?, address= ?, city= ?, postal_code= ?, blood_type= ?, referring_doctor= ?, insurance_name= ?, insurance_number= ?, emergency_contact_name= ?, emergency_contact_phone= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ?""",
+            """UPDATE patients SET first_name= ?, last_name= ?, date_of_birth= ?, gender= ?, social_security_number= ?, email= ?, phone= ?, address= ?, city= ?, postal_code= ?, blood_type= ?, referring_doctor= ?, insurance_name= ?, insurance_number= ?, insurance_serial= ?, emergency_contact_name= ?, emergency_contact_phone= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ?""",
             (
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
                 referring_doctor or None, insurance_name or None, insurance_number or None,
+                insurance_serial or None,
                 emergency_contact_name or None, emergency_contact_phone or None, notes or None,
                 patient_id, user["sub"],
             ),
@@ -306,7 +311,7 @@ async def update_patient(
                         "email": email, "phone": phone, "address": address, "city": city,
                         "postal_code": postal_code, "blood_type": blood_type,
                         "referring_doctor": referring_doctor, "insurance_name": insurance_name,
-                        "insurance_number": insurance_number,
+                        "insurance_number": insurance_number, "insurance_serial": insurance_serial,
                         "emergency_contact_name": emergency_contact_name,
                         "emergency_contact_phone": emergency_contact_phone, "notes": notes}
         return templates.TemplateResponse(

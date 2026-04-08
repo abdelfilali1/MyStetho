@@ -263,8 +263,8 @@
                     <span class="info-value">{{ patient.referring_doctor or '—' }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Mutuelle</span>
-                    <span class="info-value">{{ patient.insurance_name or '—' }}{% if patient.insurance_number %} ({{ patient.insurance_number }}){% endif %}</span>
+                    <span class="info-label">Mutuelle / Assurance</span>
+                    <span class="info-value">{{ patient.insurance_name or '—' }}{% if patient.insurance_number %} · N° {{ patient.insurance_number }}{% endif %}{% if patient.insurance_serial %} · Série {{ patient.insurance_serial }}{% endif %}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Contact d'urgence</span>
@@ -562,6 +562,13 @@
             <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
         </div>
         <div>
+            <div class="panel-section-label" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Historique des conditions</span>
+                <button onclick="toggleConditionHistory()" class="btn btn-outline btn-sm" id="btn-cond-history" style="font-size:11px;padding:3px 8px;">Afficher</button>
+            </div>
+            <div id="p-condition-history" style="display:none;max-height:140px;overflow-y:auto;"></div>
+        </div>
+        <div>
             <div class="panel-section-label">Traitements</div>
             <div id="p-treatments"></div>
         </div>
@@ -591,6 +598,7 @@
             </div>
             <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
             <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
+            <button id="btn-bulk-treatment" onclick="addBulkTreatment()" class="panel-btn-dark" style="display:none;background:linear-gradient(135deg,#0f172a,#1e3a5f);margin-top:6px;">🦷 Appliquer à toutes les dents (32)</button>
         </div>
     </div>
 </div>
@@ -868,6 +876,12 @@ function openPanel(toothNum) {
     document.getElementById('p-cond').value  = d.condition || 'sain';
     document.getElementById('p-notes').value = d.notes || '';
     document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#94a3b8;font-size:13px;text-align:center;">Chargement...</div>';
+    // Reset condition history
+    _condHistoryVisible = false;
+    const histEl = document.getElementById('p-condition-history');
+    if (histEl) { histEl.style.display = 'none'; histEl.innerHTML = ''; }
+    const histBtn = document.getElementById('btn-cond-history');
+    if (histBtn) histBtn.textContent = 'Afficher';
     document.getElementById('panel').classList.add('open');
     document.getElementById('overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -926,6 +940,70 @@ async function saveCondition() {
             showToast('Condition enregistrée ✓');
         } else { showToast('Erreur lors de l\'enregistrement'); }
     } catch (e) { showToast('Erreur réseau'); }
+}
+
+const BULK_TREATMENT_TYPES = ['Détartrage', 'Blanchiment', 'Radiographie'];
+
+document.getElementById('new-t-type')?.addEventListener('change', function() {
+    const btn = document.getElementById('btn-bulk-treatment');
+    if (btn) btn.style.display = BULK_TREATMENT_TYPES.includes(this.value) ? 'block' : 'none';
+});
+
+async function addBulkTreatment() {
+    const treatmentType = document.getElementById('new-t-type').value;
+    const desc = document.getElementById('new-t-desc').value;
+    const tdate = document.getElementById('new-t-date').value;
+    const stime = document.getElementById('new-t-time').value || '09:00';
+    if (!confirm(`Appliquer "${treatmentType}" à toutes les dents (32) ?\nCela créera un rendez-vous et 32 traitements liés.`)) return;
+    try {
+        const r = await fetch(`/dental/${PATIENT_ID}/bulk-treatment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ treatment_type: treatmentType, description: desc, treatment_date: tdate, start_time: stime }),
+        });
+        if (r.ok) {
+            showToast(`${treatmentType} appliqué à 32 dents ✓`);
+            document.getElementById('new-t-desc').value = '';
+            // Refresh current tooth treatments if a tooth is selected
+            if (currentTooth) {
+                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
+                renderTreatments(data.treatments);
+            }
+        } else { showToast('Erreur lors de l\'application', 'error'); }
+    } catch (e) { showToast('Erreur réseau', 'error'); }
+}
+
+const CONDITION_LABELS = {
+    sain:'Sain', carie:'Carie', obturation:'Obturation', couronne:'Couronne',
+    extraction:'Extraction', implant:'Implant', bridge:'Bridge', devitalise:'Dévitalisé',
+    fissure:'Fissure', fracture:'Fracture',
+};
+
+let _condHistoryVisible = false;
+async function toggleConditionHistory() {
+    const el = document.getElementById('p-condition-history');
+    const btn = document.getElementById('btn-cond-history');
+    if (!currentTooth) return;
+    _condHistoryVisible = !_condHistoryVisible;
+    if (!_condHistoryVisible) { el.style.display = 'none'; btn.textContent = 'Afficher'; return; }
+    el.style.display = 'block';
+    btn.textContent = 'Masquer';
+    el.innerHTML = '<div style="padding:8px;color:#94a3b8;font-size:12px;">Chargement...</div>';
+    try {
+        const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition-history`).then(r => r.json());
+        if (!data.history || data.history.length === 0) {
+            el.innerHTML = '<div style="padding:8px;color:#94a3b8;font-size:12px;font-style:italic;">Aucun historique</div>';
+            return;
+        }
+        el.innerHTML = data.history.map(h => {
+            const label = CONDITION_LABELS[h.condition] || h.condition;
+            const date = h.changed_at ? h.changed_at.substring(0, 16).replace('T', ' ') : '';
+            return `<div style="padding:6px 2px;border-bottom:1px solid #f1f5f9;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span class="badge badge-${h.condition}" style="font-size:11px;">${label}</span>
+                <span style="color:#94a3b8;font-size:11px;flex:1;text-align:right;">${date}</span>
+            </div>`;
+        }).join('');
+    } catch (e) { el.innerHTML = '<div style="padding:8px;color:#ef4444;font-size:12px;">Erreur réseau</div>'; }
 }
 
 async function addTreatment() {
