@@ -1,0 +1,3 @@
+Update backlog.md based on daily-suggestion.md. only use the validated bugs in daily-suggestion.md
+Keep the prompt to be used in the backlog.md 
+If an improvments/features already exists in backlog.md flag it 

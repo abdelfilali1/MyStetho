@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Doctivo Annuaire — Trouvez un médecin au Maroc</title>
+<meta name="description" content="Annuaire des médecins au Maroc. Praticiens vérifiés par ville et spécialité."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/main.css"/>
+<style>
+/* ── Hero ─────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 96px 0 104px;
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 60%, oklch(0.55 0.10 240 / 0.07), transparent 55%),
+    radial-gradient(ellipse at 78% 28%, oklch(0.62 0.06 160 / 0.06), transparent 55%);
+  pointer-events: none;
+}
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 72px;
+  align-items: center;
+  position: relative; z-index: 1;
+}
+.hero-search {
+  margin-top: 40px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 7px;
+  box-shadow: var(--shadow-md);
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+}
+.hs-field {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
+}
+.hs-field svg { width: 16px; height: 16px; color: var(--text-soft); flex-shrink: 0; }
+.hs-field input, .hs-field select {
+  border: none; outline: none; background: transparent;
+  font-size: 14px; width: 100%; color: var(--text);
+  cursor: pointer;
+}
+.hs-btn {
+  background: var(--accent); color: #fff;
+  border-radius: 10px; padding: 0 22px;
+  font-weight: 500; font-size: 14px;
+  transition: background 0.15s;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.hs-btn:hover { background: var(--accent-strong); }
+.hero-stats {
+  display: flex; gap: 36px;
+  margin-top: 36px; padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+.hs-num { font-family: var(--font-serif); font-size: 34px; line-height: 1; }
+.hs-label { font-size: 13px; color: var(--text-muted); margin-top: 5px; }
+
+/* ── Hero visual ─────────────────────────── */
+.hero-visual { position: relative; height: 500px; }
+.hv-card {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-md);
+  display: flex; gap: 14px; align-items: flex-start;
+  width: 320px;
+}
+.hv-card-1 { top: 20px; right: 40px; transform: rotate(-1.5deg); }
+.hv-card-2 { top: 190px; right: 0; transform: rotate(1.2deg); z-index: 2; }
+.hv-card-3 { top: 356px; right: 60px; transform: rotate(-0.8deg); }
+.hv-info { flex: 1; min-width: 0; }
+.hv-name { font-size: 15px; font-weight: 500; }
+.hv-spec { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.hv-meta { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+
+/* ── Section helpers ─────────────────────── */
+.section-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 40px; flex-wrap: wrap; gap: 20px;
+}
+
+/* ── Specialités ─────────────────────────── */
+.specs { padding: 88px 0; background: linear-gradient(to bottom, transparent, var(--surface) 20%); }
+.specs-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.spec-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 22px;
+  transition: all 0.15s; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: space-between; min-height: 116px;
+}
+.spec-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.spec-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent-strong);
+  display: grid; place-items: center; margin-bottom: 14px;
+}
+.spec-icon svg { width: 17px; height: 17px; }
+.spec-name { font-size: 14px; font-weight: 500; }
+.spec-count { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Villes ──────────────────────────────── */
+.villes { padding: 64px 0; background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.villes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.ville-card {
+  border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; background: var(--bg);
+  transition: all 0.15s; cursor: pointer; display: flex; flex-direction: column;
+}
+.ville-card:hover { border-color: var(--text-soft); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.ville-img {
+  aspect-ratio: 4/3; position: relative;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, oklch(0.93 0.015 240), oklch(0.95 0.01 160));
+}
+.ville-abbr { font-family: var(--font-serif); font-size: 32px; color: var(--accent); opacity: 0.45; font-style: italic; }
+.ville-info { padding: 14px 16px; }
+.ville-name { font-size: 15px; font-weight: 500; }
+.ville-count { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Comment ça marche ───────────────────── */
+.how { padding: 88px 0; }
+.how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 48px; }
+.how-step { position: relative; }
+.how-num { font-family: var(--font-serif); font-style: italic; font-size: 60px; color: var(--accent); line-height: 0.9; opacity: 0.8; margin-bottom: 20px; }
+.how-step h3 { font-size: 18px; font-weight: 500; margin-bottom: 10px; }
+.how-step p { color: var(--text-muted); font-size: 14.5px; line-height: 1.65; }
+
+/* ── Featured ────────────────────────────── */
+.featured { padding: 88px 0; background: linear-gradient(to bottom, var(--surface), var(--bg)); border-top: 1px solid var(--border); }
+.featured-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.fcard {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 22px;
+  transition: all 0.18s; display: block;
+}
+.fcard:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.fcard-head { display: flex; gap: 14px; align-items: flex-start; }
+.fcard-info { flex: 1; min-width: 0; }
+.fcard-name { font-size: 16px; font-weight: 500; }
+.fcard-spec { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.fcard-loc { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-soft); margin-top: 6px; }
+.fcard-loc svg { width: 12px; height: 12px; }
+.fcard-meta { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); align-items: center; justify-content: space-between; }
+
+/* ── CTA ─────────────────────────────────── */
+.cta { padding: 96px 0; }
+.cta-card {
+  background: linear-gradient(135deg, oklch(0.97 0.012 240), oklch(0.94 0.025 240));
+  border: 1px solid oklch(0.55 0.10 240 / 0.2);
+  border-radius: 20px; padding: 72px 40px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.cta-card::before {
+  content: ""; position: absolute; top: -100px; right: -100px;
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, oklch(0.55 0.10 240 / 0.12), transparent 70%);
+  pointer-events: none;
+}
+.cta-card > * { position: relative; z-index: 1; }
+.cta-card .dv-h2 { max-width: 580px; margin: 0 auto 14px; }
+.cta-actions { display: flex; gap: 12px; justify-content: center; margin-top: 28px; }
+
+/* ── Loading ─────────────────────────────── */
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── Responsive ──────────────────────────── */
+@media (max-width: 1024px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  .hero-visual { display: none; }
+  .specs-grid { grid-template-columns: repeat(3, 1fr); }
+  .villes-grid { grid-template-columns: repeat(3, 1fr); }
+  .featured-grid, .how-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .hero { padding: 64px 0 72px; }
+  .hero-search { grid-template-columns: 1fr; border-radius: 12px; }
+  .hs-field { border-right: none; border-bottom: 1px solid var(--border); }
+  .hs-btn { border-radius: 8px; padding: 12px; justify-content: center; }
+  .specs-grid, .villes-grid { grid-template-columns: repeat(2, 1fr); }
+  .featured-grid, .how-grid { grid-template-columns: 1fr; }
+  .hero-stats { gap: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="dv-header">
+  <div class="dv-header-inner">
+    <a href="index.html" class="dv-logo">
+      <img src="assets/logo.png" alt="Doctivo"/>
+      <span class="dv-logo-name">Doctivo</span>
+      <span class="dv-logo-sub">Annuaire</span>
+    </a>
+    <nav class="dv-nav">
+      <a href="index.html" class="active">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+    </nav>
+    <div class="dv-header-spacer"></div>
+    <a href="annuaire.html" class="dv-btn dv-btn-accent dv-btn-sm">Trouver un médecin</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero dv-grain">
+  <div class="hero-bg"></div>
+  <div class="dv-container hero-inner">
+    <div>
+      <span class="dv-eyebrow">Annuaire médical · Maroc</span>
+      <h1 class="dv-h1">Trouvez le bon <em>médecin</em>,<br/>en toute confiance.</h1>
+      <p class="dv-lead" style="margin-top:20px;">
+        Plus de 1 200 praticiens vérifiés à Casablanca, Rabat, Marrakech, Fès et Tanger.
+        Spécialités, langues, conventionnement — tout en clair.
+      </p>
+      <form class="hero-search" id="heroSearch" onsubmit="heroSubmit(event)">
+        <label class="hs-field">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input id="hq" placeholder="Nom, spécialité, mot-clé…"/>
+        </label>
+        <label class="hs-field">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 14s5-4.5 5-8.5a5 5 0 10-10 0C3 9.5 8 14 8 14z" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/></svg>
+          <select id="hville"><option value="">Toutes les villes</option></select>
+        </label>
+        <label class="hs-field">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <select id="hspec"><option value="">Toutes les spécialités</option></select>
+        </label>
+        <button type="submit" class="hs-btn">
+          Rechercher
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </form>
+      <div class="hero-stats">
+        <div><div class="hs-num" id="statTotal">—</div><div class="hs-label">Médecins référencés</div></div>
+        <div><div class="hs-num" id="statSpecs">—</div><div class="hs-label">Spécialités</div></div>
+        <div><div class="hs-num" id="statVilles">—</div><div class="hs-label">Villes couvertes</div></div>
+      </div>
+    </div>
+    <div class="hero-visual" id="heroVisual"></div>
+  </div>
+</section>
+
+<!-- SPÉCIALITÉS -->
+<section class="specs">
+  <div class="dv-container">
+    <div class="section-head">
+      <div>
+        <span class="dv-eyebrow">Par spécialité</span>
+        <h2 class="dv-h2">Pour chaque besoin,<br/>un praticien spécialisé.</h2>
+      </div>
+      <a href="annuaire.html" class="dv-btn dv-btn-ghost">Voir toutes les spécialités →</a>
+    </div>
+    <div class="specs-grid" id="specsGrid">
+      <div class="skeleton" style="height:116px;"></div>
+      <div class="skeleton" style="height:116px;"></div>
+      <div class="skeleton" style="height:116px;"></div>
+      <div class="skeleton" style="height:116px;"></div>
+      <div class="skeleton" style="height:116px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- VILLES -->
+<section class="villes">
+  <div class="dv-container">
+    <div class="section-head">
+      <div>
+        <span class="dv-eyebrow">Par ville</span>
+        <h2 class="dv-h2">Près de chez vous.</h2>
+      </div>
+    </div>
+    <div class="villes-grid" id="villesGrid">
+      <div class="skeleton" style="height:170px;"></div>
+      <div class="skeleton" style="height:170px;"></div>
+      <div class="skeleton" style="height:170px;"></div>
+      <div class="skeleton" style="height:170px;"></div>
+      <div class="skeleton" style="height:170px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMENT ÇA MARCHE -->
+<section class="how">
+  <div class="dv-container">
+    <span class="dv-eyebrow">Mode d'emploi</span>
+    <h2 class="dv-h2">Trois étapes, et c'est tout.</h2>
+    <div class="how-grid">
+      <div class="how-step"><div class="how-num">01</div><h3>Recherchez</h3><p>Filtrez par ville, spécialité ou nom. Affinez avec les langues parlées et le conventionnement CNSS.</p></div>
+      <div class="how-step"><div class="how-num">02</div><h3>Consultez la fiche</h3><p>Adresse du cabinet, type d'établissement, spécialités exercées et avis vérifiés de patients réels.</p></div>
+      <div class="how-step"><div class="how-num">03</div><h3>Demandez le contact</h3><p>Pour obtenir l'email ou le téléphone, remplissez un court formulaire. Réponse garantie sous 24 h.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURED DOCTORS -->
+<section class="featured">
+  <div class="dv-container">
+    <div class="section-head">
+      <div>
+        <span class="dv-eyebrow">Les mieux notés</span>
+        <h2 class="dv-h2">Des praticiens recommandés<br/>par leurs patients.</h2>
+      </div>
+      <a href="annuaire.html" class="dv-btn dv-btn-ghost">Voir l'annuaire complet →</a>
+    </div>
+    <div class="featured-grid" id="featuredGrid">
+      <div class="skeleton" style="height:130px;"></div>
+      <div class="skeleton" style="height:130px;"></div>
+      <div class="skeleton" style="height:130px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="dv-container">
+    <div class="cta-card">
+      <span class="dv-eyebrow">Vous êtes médecin ?</span>
+      <h2 class="dv-h2">Référencez votre cabinet sur Doctivo.</h2>
+      <p class="dv-lead" style="margin:0 auto;">Faites-vous trouver par les patients de votre région. Inscription gratuite, profil vérifié sous 48 h.</p>
+      <div class="cta-actions">
+        <a href="#" class="dv-btn dv-btn-accent">Créer ma fiche praticien</a>
+        <a href="#" class="dv-btn dv-btn-ghost">En savoir plus</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="dv-footer">
+  <div class="dv-footer-inner">
+    <div>
+      <a href="index.html" class="dv-logo" style="margin-bottom:14px;">
+        <img src="assets/logo.png" alt="Doctivo" style="height:28px;"/>
+        <span class="dv-logo-name">Doctivo</span>
+        <span class="dv-logo-sub">Annuaire</span>
+      </a>
+      <p class="dv-footer-tagline">L'annuaire de référence des médecins au Maroc. Praticiens vérifiés, fiches complètes, contact protégé.</p>
+    </div>
+    <div>
+      <h4>Villes</h4>
+      <ul id="footerVilles"></ul>
+    </div>
+    <div>
+      <h4>Spécialités</h4>
+      <ul id="footerSpecs"></ul>
+    </div>
+    <div>
+      <h4>Doctivo</h4>
+      <ul>
+        <li><a href="#">À propos</a></li>
+        <li><a href="#">Référencer mon cabinet</a></li>
+        <li><a href="#">Mentions légales</a></li>
+        <li><a href="#">Confidentialité</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="dv-footer-bottom">
+    <span>© 2026 Doctivo — Annuaire médical au Maroc</span>
+    <span>La santé, mieux organisée.</span>
+  </div>
+</footer>
+
+<script src="js/shared.js"></script>
+<script>
+const API = '';  // same origin
+
+async function load() {
+  const [meta, topDocs] = await Promise.all([
+    fetch(`${API}/api/meta`).then(r => r.json()),
+    fetch(`${API}/api/doctors?sort=note&per_page=3`).then(r => r.json()),
+  ]);
+
+  const { villes, specialites } = meta;
+
+  // Stats
+  const allRes = await fetch(`${API}/api/doctors?per_page=1`).then(r => r.json());
+  document.getElementById('statTotal').textContent = allRes.total.toLocaleString('fr-FR');
+  document.getElementById('statSpecs').textContent = specialites.length;
+  document.getElementById('statVilles').textContent = villes.length;
+
+  // Hero dropdowns
+  const hv = document.getElementById('hville');
+  const hs = document.getElementById('hspec');
+  villes.forEach(v => hv.innerHTML += `<option value="${v}">${v}</option>`);
+  specialites.forEach(s => hs.innerHTML += `<option value="${s}">${s}</option>`);
+
+  // Hero visual cards
+  const heroVis = document.getElementById('heroVisual');
+  topDocs.doctors.slice(0, 3).forEach((d, i) => {
+    heroVis.innerHTML += `
+      <div class="hv-card hv-card-${i+1}">
+        ${avatarHTML(d, 48)}
+        <div class="hv-info">
+          <div class="hv-name">Dr. ${d.prenom} ${d.nom}</div>
+          <div class="hv-spec">${d.specialite} · ${d.ville}</div>
+          <div class="hv-meta">${starsHTML(d.note, d.avis, true)} ${verifiedHTML()}</div>
+        </div>
+      </div>`;
+  });
+
+  // Specialties grid
+  const specCountsRes = await fetch(`${API}/api/doctors?per_page=200`).then(r => r.json());
+  const all = specCountsRes.doctors;
+  const specCounts = {};
+  const villeCounts = {};
+  all.forEach(d => {
+    specCounts[d.specialite] = (specCounts[d.specialite] || 0) + 1;
+    villeCounts[d.ville] = (villeCounts[d.ville] || 0) + 1;
+  });
+  const realN = n => Math.floor(n * 47 + 23);
+
+  const sg = document.getElementById('specsGrid');
+  sg.innerHTML = specialites.slice(0, 10).map(s => `
+    <a href="annuaire.html?spec=${encodeURIComponent(s)}" class="spec-card">
+      <div>
+        <div class="spec-icon"><svg viewBox="0 0 16 16">${SPEC_ICONS[s] || SPEC_ICONS['Médecine générale']}</svg></div>
+        <div class="spec-name">${s}</div>
+      </div>
+      <div class="spec-count">${realN(specCounts[s] || 1)} médecins</div>
+    </a>`).join('');
+
+  // Villes
+  const vg = document.getElementById('villesGrid');
+  vg.innerHTML = villes.map(v => `
+    <a href="annuaire.html?ville=${encodeURIComponent(v)}" class="ville-card">
+      <div class="ville-img"><div class="ville-abbr">${v.slice(0,3)}</div></div>
+      <div class="ville-info">
+        <div class="ville-name">${v}</div>
+        <div class="ville-count">${realN(villeCounts[v] || 1)} médecins</div>
+      </div>
+    </a>`).join('');
+
+  // Featured
+  const fg = document.getElementById('featuredGrid');
+  fg.innerHTML = topDocs.doctors.map(d => `
+    <a href="medecin.html?id=${d.id}" class="fcard">
+      <div class="fcard-head">
+        ${avatarHTML(d, 56)}
+        <div class="fcard-info">
+          <div class="fcard-name">Dr. ${d.prenom} ${d.nom}</div>
+          <div class="fcard-spec">${d.specialite}</div>
+          <div class="fcard-loc">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 14s5-4.5 5-8.5a5 5 0 10-10 0C3 9.5 8 14 8 14z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/></svg>
+            ${d.quartier}, ${d.ville}
+          </div>
+        </div>
+      </div>
+      <div class="fcard-meta">${starsHTML(d.note, d.avis)} ${verifiedHTML()}</div>
+    </a>`).join('');
+
+  // Footer
+  document.getElementById('footerVilles').innerHTML = villes.map(v => `<li><a href="annuaire.html?ville=${encodeURIComponent(v)}">${v}</a></li>`).join('');
+  document.getElementById('footerSpecs').innerHTML = specialites.slice(0, 5).map(s => `<li><a href="annuaire.html?spec=${encodeURIComponent(s)}">${s}</a></li>`).join('');
+}
+
+function heroSubmit(e) {
+  e.preventDefault();
+  const p = new URLSearchParams();
+  const q = document.getElementById('hq').value.trim();
+  const v = document.getElementById('hville').value;
+  const s = document.getElementById('hspec').value;
+  if(q) p.set('q', q);
+  if(v) p.set('ville', v);
+  if(s) p.set('spec', s);
+  window.location.href = 'annuaire.html' + (p.toString() ? '?' + p.toString() : '');
+}
+
+load().catch(console.error);
+</script>
+</body>
+</html>

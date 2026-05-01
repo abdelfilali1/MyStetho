@@ -3,9 +3,9 @@ Read backlog.md and work through every unchecked [ ] item top to bottom.
 For each item:
 1. Read the relevant code before making any changes
 2. Implement the change, keeping it simple and focused
-3. Run existing tests if any (pytest)
+3. Run existing tests Always run test after every change (you can directly check in the local host URL : http://localhost:8000/)
 4. Update the item to [x] in backlog.md when done, or [!] + reason if blocked after 3 tries
-5. Always run test after every change (you can directly check in the local host)
+5. Save the day of the change in backlog.md and Daily_log.md
 6. Log what changed in DAILY_LOG.md (files touched, what was done, any decisions made)
 
 Do not push to git.

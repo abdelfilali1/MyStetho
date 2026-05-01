@@ -32,12 +32,17 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Patient</th>
-                    <th>Date de naissance</th>
+                    {% macro sort_link(col, label) %}
+                        {% set next_order = 'desc' if sort_by == col and sort_order == 'asc' else 'asc' %}
+                        {% set arrow = ' ↑' if sort_by == col and sort_order == 'asc' else ' ↓' if sort_by == col else '' %}
+                        <th><a href="/patients?q={{ search }}&sort_by={{ col }}&sort_order={{ next_order }}" style="color:inherit;text-decoration:none;">{{ label }}{{ arrow }}</a></th>
+                    {% endmacro %}
+                    {{ sort_link('last_name', 'Patient') }}
+                    {{ sort_link('date_of_birth', 'Date de naissance') }}
                     <th>Âge</th>
                     <th>Téléphone</th>
-                    <th>Ville</th>
-                    <th>N° Sécu</th>
+                    {{ sort_link('city', 'Ville') }}
+                    <th>Dernière visite</th>
                     <th></th>
                 </tr>
             </thead>
@@ -58,15 +63,12 @@
                     <td>{{ p.date_of_birth }}</td>
                     <td>
                         {% if p.date_of_birth %}
-                        {% set birth_parts = p.date_of_birth.split('-') %}
-                        {% if birth_parts|length == 3 %}
-                        {{ now_year - birth_parts[0]|int }} ans
-                        {% endif %}
+                        {{ p.date_of_birth | calc_age }} ans
                         {% endif %}
                     </td>
                     <td>{{ p.phone or '—' }}</td>
                     <td>{{ p.city or '—' }}</td>
-                    <td>{{ p.social_security_number or '—' }}</td>
+                    <td>{{ p.last_visit or '—' }}</td>
                     <td>
                         <a href="/patients/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
                     </td>

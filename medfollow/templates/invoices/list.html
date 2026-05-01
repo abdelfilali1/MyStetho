@@ -14,7 +14,10 @@
         <h2>Facturation</h2>
         <p class="subtitle">{{ total_count if total_count is defined else invoices|length }} facture{{ 's' if (total_count if total_count is defined else invoices|length) != 1 }}</p>
     </div>
-    <a href="/invoices/new" class="btn btn-primary">+ Nouvelle facture</a>
+    <div style="display:flex;gap:8px;">
+        <a href="/invoices/export.csv{% if selected_status or (date_from is defined and date_from) or (date_to is defined and date_to) %}?{% if selected_status %}status={{ selected_status }}{% endif %}{% if date_from is defined and date_from %}{% if selected_status %}&{% endif %}date_from={{ date_from }}{% endif %}{% if date_to is defined and date_to %}&date_to={{ date_to }}{% endif %}{% endif %}" class="btn btn-outline">↓ Export CSV</a>
+        <a href="/invoices/new" class="btn btn-primary">+ Nouvelle facture</a>
+    </div>
 </div>
 
 <div class="stats-grid" style="margin-bottom: 20px; grid-template-columns: repeat(5, 1fr);">

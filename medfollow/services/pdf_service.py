@@ -98,6 +98,113 @@ def generate_prescription_pdf(prescription: dict, items: list) -> bytes:
     return buf.getvalue()
 
 
+def generate_patient_brochure_pdf(patient: dict, history: list, appointments: list, prescriptions: list) -> bytes:
+    """Generate a patient information brochure PDF."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=22 * mm, rightMargin=22 * mm,
+                            topMargin=20 * mm, bottomMargin=20 * mm)
+    styles = _get_styles()
+    elements = []
+
+    elements.append(Paragraph("FICHE PATIENT", styles["DocTitle"]))
+    full_name = f"{patient.get('last_name', '').upper()} {patient.get('first_name', '')}"
+    elements.append(Paragraph(full_name, styles["DocSubtitle"]))
+    elements.append(Spacer(1, 8))
+
+    elements.append(Paragraph("Informations personnelles", styles["SectionHead"]))
+    identity_rows = []
+    if patient.get("date_of_birth"):
+        identity_rows.append(["Date de naissance", patient["date_of_birth"]])
+    if patient.get("gender"):
+        identity_rows.append(["Sexe", patient["gender"]])
+    if patient.get("blood_type"):
+        identity_rows.append(["Groupe sanguin", patient["blood_type"]])
+    if patient.get("phone"):
+        identity_rows.append(["Téléphone", patient["phone"]])
+    if patient.get("email"):
+        identity_rows.append(["Email", patient["email"]])
+    if patient.get("address"):
+        addr = patient["address"]
+        if patient.get("city"):
+            addr += f", {patient['city']}"
+        if patient.get("postal_code"):
+            addr += f" {patient['postal_code']}"
+        identity_rows.append(["Adresse", addr])
+    if patient.get("social_security_number"):
+        identity_rows.append(["N° Sécu", patient["social_security_number"]])
+    if patient.get("insurance_name"):
+        ins = patient["insurance_name"]
+        if patient.get("insurance_number"):
+            ins += f" — N° {patient['insurance_number']}"
+        if patient.get("insurance_serial"):
+            ins += f" — Série {patient['insurance_serial']}"
+        identity_rows.append(["Mutuelle / Assurance", ins])
+
+    if identity_rows:
+        t = Table(identity_rows, colWidths=[60 * mm, 110 * mm])
+        t.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("TEXTCOLOR", (0, 0), (0, -1), GRAY),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.25, HexColor("#e5e7eb")),
+        ]))
+        elements.append(t)
+
+    if history:
+        elements.append(Paragraph("Antécédents médicaux", styles["SectionHead"]))
+        for h in history:
+            type_labels = {"medical": "Médical", "surgical": "Chirurgical",
+                           "family": "Familial", "allergy": "Allergie"}
+            label = type_labels.get(h.get("type", ""), "Médical")
+            elements.append(Paragraph(f"<b>{label}</b> — {h.get('description', '')}", styles["Normal"]))
+        elements.append(Spacer(1, 4))
+
+    if appointments:
+        elements.append(Paragraph("Prochains rendez-vous", styles["SectionHead"]))
+        appt_rows = [["Date", "Motif", "Statut"]]
+        for a in appointments[:5]:
+            appt_rows.append([
+                str(a.get("start_datetime", ""))[:16].replace("T", " "),
+                a.get("title", ""),
+                a.get("status", ""),
+            ])
+        t = Table(appt_rows, colWidths=[45 * mm, 95 * mm, 30 * mm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#eef5ff")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.3, HexColor("#d1d9e6")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 4))
+
+    if prescriptions:
+        elements.append(Paragraph("Traitements en cours", styles["SectionHead"]))
+        for rx in prescriptions[:3]:
+            elements.append(Paragraph(
+                f"Ordonnance du {str(rx.get('prescription_date', ''))[:10]}", styles["MedName"]
+            ))
+            for item in rx.get("items", []):
+                elements.append(Paragraph(
+                    f"• {item.get('medication_name', '')} — {item.get('dosage', '')} — {item.get('frequency', '')}",
+                    styles["MedDetail"]
+                ))
+            elements.append(Spacer(1, 4))
+
+    elements.append(Spacer(1, 20))
+    from datetime import date as _date
+    elements.append(Paragraph(
+        f"Document généré le {_date.today().strftime('%d/%m/%Y')}",
+        ParagraphStyle("Footer", parent=styles["Normal"], fontSize=8, textColor=GRAY, alignment=1),
+    ))
+    doc.build(elements)
+    return buf.getvalue()
+
+
 def generate_consultation_pdf(consultation: dict, vitals: dict | None = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spécialités — Doctivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ===== DENTAL SECTION ===== */
+    .dental-feature-section { padding: 100px 0; background: #fff; }
+    .dental-available-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #dcfce7; border: 1px solid #86efac; color: #15803d;
+      padding: 6px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 700;
+      margin-bottom: 24px;
+    }
+    .dental-available-badge span { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+    .feat-check-list { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-top: 24px; }
+    .feat-check-list li { display: flex; align-items: flex-start; gap: 12px; font-size: 0.92rem; color: #334155; line-height: 1.6; }
+    .feat-check-list li .ico { width: 22px; height: 22px; border-radius: 50%; background: #dcfce7; color: #15803d; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ===== ENDO TABLE MOCKUP ===== */
+    .endo-mockup {
+      background: linear-gradient(160deg,#0c1829,#0f172a);
+      border-radius: 20px; padding: 20px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .endo-mockup-title { color: white; font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+    .endo-mockup-sub { color: rgba(255,255,255,0.45); font-size: 10px; margin-bottom: 16px; }
+    .endo-tooth-header {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(28,140,248,0.15); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+      border: 1px solid rgba(28,140,248,0.2);
+    }
+    .endo-tooth-num { color: #60a5fa; font-weight: 800; font-size: 18px; font-family: 'Sora',sans-serif; }
+    .endo-tooth-name { color: rgba(255,255,255,0.6); font-size: 11px; }
+    .endo-table { width: 100%; border-collapse: collapse; }
+    .endo-table th { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 8px; text-align: left; }
+    .endo-table td { padding: 6px 8px; font-size: 10px; color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .endo-table tr:last-child td { border-bottom: none; }
+    .endo-table tr:hover td { background: rgba(255,255,255,0.03); }
+    .endo-canal-name { color: white; font-weight: 600; font-size: 11px; }
+    .endo-status {
+      display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px;
+      font-size: 9px; font-weight: 700;
+    }
+    .endo-status.localise { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .endo-status.mesure { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .endo-status.prepare { background: rgba(139,92,246,0.2); color: #c4b5fd; }
+    .endo-status.obture { background: rgba(34,197,94,0.2); color: #86efac; }
+    .endo-measure { font-family: monospace; font-size: 11px; }
+    .endo-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+    /* ===== ROADMAP ===== */
+    .roadmap-section { background: #f8fafc; padding: 100px 0; }
+    .roadmap-timeline { position: relative; margin-top: 60px; }
+    .roadmap-line {
+      position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+      background: linear-gradient(180deg,#1c8cf8,rgba(28,140,248,0.1));
+      transform: translateX(-50%);
+    }
+    .roadmap-item { display: grid; grid-template-columns: 1fr 60px 1fr; align-items: center; gap: 24px; margin-bottom: 48px; position: relative; }
+    .roadmap-item:last-child { margin-bottom: 0; }
+    .roadmap-content { padding: 28px; background: white; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .roadmap-content.right { grid-column: 3; }
+    .roadmap-content.left { grid-column: 1; text-align: right; }
+    .roadmap-node { grid-column: 2; display: flex; justify-content: center; }
+    .roadmap-dot {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg,#1c8cf8,#0f76d9);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 0 4px #f8fafc, 0 0 0 6px rgba(28,140,248,0.2);
+      font-size: 18px; z-index: 1; position: relative;
+    }
+    .roadmap-dot.coming {
+      background: #e2e8f0;
+      box-shadow: 0 0 0 4px #f8fafc, 0 0 0 6px rgba(0,0,0,0.06);
+    }
+    .roadmap-quarter { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #1c8cf8; margin-bottom: 8px; }
+    .roadmap-quarter.coming { color: #94a3b8; }
+    .roadmap-content h4 { font-size: 1.05rem; margin-bottom: 8px; }
+    .roadmap-content p { font-size: 0.85rem; color: #64748b; line-height: 1.65; }
+    .roadmap-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .roadmap-content.left .roadmap-tags { justify-content: flex-end; }
+    .roadmap-tag { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+    .roadmap-tag.active { background: #dbeafe; color: #1d4ed8; }
+    .roadmap-multi { background: linear-gradient(160deg,#0a1628,#1e3a5f); }
+    .roadmap-multi h4, .roadmap-multi p { color: white; }
+    .roadmap-multi p { color: rgba(255,255,255,0.65); }
+    .roadmap-multi .roadmap-quarter { color: #60a5fa; }
+
+    /* ===== WHY SECTION ===== */
+    .why-section { padding: 100px 0; background: white; }
+    .why-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; margin-top: 56px; }
+    .why-card { padding: 32px; border-radius: 20px; border: 1px solid #e2e8f0; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.06); transition: all 0.25s; }
+    .why-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.12); }
+    .why-icon { font-size: 2rem; margin-bottom: 16px; }
+    .why-card h4 { font-size: 1.05rem; margin-bottom: 10px; }
+    .why-card p { font-size: 0.88rem; color: #64748b; line-height: 1.65; }
+
+    /* ===== CTA ===== */
+    .page-cta { background: linear-gradient(135deg,#0a1628,#1e3a5f); padding: 80px 0; text-align: center; }
+    .page-cta h2 { color: white; margin-bottom: 16px; }
+    .page-cta p { color: rgba(255,255,255,0.65); margin-bottom: 36px; font-size: 1rem; }
+
+    @media(max-width:900px) {
+      .roadmap-line { display: none; }
+      .roadmap-item { grid-template-columns: 1fr; gap: 16px; }
+      .roadmap-content.left { grid-column: 1; text-align: left; }
+      .roadmap-content.left .roadmap-tags { justify-content: flex-start; }
+      .roadmap-node { display: none; }
+      .why-grid { grid-template-columns: 1fr; }
+    }
+    @media(max-width:768px) {
+      .grid-2 { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav nav-transparent" data-transparent="true">
+  <div class="nav-logo">
+    <img src="img/logo.png" alt="Doctivo">
+    <span class="nav-logo-name">Doctivo</span>
+  </div>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="fonctionnalites.html">Fonctionnalités</a>
+    <a href="specialites.html" class="active">Spécialités</a>
+    <a href="demo.html">Démonstration</a>
+    <a href="tarifs.html">Tarifs</a>
+  </div>
+  <div class="nav-cta">
+    <a href="contact.html" class="btn btn-outline btn-sm">Connexion</a>
+    <a href="contact.html" class="btn btn-primary btn-sm">Demander une démo</a>
+  </div>
+  <div class="nav-hamburger"><span></span><span></span><span></span></div>
+  <div class="nav-mobile">
+    <a href="index.html" class="nav-mobile-link">Accueil</a>
+    <a href="fonctionnalites.html" class="nav-mobile-link">Fonctionnalités</a>
+    <a href="specialites.html" class="nav-mobile-link active">Spécialités</a>
+    <a href="demo.html" class="nav-mobile-link">Démonstration</a>
+    <a href="tarifs.html" class="nav-mobile-link">Tarifs</a>
+    <div class="nav-mobile-divider"></div>
+    <div class="nav-mobile-ctas">
+      <a href="contact.html" class="btn btn-outline">Connexion</a>
+      <a href="contact.html" class="btn btn-primary">Demander une démo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Approche spécialité-first</div>
+    <h1>Spécialisé pour votre métier</h1>
+    <p>Doctivo n'est pas un logiciel générique. Chaque module est conçu pour répondre aux besoins cliniques précis de votre spécialité. Aujourd'hui pour les dentistes — demain pour toutes les spécialités.</p>
+  </div>
+</section>
+
+<!-- DENTISTERIE SECTION -->
+<section class="dental-feature-section">
+  <div class="container">
+    <div class="text-center reveal" style="margin-bottom:64px;">
+      <div class="dental-available-badge"><span></span>Disponible maintenant</div>
+      <h2>Dentisterie</h2>
+      <p class="lead mt-16" style="max-width:620px;margin:16px auto 0;">La première spécialité de Doctivo est la dentisterie — la plus exigeante sur le plan du suivi clinique. Chaque outil a été conçu avec des chirurgiens-dentistes en exercice.</p>
+    </div>
+
+    <div class="grid-2" style="gap:60px;align-items:center;">
+      <div class="reveal">
+        <h3 style="margin-bottom:8px;">Outils dentaires de précision</h3>
+        <p style="color:#64748b;font-size:0.92rem;">Tout ce dont un chirurgien-dentiste a besoin, sans les compromis d'un logiciel généraliste.</p>
+        <ul class="feat-check-list">
+          <li><span class="ico">✓</span><div><strong>Odontogramme interactif 32 dents</strong> — Notation FDI. Deux vues : Disposition (carrée) et Odontogramme (circulaire). Conditions par dent en un clic, avec historique daté.</div></li>
+          <li><span class="ico">✓</span><div><strong>Endodontie avancée par canal</strong> — Suivi individuel des canaux : MV1, MV2, DV, Palatin, MB, DB, Lingual. Statuts précis : non localisé → localisé → mesuré → préparé → obturé. Couleurs persistantes entre sessions.</div></li>
+          <li><span class="ico">✓</span><div><strong>Traitements liés aux rendez-vous</strong> — Chaque soin enregistré sur l'odontogramme génère automatiquement un rendez-vous dans l'agenda, avec statut synchronisé.</div></li>
+          <li><span class="ico">✓</span><div><strong>Antécédents médicaux structurés</strong> — Diabète, HTA, cardiopathies, allergies médicamenteuses, anticoagulants — présentés dans l'interface de consultation pour une prise de décision éclairée.</div></li>
+          <li><span class="ico">✓</span><div><strong>Médicaments dentaires filtrés</strong> — La base de 5 000+ médicaments est filtrée pour proposer en priorité les anesthésiques, antibiotiques, AINS et antalgiques utilisés en dentisterie.</div></li>
+          <li><span class="ico">✓</span><div><strong>Ordonnances dentaires spécialisées</strong> — Posologie adaptée aux actes dentaires, avec instructions patients claires (à jeun, avec repas, durée du traitement).</div></li>
+        </ul>
+      </div>
+
+      <!-- ENDO MOCKUP -->
+      <div class="reveal reveal-delay-2">
+        <div class="endo-mockup">
+          <div class="endo-mockup-title">Endodontie — Dent 26</div>
+          <div class="endo-mockup-sub">Première molaire supérieure gauche · Traitement en cours</div>
+
+          <div class="endo-tooth-header">
+            <div>
+              <div class="endo-tooth-num">26</div>
+              <div class="endo-tooth-name">1ère molaire sup. gauche</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-bottom:4px;">Progression</div>
+              <div style="font-size:12px;font-weight:700;color:#60a5fa;">3 / 4 canaux</div>
+            </div>
+          </div>
+
+          <table class="endo-table">
+            <thead>
+              <tr>
+                <th>Canal</th>
+                <th>L. estimée</th>
+                <th>L. travail</th>
+                <th>L. finale</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="endo-dot" style="background:#3b82f6;"></span><span class="endo-canal-name">MV1</span></td>
+                <td class="endo-measure">21.0 mm</td>
+                <td class="endo-measure">20.5 mm</td>
+                <td class="endo-measure">20.0 mm</td>
+                <td><span class="endo-status obture">Obturé</span></td>
+              </tr>
+              <tr>
+                <td><span class="endo-dot" style="background:#8b5cf6;"></span><span class="endo-canal-name">MV2</span></td>
+                <td class="endo-measure">20.5 mm</td>
+                <td class="endo-measure">20.0 mm</td>
+                <td class="endo-measure">19.5 mm</td>
+                <td><span class="endo-status obture">Obturé</span></td>
+              </tr>
+              <tr>
+                <td><span class="endo-dot" style="background:#f59e0b;"></span><span class="endo-canal-name">DV</span></td>
+                <td class="endo-measure">19.5 mm</td>
+                <td class="endo-measure">19.0 mm</td>
+                <td class="endo-measure">—</td>
+                <td><span class="endo-status prepare">Préparé</span></td>
+              </tr>
+              <tr>
+                <td><span class="endo-dot" style="background:#22c55e;"></span><span class="endo-canal-name">Palatin</span></td>
+                <td class="endo-measure">22.0 mm</td>
+                <td class="endo-measure">—</td>
+                <td class="endo-measure">—</td>
+                <td><span class="endo-status mesure">Mesuré</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top:14px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.05);">
+            <div style="font-size:9px;color:rgba(255,255,255,0.4);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Note clinique</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.6);line-height:1.5;">Canal MV2 calcifié partiellement. Utilisation lime K-file #08 recommandée. RDV de finition prévu.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section class="roadmap-section">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="overline">Feuille de route</div>
+      <h2 style="margin-top:8px;">Les spécialités qui arrivent</h2>
+      <p class="lead mt-16" style="max-width:600px;margin:16px auto 0;">Doctivo est une plateforme évolutive. La même architecture qui alimente la dentisterie sera adaptée à chaque nouvelle spécialité — avec la même profondeur clinique.</p>
+    </div>
+
+    <div class="roadmap-timeline">
+      <div class="roadmap-line"></div>
+
+      <!-- Q2 2026 -->
+      <div class="roadmap-item reveal">
+        <div class="roadmap-content right">
+          <div class="roadmap-quarter active">Q2 2026</div>
+          <h4>🩺 Médecine générale</h4>
+          <p>Formulaires de consultation personnalisables par type de pathologie. Suivi des constantes vitales avec graphiques d'évolution. Gestion des antécédents médicaux et familiaux. Protocoles de suivi des maladies chroniques.</p>
+          <div class="roadmap-tags">
+            <span class="roadmap-tag active">Formulaires custom</span>
+            <span class="roadmap-tag active">Constantes</span>
+            <span class="roadmap-tag active">Antécédents</span>
+            <span class="roadmap-tag active">Suivi chronique</span>
+          </div>
+        </div>
+        <div class="roadmap-node">
+          <div class="roadmap-dot coming" style="font-size:20px;">🩺</div>
+        </div>
+        <div></div>
+      </div>
+
+      <!-- Q3 2026 -->
+      <div class="roadmap-item reveal">
+        <div></div>
+        <div class="roadmap-node">
+          <div class="roadmap-dot coming" style="font-size:20px;">❤️</div>
+        </div>
+        <div class="roadmap-content left">
+          <div class="roadmap-quarter coming">Q3 2026</div>
+          <h4>❤️ Cardiologie</h4>
+          <p>Module ECG intégré avec visualisation des tracés. Suivi tensionnel longitudinal avec alertes automatiques. Base de médicaments cardio-vasculaires spécialisée. Protocoles de suivi post-intervention.</p>
+          <div class="roadmap-tags">
+            <span class="roadmap-tag">ECG intégré</span>
+            <span class="roadmap-tag">Suivi tensionnel</span>
+            <span class="roadmap-tag">Médicaments cardio</span>
+            <span class="roadmap-tag">Alertes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q4 2026 -->
+      <div class="roadmap-item reveal">
+        <div class="roadmap-content right">
+          <div class="roadmap-quarter coming">Q4 2026</div>
+          <h4>👁️ Ophtalmologie</h4>
+          <p>Schéma oculaire interactif pour noter les pathologies par zone. Mesure et suivi de l'acuité visuelle (avec ou sans correction). Gestion des prescriptions de verres correcteurs et lentilles. Suivi de la pression intraoculaire.</p>
+          <div class="roadmap-tags">
+            <span class="roadmap-tag">Schéma oculaire</span>
+            <span class="roadmap-tag">Acuité visuelle</span>
+            <span class="roadmap-tag">Verres correcteurs</span>
+            <span class="roadmap-tag">Pression IO</span>
+          </div>
+        </div>
+        <div class="roadmap-node">
+          <div class="roadmap-dot coming" style="font-size:20px;">👁️</div>
+        </div>
+        <div></div>
+      </div>
+
+      <!-- 2027 -->
+      <div class="roadmap-item reveal">
+        <div></div>
+        <div class="roadmap-node">
+          <div class="roadmap-dot coming" style="font-size:16px;">+</div>
+        </div>
+        <div class="roadmap-content left roadmap-multi">
+          <div class="roadmap-quarter coming" style="color:#60a5fa;">2027 et au-delà</div>
+          <h4 style="color:white;">Dermatologie, Pédiatrie & Gynécologie</h4>
+          <p>Schéma corporel pour la dermatologie, carnet de santé numérique pour la pédiatrie, suivi obstétrical pour la gynécologie. Chaque spécialité avec ses outils propres.</p>
+          <div class="roadmap-tags">
+            <span class="roadmap-tag" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);">Dermatologie</span>
+            <span class="roadmap-tag" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);">Pédiatrie</span>
+            <span class="roadmap-tag" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);">Gynécologie</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY THIS APPROACH -->
+<section class="why-section">
+  <div class="container">
+    <div class="text-center reveal" style="max-width:640px;margin:0 auto;">
+      <div class="overline">Notre philosophie</div>
+      <h2 style="margin-top:8px;">Pourquoi cette approche ?</h2>
+      <p class="lead mt-16">Plutôt que de faire un logiciel générique médiocre pour tout le monde, nous construisons des outils excellents pour chaque spécialité — un à la fois.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card reveal">
+        <div class="why-icon">🎯</div>
+        <h4>Profondeur clinique réelle</h4>
+        <p>Un outil dental générique ne peut pas modéliser l'endodontie par canal. Un logiciel cardio générique ne peut pas gérer un tracé ECG. La spécialisation permet une profondeur impossible autrement.</p>
+      </div>
+      <div class="why-card reveal reveal-delay-1">
+        <div class="why-icon">🔬</div>
+        <h4>Développé avec des praticiens</h4>
+        <p>Chaque fonctionnalité de la version dentaire a été co-construite avec des chirurgiens-dentistes en exercice. Ce même processus sera appliqué à chaque nouvelle spécialité avant sa sortie.</p>
+      </div>
+      <div class="why-card reveal reveal-delay-2">
+        <div class="why-icon">🔗</div>
+        <h4>Une plateforme, plusieurs spécialités</h4>
+        <p>Malgré la spécialisation, les fondations sont communes : dossier patient, agenda, facturation, ordonnances. Le cabinet multi-spécialités bénéficiera d'un système unifié dès le premier jour.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="page-cta">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Rejoignez les pionniers</div>
+    <h2>Commencez avec la dentisterie.<br>Évoluez avec Doctivo.</h2>
+    <p style="color:rgba(255,255,255,0.65);margin-bottom:36px;">Les premiers cabinets adoptent Doctivo aujourd'hui et bénéficieront des tarifs préférentiels pour toutes les futures spécialités.</p>
+    <div class="cta-actions" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
+      <a href="contact.html" class="btn btn-primary btn-lg">Demander une démo gratuite</a>
+      <a href="tarifs.html" class="btn btn-white btn-lg">Voir les tarifs</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo"><img src="img/logo.png" alt="Doctivo"><span>Doctivo</span></div>
+        <p>La plateforme de gestion de cabinet médicale de nouvelle génération.</p>
+      </div>
+      <div class="footer-col"><h5>Produit</h5><ul><li><a href="fonctionnalites.html">Fonctionnalités</a></li><li><a href="specialites.html">Spécialités</a></li><li><a href="demo.html">Démonstration</a></li><li><a href="tarifs.html">Tarifs</a></li></ul></div>
+      <div class="footer-col"><h5>Spécialités</h5><ul><li><a href="specialites.html">Dentisterie ✓</a></li><li><a href="#">Cardiologie (bientôt)</a></li><li><a href="#">Ophtalmologie (bientôt)</a></li><li><a href="#">Médecine générale (bientôt)</a></li></ul></div>
+      <div class="footer-col"><h5>Contact</h5><ul><li><a href="contact.html">Demander une démo</a></li><li><a href="contact.html">Support</a></li><li><a href="#">Mentions légales</a></li></ul></div>
+    </div>
+    <div class="footer-bottom"><p>© 2026 Doctivo. Tous droits réservés.</p><p>La santé, mieux organisée.</p></div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Démonstration — Doctivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ===== MAC BROWSER FRAME ===== */
+    .mac-browser { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 24px 72px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06); }
+    .mac-bar { background: #e2e2e2; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
+    .mac-dots { display: flex; gap: 7px; }
+    .mac-dots span { width: 12px; height: 12px; border-radius: 50%; }
+    .mac-dots span:nth-child(1) { background: #ff5f57; }
+    .mac-dots span:nth-child(2) { background: #ffbd2e; }
+    .mac-dots span:nth-child(3) { background: #28c840; }
+    .mac-url-bar { flex: 1; background: white; border-radius: 6px; padding: 4px 14px; font-size: 12px; color: #888; text-align: center; border: 1px solid #ddd; }
+    .mac-browser img { width: 100%; display: block; }
+    /* ===== DEMO SECTION ===== */
+    .demo-section { padding: 80px 0 100px; background: white; }
+    .demo-tab-area { margin-top: 40px; }
+    .demo-tab-inner { display: grid; grid-template-columns: 1fr 420px; gap: 48px; align-items: start; }
+
+    /* ===== MOCKUP CHROME ===== */
+    .app-chrome {
+      background: #1e293b; border-radius: 16px; overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05);
+    }
+    .app-chrome-bar {
+      background: #0f172a; padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .app-chrome-bar .dots { display: flex; gap: 5px; }
+    .app-chrome-bar .dots span { width: 9px; height: 9px; border-radius: 50%; }
+    .app-chrome-bar .dots span:nth-child(1) { background: #ef4444; }
+    .app-chrome-bar .dots span:nth-child(2) { background: #f59e0b; }
+    .app-chrome-bar .dots span:nth-child(3) { background: #22c55e; }
+    .app-chrome-url { flex:1; background: rgba(255,255,255,0.06); border-radius: 5px; padding: 4px 10px; font-size: 10px; color: rgba(255,255,255,0.35); font-family: monospace; }
+    .app-inner { display: flex; height: 380px; overflow: hidden; }
+
+    /* Sidebar */
+    .app-sidebar { width: 180px; background: #0c1829; padding: 14px 10px; border-right: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+    .app-sidebar-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 6px 8px; }
+    .app-sidebar-logo img { width: 28px; height: 28px; border-radius: 6px; }
+    .app-sidebar-logo span { color: white; font-weight: 700; font-size: 12px; }
+    .app-nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 7px; margin-bottom: 2px; font-size: 10px; color: rgba(255,255,255,0.45); cursor: pointer; }
+    .app-nav-item.active { background: rgba(28,140,248,0.2); color: #60a5fa; }
+    .app-nav-item svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* Main area */
+    .app-main { flex: 1; background: #f8fafc; padding: 14px; overflow: hidden; }
+    .app-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .app-main-header h5 { font-size: 12px; font-weight: 700; color: #0f172a; }
+    .app-avatar-sm { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg,#1c8cf8,#0f76d9); }
+    .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 12px; }
+    .kpi-box { background: white; border-radius: 8px; padding: 9px 11px; border: 1px solid #e2e8f0; }
+    .kpi-box .kn { font-size: 17px; font-weight: 800; color: #0f172a; }
+    .kpi-box .kl { font-size: 8px; color: #94a3b8; margin-top: 2px; font-weight: 500; }
+    .kpi-color { width: 7px; height: 7px; border-radius: 2px; margin-bottom: 5px; }
+    .pt-list { background: white; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
+    .pt-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid #f1f5f9; font-size: 9px; color: #475569; }
+    .pt-row:last-child { border-bottom: none; }
+    .pt-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: white; flex-shrink: 0; }
+    .pt-nm { font-weight: 600; color: #1e293b; font-size: 9px; }
+    .pt-sb { font-size: 8px; color: #94a3b8; }
+    .pt-bx { margin-left: auto; padding: 2px 6px; border-radius: 8px; font-size: 7px; font-weight: 700; }
+
+    /* Patient detail tabs */
+    .pd-tabs { display: flex; gap: 2px; background: #f1f5f9; padding: 3px; overflow-x: auto; }
+    .pd-tab { padding: 5px 9px; border-radius: 6px; font-size: 9px; font-weight: 600; color: #64748b; white-space: nowrap; }
+    .pd-tab.active { background: white; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .pd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; }
+    .pd-info-box { background: #f8fafc; border-radius: 6px; padding: 7px 9px; border: 1px solid #e2e8f0; }
+    .pd-info-label { font-size: 8px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+    .pd-info-val { font-size: 10px; color: #1e293b; font-weight: 600; margin-top: 1px; }
+
+    /* Odo tab */
+    .odo-tab-wrap { background: #0c1829; padding: 14px; height: 100%; }
+    .odo-tab-kpi { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-bottom: 10px; }
+    .odo-kpi-sm { background: rgba(255,255,255,0.05); border-radius: 7px; padding: 7px; }
+    .odo-kpi-sm .n { font-size: 14px; font-weight: 800; }
+    .odo-kpi-sm .l { font-size: 7px; color: rgba(255,255,255,0.35); margin-top: 1px; }
+
+    /* Prescription tab */
+    .rx-tab { padding: 12px; background: white; height: 100%; overflow: hidden; }
+    .rx-tab-head { font-size: 11px; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+    .rx-item-sm { background: #f8fafc; border-radius: 8px; padding: 8px 10px; border-left: 3px solid #1c8cf8; margin-bottom: 7px; }
+    .rx-nm { font-size: 10px; font-weight: 700; color: #0f172a; }
+    .rx-dt { font-size: 9px; color: #64748b; margin-top: 2px; }
+
+    /* Invoice tab */
+    .inv-tab { padding: 12px; background: white; height: 100%; }
+    .inv-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .inv-num { font-size: 12px; font-weight: 800; color: #0f172a; }
+    .inv-date { font-size: 9px; color: #94a3b8; }
+    .inv-patient { font-size: 10px; color: #475569; margin-bottom: 8px; }
+    .inv-table { width: 100%; border-collapse: collapse; }
+    .inv-table th { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; padding: 4px 0; border-bottom: 1px solid #f1f5f9; text-align: left; }
+    .inv-table td { font-size: 10px; color: #334155; padding: 5px 0; border-bottom: 1px solid #f8fafc; }
+    .inv-total { display: flex; justify-content: space-between; padding: 8px 0 0; margin-top: 4px; border-top: 2px solid #e2e8f0; }
+    .inv-total-label { font-size: 11px; font-weight: 700; color: #0f172a; }
+    .inv-total-amount { font-size: 13px; font-weight: 800; color: #1c8cf8; }
+    .inv-paid { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 12px; background: #dcfce7; color: #15803d; font-size: 9px; font-weight: 700; margin-top: 8px; }
+
+    /* ===== DESCRIPTION PANEL ===== */
+    .demo-desc { padding-top: 12px; }
+    .demo-desc h3 { font-size: 1.4rem; margin-bottom: 12px; }
+    .demo-desc p { font-size: 0.92rem; color: #475569; line-height: 1.7; margin-bottom: 20px; }
+    .demo-desc-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .demo-desc-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.88rem; color: #334155; }
+    .demo-desc-list li .ico { width: 20px; height: 20px; border-radius: 50%; background: #dbeafe; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ===== METRICS ===== */
+    .metrics-section { background: #f8fafc; padding: 80px 0; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; margin-top: 56px; }
+    .metric-card {
+      background: white; border-radius: 24px; padding: 40px 32px; text-align: center;
+      border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      transition: all 0.25s;
+    }
+    .metric-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.12); }
+    .metric-num { font-family: 'Sora',sans-serif; font-size: 3.5rem; font-weight: 800; letter-spacing: -0.04em; background: linear-gradient(135deg,#1c8cf8,#0f76d9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .metric-label { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 8px 0 6px; }
+    .metric-sub { font-size: 0.85rem; color: #64748b; }
+
+    /* ===== VIDEO SECTION ===== */
+    .video-section { background: white; padding: 80px 0; }
+    .video-placeholder {
+      max-width: 800px; margin: 48px auto 0;
+      border-radius: 24px; overflow: hidden;
+      background: linear-gradient(160deg,#0a1628,#1e3a5f);
+      aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;
+      position: relative; box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+      cursor: pointer;
+    }
+    .video-placeholder::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(28,140,248,0.2) 0%, transparent 70%);
+    }
+    .play-btn {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+      border: 2px solid rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 1; transition: all 0.3s;
+    }
+    .play-btn:hover { background: rgba(28,140,248,0.4); transform: scale(1.1); }
+    .play-btn::after { content: '▶'; font-size: 28px; color: white; margin-left: 4px; }
+    .video-label { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.6); font-size: 0.88rem; font-weight: 600; white-space: nowrap; z-index: 1; }
+
+    /* ===== CTA ===== */
+    .page-cta { background: linear-gradient(135deg,#0a1628,#1e3a5f); padding: 80px 0; text-align: center; }
+    .page-cta h2 { color: white; margin-bottom: 16px; }
+    .page-cta p { color: rgba(255,255,255,0.65); margin-bottom: 36px; }
+
+    @media(max-width:1024px) {
+      .demo-tab-inner { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media(max-width:768px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+      .kpi-row { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav nav-transparent" data-transparent="true">
+  <div class="nav-logo">
+    <img src="img/logo.png" alt="Doctivo">
+    <span class="nav-logo-name">Doctivo</span>
+  </div>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="fonctionnalites.html">Fonctionnalités</a>
+    <a href="specialites.html">Spécialités</a>
+    <a href="demo.html" class="active">Démonstration</a>
+    <a href="tarifs.html">Tarifs</a>
+  </div>
+  <div class="nav-cta">
+    <a href="contact.html" class="btn btn-outline btn-sm">Connexion</a>
+    <a href="contact.html" class="btn btn-primary btn-sm">Demander une démo</a>
+  </div>
+  <div class="nav-hamburger"><span></span><span></span><span></span></div>
+  <div class="nav-mobile">
+    <a href="index.html" class="nav-mobile-link">Accueil</a>
+    <a href="fonctionnalites.html" class="nav-mobile-link">Fonctionnalités</a>
+    <a href="specialites.html" class="nav-mobile-link">Spécialités</a>
+    <a href="demo.html" class="nav-mobile-link active">Démonstration</a>
+    <a href="tarifs.html" class="nav-mobile-link">Tarifs</a>
+    <div class="nav-mobile-divider"></div>
+    <div class="nav-mobile-ctas">
+      <a href="contact.html" class="btn btn-outline">Connexion</a>
+      <a href="contact.html" class="btn btn-primary">Demander une démo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Visite guidée</div>
+    <h1>Découvrez Doctivo en action</h1>
+    <p>Explorez chaque module de la plateforme. Des mockups fidèles à l'interface réelle pour que vous sachiez exactement ce que vous adoptez.</p>
+  </div>
+</section>
+
+<!-- DEMO TAB SECTION -->
+<section class="demo-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="tab-bar" style="max-width:700px;margin:0 auto 40px;">
+        <button class="tab-btn active" data-group="demo" data-target="dashboard">Agenda</button>
+        <button class="tab-btn" data-group="demo" data-target="patients">Dossier patient</button>
+        <button class="tab-btn" data-group="demo" data-target="odontogramme">Odontogramme</button>
+        <button class="tab-btn" data-group="demo" data-target="ordonnances">Ordonnances</button>
+        <button class="tab-btn" data-group="demo" data-target="facturation">Facturation</button>
+      </div>
+    </div>
+
+    <!-- TAB 1: AGENDA -->
+    <div class="tab-content active" data-group="demo" data-tab="dashboard">
+      <div class="demo-tab-inner">
+        <div class="mac-browser reveal">
+          <div class="mac-bar">
+            <div class="mac-dots"><span></span><span></span><span></span></div>
+            <div class="mac-url-bar">app.doctivo.ma/agenda</div>
+          </div>
+          <img src="img/Agenda.png" alt="Agenda Doctivo">
+        </div>
+        <div class="demo-desc reveal reveal-delay-1">
+          <h3>Agenda du cabinet</h3>
+          <p>L'agenda Doctivo vous donne une vue claire de votre journée et de votre semaine. Planifiez, déplacez et confirmez vos rendez-vous en quelques clics depuis n'importe quel appareil.</p>
+          <ul class="demo-desc-list">
+            <li><span class="ico">✓</span><div>4 indicateurs clés : patients actifs, RDV du jour, mois en cours, chiffre d'affaires</div></li>
+            <li><span class="ico">✓</span><div>Liste des rendez-vous du jour avec statuts colorés mis à jour en temps réel</div></li>
+            <li><span class="ico">✓</span><div>Accès rapide aux derniers patients consultés</div></li>
+            <li><span class="ico">✓</span><div>Navigation complète depuis la barre latérale persistante</div></li>
+            <li><span class="ico">✓</span><div>Interface adaptée à tous les écrans — tablette, ordinateur, grand écran</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: PATIENTS -->
+    <div class="tab-content" data-group="demo" data-tab="patients">
+      <div class="demo-tab-inner">
+        <div class="mac-browser reveal">
+          <div class="mac-bar">
+            <div class="mac-dots"><span></span><span></span><span></span></div>
+            <div class="mac-url-bar">app.doctivo.ma/patients/2891</div>
+          </div>
+          <img src="img/Odontogramme.png" alt="Dossier patient Doctivo">
+        </div>
+        <div class="demo-desc reveal reveal-delay-1">
+          <h3>Fiche patient complète</h3>
+          <p>Toutes les informations d'un patient accessibles depuis un seul écran, organisées en 8 onglets thématiques. La fiche est mise à jour en temps réel après chaque consultation.</p>
+          <ul class="demo-desc-list">
+            <li><span class="ico">✓</span><div>8 onglets : Informations, Antécédents, RDV, Consultations, Ordonnances, Disposition, Odontogramme, Endodontie</div></li>
+            <li><span class="ico">✓</span><div>Alertes médicales visibles immédiatement (allergies, traitements en cours)</div></li>
+            <li><span class="ico">✓</span><div>Historique complet des rendez-vous et consultations</div></li>
+            <li><span class="ico">✓</span><div>Toutes les ordonnances passées consultables et réimprimables</div></li>
+            <li><span class="ico">✓</span><div>Vue dentaire (odontogramme) directement dans la fiche</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ODONTOGRAMME -->
+    <div class="tab-content" data-group="demo" data-tab="odontogramme">
+      <div class="demo-tab-inner">
+        <div class="mac-browser reveal">
+          <div class="mac-bar">
+            <div class="mac-dots"><span></span><span></span><span></span></div>
+            <div class="mac-url-bar">app.doctivo.ma/patients/2891/odontogramme</div>
+          </div>
+          <img src="img/Endodentie.png" alt="Odontogramme et endodontie Doctivo">
+        </div>
+        <div class="demo-desc reveal reveal-delay-1">
+          <h3>Odontogramme interactif</h3>
+          <p>Le schéma dentaire le plus complet du marché. Chaque dent est interactive — cliquez pour assigner une condition, afficher l'historique ou lancer un traitement.</p>
+          <ul class="demo-desc-list">
+            <li><span class="ico">✓</span><div>32 dents en notation FDI, disposées anatomiquement en 4 quadrants</div></li>
+            <li><span class="ico">✓</span><div>7 conditions : sain, carie, obturation, couronne, extraction, dévitalisé, bridge</div></li>
+            <li><span class="ico">✓</span><div>KPIs en temps réel mis à jour à chaque modification</div></li>
+            <li><span class="ico">✓</span><div>Deux vues : Disposition carrée et Odontogramme traditionnel</div></li>
+            <li><span class="ico">✓</span><div>Accès à l'endodontie par canal depuis chaque dent</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: ORDONNANCES -->
+    <div class="tab-content" data-group="demo" data-tab="ordonnances">
+      <div class="demo-tab-inner">
+        <div class="mac-browser reveal">
+          <div class="mac-bar">
+            <div class="mac-dots"><span></span><span></span><span></span></div>
+            <div class="mac-url-bar">app.doctivo.ma/prescriptions/new</div>
+          </div>
+          <img src="img/Ordonance.png" alt="Ordonnances Doctivo">
+        </div>
+        <div class="demo-desc reveal reveal-delay-1">
+          <h3>Ordonnances en 30 secondes</h3>
+          <p>Recherchez un médicament par nom générique ou commercial, définissez la posologie et générez le PDF. La base couvre 5 000+ médicaments disponibles au Maroc.</p>
+          <ul class="demo-desc-list">
+            <li><span class="ico">✓</span><div>Recherche intelligente dans 5 000+ médicaments marocains</div></li>
+            <li><span class="ico">✓</span><div>Posologie guidée : fréquence, durée, voie d'administration</div></li>
+            <li><span class="ico">✓</span><div>PDF professionnel avec en-tête du praticien et cachet</div></li>
+            <li><span class="ico">✓</span><div>Base filtrée par spécialité (dentaire, généraliste...)</div></li>
+            <li><span class="ico">✓</span><div>Historique complet lié à chaque consultation</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: FACTURATION -->
+    <div class="tab-content" data-group="demo" data-tab="facturation">
+      <div class="demo-tab-inner">
+        <div class="app-chrome reveal">
+          <div class="app-chrome-bar">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <div class="app-chrome-url">app.doctivo.fr/invoices/F2026-001</div>
+          </div>
+          <div class="app-inner" style="height:auto;">
+            <div class="inv-tab" style="width:100%;">
+              <div class="inv-head">
+                <div>
+                  <div class="inv-num">Facture F2026-001</div>
+                  <div class="inv-date">Émise le 19/03/2026</div>
+                </div>
+                <div class="inv-paid">✓ Payée</div>
+              </div>
+              <div class="inv-patient">
+                Patient : <strong>RIFAI Amina</strong> · Consultation du 19/03/2026
+              </div>
+              <table class="inv-table">
+                <thead>
+                  <tr>
+                    <th>Acte / Prestation</th>
+                    <th>Qté</th>
+                    <th>Prix unit.</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Consultation et examen</td>
+                    <td>1</td>
+                    <td>150 MAD</td>
+                    <td><strong>150 MAD</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Détartrage complet</td>
+                    <td>1</td>
+                    <td>400 MAD</td>
+                    <td><strong>400 MAD</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Radiographie rétro-alvéolaire</td>
+                    <td>1</td>
+                    <td>200 MAD</td>
+                    <td><strong>200 MAD</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="inv-total">
+                <div class="inv-total-label">Total TTC</div>
+                <div class="inv-total-amount">750 MAD</div>
+              </div>
+              <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px;">
+                <button style="background:#f1f5f9;color:#475569;border:none;border-radius:7px;padding:6px 12px;font-size:9px;font-weight:700;cursor:pointer;">📤 Envoyer</button>
+                <button style="background:#1c8cf8;color:white;border:none;border-radius:7px;padding:6px 12px;font-size:9px;font-weight:700;cursor:pointer;">⬇ PDF</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="demo-desc reveal reveal-delay-1">
+          <h3>Facturation sans friction</h3>
+          <p>Générez des factures professionnelles après chaque consultation. Numérotation automatique, suivi des paiements et statistiques financières intégrées.</p>
+          <ul class="demo-desc-list">
+            <li><span class="ico">✓</span><div>Numérotation automatique : F2026-001, F2026-002... sans possibilité de doublon</div></li>
+            <li><span class="ico">✓</span><div>Pré-remplissage avec les actes de la consultation correspondante</div></li>
+            <li><span class="ico">✓</span><div>Modes de paiement multiples : espèces, chèque, virement, mobile</div></li>
+            <li><span class="ico">✓</span><div>PDF et envoi par email au patient depuis l'interface</div></li>
+            <li><span class="ico">✓</span><div>Statistiques de CA mensuelles et annuelles avec graphiques</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- METRICS -->
+<section class="metrics-section">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="overline">Valeur ajoutée</div>
+      <h2 style="margin-top:8px;">Ce que Doctivo vous apporte</h2>
+      <p class="lead mt-16">Des résultats mesurables dès les premières semaines d'utilisation.</p>
+    </div>
+    <div class="metrics-grid">
+      <div class="metric-card reveal">
+        <div class="metric-num">-40%</div>
+        <div class="metric-label">Temps administratif</div>
+        <div class="metric-sub">En moyenne, les praticiens réduisent de 40% le temps consacré aux tâches administratives (saisie, facturation, ordonnances).</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-1">
+        <div class="metric-num">100%</div>
+        <div class="metric-label">Actes documentés</div>
+        <div class="metric-sub">Traçabilité complète de chaque acte clinique, consultation, ordonnance et paiement. Idéal pour les contrôles et audits.</div>
+      </div>
+      <div class="metric-card reveal reveal-delay-2">
+        <div class="metric-num">SSL</div>
+        <div class="metric-label">Données chiffrées</div>
+        <div class="metric-sub">Toutes les données patients sont chiffrées en transit et au repos. Conformité RGPD et hébergement sécurisé sur serveurs dédiés.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VIDEO SECTION -->
+<section class="video-section">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="overline">Démo complète</div>
+      <h2 style="margin-top:8px;">Voir la démo complète</h2>
+      <p class="lead mt-16" style="max-width:560px;margin:16px auto 0;">Une visite guidée de 8 minutes par l'équipe Doctivo. Tous les modules, toutes les fonctionnalités, avec un cas clinique réel de A à Z.</p>
+    </div>
+    <div class="video-placeholder reveal">
+      <div class="play-btn"></div>
+      <div class="video-label">Démo complète — 8 min · Cabinet dentaire type</div>
+    </div>
+    <div class="text-center mt-48 reveal">
+      <p style="color:#64748b;margin-bottom:20px;">Préférez une démo personnalisée avec notre équipe ?</p>
+      <a href="contact.html" class="btn btn-primary btn-lg">Demander une démo en direct</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="page-cta">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Convaincu ?</div>
+    <h2>Passez à l'étape suivante</h2>
+    <p>Rejoignez les praticiens qui transforment leur cabinet avec Doctivo. Démonstration gratuite, sans engagement.</p>
+    <div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
+      <a href="contact.html" class="btn btn-primary btn-lg">Demander une démo gratuite</a>
+      <a href="tarifs.html" class="btn btn-white btn-lg">Voir les tarifs →</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo"><img src="img/logo.png" alt="Doctivo"><span>Doctivo</span></div>
+        <p>La plateforme de gestion de cabinet médicale de nouvelle génération.</p>
+      </div>
+      <div class="footer-col"><h5>Produit</h5><ul><li><a href="fonctionnalites.html">Fonctionnalités</a></li><li><a href="specialites.html">Spécialités</a></li><li><a href="demo.html">Démonstration</a></li><li><a href="tarifs.html">Tarifs</a></li></ul></div>
+      <div class="footer-col"><h5>Spécialités</h5><ul><li><a href="specialites.html">Dentisterie ✓</a></li><li><a href="#">Cardiologie (bientôt)</a></li><li><a href="#">Ophtalmologie (bientôt)</a></li><li><a href="#">Médecine générale (bientôt)</a></li></ul></div>
+      <div class="footer-col"><h5>Contact</h5><ul><li><a href="contact.html">Demander une démo</a></li><li><a href="contact.html">Support</a></li><li><a href="#">Mentions légales</a></li></ul></div>
+    </div>
+    <div class="footer-bottom"><p>© 2026 Doctivo. Tous droits réservés.</p><p>La santé, mieux organisée.</p></div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

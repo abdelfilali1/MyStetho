@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact & Démonstration — Doctivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ===== CONTACT SECTION ===== */
+    .contact-section { padding: 80px 0 100px; background: white; }
+    .contact-grid { display: grid; grid-template-columns: 1fr 380px; gap: 60px; align-items: start; margin-top: 56px; }
+
+    /* ===== FORM ===== */
+    .contact-form-wrap { background: white; border-radius: 24px; border: 1px solid #e2e8f0; padding: 40px; box-shadow: 0 8px 40px rgba(0,0,0,0.08); }
+    .contact-form-wrap h3 { font-size: 1.3rem; margin-bottom: 6px; }
+    .contact-form-wrap > p { font-size: 0.88rem; color: #64748b; margin-bottom: 28px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%; padding: 12px 14px; border-radius: 10px;
+      border: 1.5px solid #e2e8f0; font-family: 'Manrope', sans-serif;
+      font-size: 0.88rem; color: #0f172a; background: #f8fafc;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none; border-color: #1c8cf8;
+      box-shadow: 0 0 0 3px rgba(28,140,248,0.12);
+      background: white;
+    }
+    .form-group textarea { min-height: 110px; resize: vertical; }
+    .form-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px; cursor: pointer; }
+    .form-submit { width: 100%; padding: 15px; border-radius: 12px; background: #1c8cf8; color: white; border: none; font-family: 'Manrope', sans-serif; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 16px rgba(28,140,248,0.35); }
+    .form-submit:hover { background: #0f76d9; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(28,140,248,0.45); }
+    .form-note { font-size: 0.78rem; color: #94a3b8; text-align: center; margin-top: 12px; }
+
+    /* ===== INFO CARDS ===== */
+    .contact-info { display: flex; flex-direction: column; gap: 16px; }
+    .info-card { background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; padding: 22px 24px; display: flex; align-items: flex-start; gap: 16px; transition: all 0.2s; }
+    .info-card:hover { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.08); transform: translateY(-2px); }
+    .info-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .info-card h5 { font-size: 0.9rem; margin-bottom: 4px; }
+    .info-card p { font-size: 0.85rem; color: #64748b; line-height: 1.55; }
+    .info-card a { color: #1c8cf8; font-weight: 600; }
+
+    .contact-response-time { background: linear-gradient(135deg,#0f172a,#1e3a5f); border-radius: 16px; padding: 22px 24px; margin-top: 4px; }
+    .contact-response-time h5 { color: white; font-size: 0.9rem; margin-bottom: 8px; }
+    .response-items { display: flex; flex-direction: column; gap: 8px; }
+    .response-item { display: flex; justify-content: space-between; align-items: center; }
+    .response-item span:first-child { font-size: 0.82rem; color: rgba(255,255,255,0.6); }
+    .response-item span:last-child { font-size: 0.82rem; font-weight: 700; color: #60a5fa; }
+
+    /* ===== BOTTOM CARDS ===== */
+    .contact-cards-section { background: #f8fafc; padding: 80px 0; }
+    .contact-cards-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; margin-top: 56px; }
+    .contact-card { background: white; border-radius: 20px; border: 1px solid #e2e8f0; padding: 36px 32px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); transition: all 0.25s; }
+    .contact-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.12); }
+    .contact-card-icon { font-size: 2.5rem; margin-bottom: 16px; }
+    .contact-card h4 { font-size: 1.05rem; margin-bottom: 10px; }
+    .contact-card p { font-size: 0.85rem; color: #64748b; line-height: 1.65; margin-bottom: 20px; }
+    .contact-card.featured-card { background: linear-gradient(160deg,#0a1628,#1e3a5f); border-color: rgba(28,140,248,0.3); }
+    .contact-card.featured-card h4, .contact-card.featured-card p { color: rgba(255,255,255,0.85); }
+    .contact-card.featured-card p { color: rgba(255,255,255,0.6); }
+
+    @media(max-width:1024px) {
+      .contact-grid { grid-template-columns: 1fr; }
+      .contact-info { display: grid; grid-template-columns: 1fr 1fr; }
+    }
+    @media(max-width:768px) {
+      .form-row { grid-template-columns: 1fr; }
+      .contact-cards-grid { grid-template-columns: 1fr; }
+      .contact-info { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav nav-transparent" data-transparent="true">
+  <div class="nav-logo">
+    <img src="img/logo.png" alt="Doctivo">
+    <span class="nav-logo-name">Doctivo</span>
+  </div>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="fonctionnalites.html">Fonctionnalités</a>
+    <a href="specialites.html">Spécialités</a>
+    <a href="demo.html">Démonstration</a>
+    <a href="tarifs.html">Tarifs</a>
+  </div>
+  <div class="nav-cta">
+    <a href="contact.html" class="btn btn-outline btn-sm">Connexion</a>
+    <a href="contact.html" class="btn btn-primary btn-sm">Demander une démo</a>
+  </div>
+  <div class="nav-hamburger"><span></span><span></span><span></span></div>
+  <div class="nav-mobile">
+    <a href="index.html" class="nav-mobile-link">Accueil</a>
+    <a href="fonctionnalites.html" class="nav-mobile-link">Fonctionnalités</a>
+    <a href="specialites.html" class="nav-mobile-link">Spécialités</a>
+    <a href="demo.html" class="nav-mobile-link">Démonstration</a>
+    <a href="tarifs.html" class="nav-mobile-link">Tarifs</a>
+    <div class="nav-mobile-divider"></div>
+    <div class="nav-mobile-ctas">
+      <a href="contact.html" class="btn btn-outline">Connexion</a>
+      <a href="contact.html" class="btn btn-primary">Demander une démo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE HERO -->
+<section class="page-hero">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Nous sommes là</div>
+    <h1>Parlons de votre cabinet</h1>
+    <p>Demandez une démonstration personnalisée ou posez-nous toutes vos questions. Notre équipe vous répond sous 24h ouvrées.</p>
+  </div>
+</section>
+
+<!-- CONTACT SECTION -->
+<section class="contact-section">
+  <div class="container">
+    <div class="contact-grid">
+
+      <!-- FORM -->
+      <div class="contact-form-wrap reveal">
+        <h3>Demander une démonstration</h3>
+        <p>Remplissez ce formulaire et nous vous contacterons pour planifier une démo personnalisée adaptée à votre spécialité.</p>
+
+        <form id="contact-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="prenom">Prénom <span style="color:#ef4444;">*</span></label>
+              <input type="text" id="prenom" name="prenom" placeholder="Mohamed" required>
+            </div>
+            <div class="form-group">
+              <label for="nom">Nom <span style="color:#ef4444;">*</span></label>
+              <input type="text" id="nom" name="nom" placeholder="BENALI" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="email">Email professionnel <span style="color:#ef4444;">*</span></label>
+              <input type="email" id="email" name="email" placeholder="dr.benali@cabinet.ma" required>
+            </div>
+            <div class="form-group">
+              <label for="telephone">Téléphone</label>
+              <input type="tel" id="telephone" name="telephone" placeholder="+212 6 00 00 00 00">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="specialite">Spécialité <span style="color:#ef4444;">*</span></label>
+              <select id="specialite" name="specialite" required>
+                <option value="" disabled selected>Choisir votre spécialité</option>
+                <option value="dentiste">Chirurgien-dentiste</option>
+                <option value="generaliste">Médecin généraliste</option>
+                <option value="cardiologue">Cardiologue</option>
+                <option value="ophtalmologue">Ophtalmologue</option>
+                <option value="autre">Autre spécialité</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="praticiens">Nombre de praticiens</label>
+              <select id="praticiens" name="praticiens">
+                <option value="" disabled selected>Taille du cabinet</option>
+                <option value="1">1 praticien (solo)</option>
+                <option value="2-3">2 à 3 praticiens</option>
+                <option value="4+">4 praticiens et plus</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="message">Message (optionnel)</label>
+            <textarea id="message" name="message" placeholder="Décrivez vos besoins, vos questions, ou précisez ce que vous souhaitez voir lors de la démonstration..."></textarea>
+          </div>
+
+          <button type="submit" class="form-submit">Envoyer la demande de démo</button>
+          <p class="form-note">En soumettant ce formulaire, vous acceptez d'être contacté par l'équipe Doctivo. Vos données ne seront jamais partagées avec des tiers.</p>
+        </form>
+      </div>
+
+      <!-- INFO SIDEBAR -->
+      <div class="contact-info reveal reveal-delay-1">
+
+        <div class="info-card">
+          <div class="info-icon" style="background:#dbeafe;">📞</div>
+          <div>
+            <h5>Téléphone</h5>
+            <p><a href="tel:+212522000000">+212 5 22 00 00 00</a><br>Lun–Ven, 9h–18h (heure Maroc)</p>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon" style="background:#dcfce7;">📧</div>
+          <div>
+            <h5>Email</h5>
+            <p><a href="mailto:contact@doctivo.fr">contact@doctivo.fr</a><br>Réponse garantie sous 24h ouvrées</p>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon" style="background:#fef3c7;">📍</div>
+          <div>
+            <h5>Adresse</h5>
+            <p>Casablanca, Maroc<br>Quartier Maarif — Bureau sur RDV</p>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon" style="background:#ede9fe;">🕐</div>
+          <div>
+            <h5>Horaires d'ouverture</h5>
+            <p>Lundi — Vendredi : 9h00 – 18h00<br>Samedi : 10h00 – 14h00<br>Dimanche : Fermé</p>
+          </div>
+        </div>
+
+        <div class="contact-response-time">
+          <h5>Délais de réponse</h5>
+          <div class="response-items">
+            <div class="response-item">
+              <span>Demande de démo</span>
+              <span>&lt; 4h ouvrées</span>
+            </div>
+            <div class="response-item">
+              <span>Support technique</span>
+              <span>&lt; 24h</span>
+            </div>
+            <div class="response-item">
+              <span>Partenariat commercial</span>
+              <span>2–3 jours ouvrés</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BOTTOM CARDS -->
+<section class="contact-cards-section">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="overline">Comment pouvons-nous vous aider ?</div>
+      <h2 style="margin-top:8px;">Plusieurs façons de nous joindre</h2>
+    </div>
+    <div class="contact-cards-grid">
+
+      <div class="contact-card featured-card reveal">
+        <div class="contact-card-icon">🎯</div>
+        <h4>Démonstration gratuite</h4>
+        <p>Réservez une session de 30 minutes avec notre équipe. Nous vous montrons Doctivo adapté à votre spécialité et répondons à toutes vos questions.</p>
+        <a href="#contact-form" class="btn btn-primary btn-sm" style="display:inline-flex;">Réserver ma démo →</a>
+      </div>
+
+      <div class="contact-card reveal reveal-delay-1">
+        <div class="contact-card-icon">🛠️</div>
+        <h4>Support technique</h4>
+        <p>Vous utilisez déjà Doctivo et avez besoin d'aide ? Notre équipe technique est disponible pour vous accompagner, vous former et résoudre tout problème.</p>
+        <a href="mailto:support@doctivo.fr" class="btn btn-outline btn-sm" style="display:inline-flex;">Contacter le support →</a>
+      </div>
+
+      <div class="contact-card reveal reveal-delay-2">
+        <div class="contact-card-icon">🤝</div>
+        <h4>Partenariat</h4>
+        <p>Vous représentez un groupement médical, une école de médecine ou une entreprise de santé ? Discutons d'une collaboration et des conditions partenaires.</p>
+        <a href="mailto:partenariats@doctivo.fr" class="btn btn-dark btn-sm" style="display:inline-flex;">Nous écrire →</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SUCCESS INLINE MESSAGE (hidden by default) -->
+<div id="success-banner" style="display:none;background:#dcfce7;border-top:3px solid #22c55e;padding:20px;text-align:center;position:fixed;bottom:0;left:0;right:0;z-index:9999;animation:fadeSlideUp 0.5s ease;">
+  <strong style="color:#15803d;font-size:1rem;">✓ Demande envoyée avec succès !</strong>
+  <span style="color:#166534;font-size:0.88rem;margin-left:12px;">Notre équipe vous contactera sous 4h ouvrées.</span>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo"><img src="img/logo.png" alt="Doctivo"><span>Doctivo</span></div>
+        <p>La plateforme de gestion de cabinet médicale de nouvelle génération.</p>
+      </div>
+      <div class="footer-col"><h5>Produit</h5><ul><li><a href="fonctionnalites.html">Fonctionnalités</a></li><li><a href="specialites.html">Spécialités</a></li><li><a href="demo.html">Démonstration</a></li><li><a href="tarifs.html">Tarifs</a></li></ul></div>
+      <div class="footer-col"><h5>Spécialités</h5><ul><li><a href="specialites.html">Dentisterie ✓</a></li><li><a href="#">Cardiologie (bientôt)</a></li><li><a href="#">Ophtalmologie (bientôt)</a></li><li><a href="#">Médecine générale (bientôt)</a></li></ul></div>
+      <div class="footer-col"><h5>Contact</h5><ul><li><a href="contact.html">Demander une démo</a></li><li><a href="contact.html">Support</a></li><li><a href="#">Mentions légales</a></li></ul></div>
+    </div>
+    <div class="footer-bottom"><p>© 2026 Doctivo. Tous droits réservés.</p><p>La santé, mieux organisée.</p></div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+<script>
+  // Override contact form to show success banner
+  const form = document.getElementById('contact-form');
+  const banner = document.getElementById('success-banner');
+  if (form) {
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const btn = form.querySelector('.form-submit');
+      btn.textContent = 'Demande envoyée ✓';
+      btn.style.background = '#22c55e';
+      btn.disabled = true;
+      banner.style.display = 'block';
+      setTimeout(() => {
+        btn.textContent = 'Envoyer la demande de démo';
+        btn.style.background = '';
+        btn.disabled = false;
+        form.reset();
+        banner.style.display = 'none';
+      }, 5000);
+    });
+  }
+</script>
+</body>
+</html>

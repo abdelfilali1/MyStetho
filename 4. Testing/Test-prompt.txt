@@ -1,0 +1,3 @@
+Restart the server to pick the new changes and check if the listed as completed lines in backlog.md are working correctly 
+Save your observations (working correctly, need to be reviwed and why, not working at all) in a Test-reslutls.md file. keep the date of the testing 
+Here is the link to the local host to do the checks : http://localhost:8000

@@ -55,7 +55,7 @@ async def login(
             {"request": request, "error": "Email ou mot de passe incorrect"},
         )
 
-    token = create_token(user_id=row[0], email=row[1], role=row[5], specialty=row[6])
+    token = create_token(user_id=row[0], email=row[1], role=row[5], specialty=row[6], first_name=row[3], last_name=row[4])
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(
         key="access_token",
@@ -186,7 +186,7 @@ async def setup(
     )
     await db.commit()
 
-    token = create_token(user_id=cursor.lastrowid, email=email, role="admin")
+    token = create_token(user_id=cursor.lastrowid, email=email, role="admin", first_name=first_name, last_name=last_name)
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(key="access_token", value=token, httponly=True, samesite="lax", max_age=8 * 3600)
     return response

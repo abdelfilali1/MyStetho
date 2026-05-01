@@ -187,6 +187,7 @@
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;" class="no-print">
         <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+        <a href="/patients/{{ patient.id }}/brochure.pdf" target="_blank" class="btn btn-outline">📄 Brochure PDF</a>
         <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline">Modifier</a>
         <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer le patient {{ patient.last_name | upper }} {{ patient.first_name }} ? Cette action est irréversible.')">
             <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>

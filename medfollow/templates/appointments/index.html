@@ -338,9 +338,9 @@ document.addEventListener('DOMContentLoaded', function() {
         initialView: isMobileView ? 'timeGridDay' : 'dayGridMonth',
         locale: 'fr',
         headerToolbar: isMobileView
-            ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
-            : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
-        buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour' },
+            ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay,listWeek' }
+            : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,listMonth' },
+        buttonText: { today: "Aujourd'hui", month: 'Mois', week: 'Semaine', day: 'Jour', listWeek: 'Liste sem.', listMonth: 'Liste mois' },
         eventSourceFailure: function() {
             if (window.showToast) window.showToast('Erreur de chargement des rendez-vous', 'error');
         },

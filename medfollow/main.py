@@ -11,6 +11,17 @@ import uvicorn
 
 from datetime import date
 from config import HOST, PORT
+
+
+def _calc_age(dob_str):
+    """Return exact age in years from a YYYY-MM-DD string."""
+    try:
+        today = date.today()
+        parts = str(dob_str).split("-")
+        dob = date(int(parts[0]), int(parts[1]), int(parts[2]))
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    except Exception:
+        return ""
 from database.connection import init_db
 from database.seed import seed_db
 from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental
@@ -39,10 +50,12 @@ from config import TEMPLATES_DIR
 _global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _global_templates.env.globals["now_year"] = date.today().year
 
-# Patch all router template envs to include now_year
+# Patch all router template envs to include now_year and calc_age filter
 for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental]:
     if hasattr(mod, 'templates'):
         mod.templates.env.globals["now_year"] = date.today().year
+        mod.templates.env.filters["calc_age"] = _calc_age
+_global_templates.env.filters["calc_age"] = _calc_age
 
 # Static files
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")

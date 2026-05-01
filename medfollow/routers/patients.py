@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import aiosqlite
@@ -20,16 +20,26 @@ def require_user(request: Request) -> dict:
     return user
 
 
+SORT_WHITELIST = {"last_name", "date_of_birth", "city", "created_at"}
+
 @router.get("/", response_class=HTMLResponse)
 async def list_patients(
     request: Request,
     q: str = "",
     page: int = 1,
+    sort_by: str = "last_name",
+    sort_order: str = "asc",
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+
+    if sort_by not in SORT_WHITELIST:
+        sort_by = "last_name"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+    order_clause = f"ORDER BY {sort_by} {sort_order.upper()}, last_name ASC"
 
     per_page = 20
     offset = (page - 1) * per_page
@@ -43,7 +53,10 @@ async def list_patients(
         total_count = (await count_cursor.fetchone())[0]
 
         cursor = await db.execute(
-            """SELECT * FROM patients WHERE doctor_id = ? AND is_active = 1 AND (lower(first_name) LIKE ? OR lower(last_name) LIKE ? OR phone LIKE ? OR social_security_number LIKE ?) ORDER BY last_name, first_name LIMIT ? OFFSET ?""",
+            f"""SELECT p.*, (SELECT MAX(consultation_date) FROM consultations WHERE patient_id = p.id) AS last_visit
+                FROM patients p WHERE p.doctor_id = ? AND p.is_active = 1
+                AND (lower(p.first_name) LIKE ? OR lower(p.last_name) LIKE ? OR p.phone LIKE ? OR p.social_security_number LIKE ?)
+                {order_clause} LIMIT ? OFFSET ?""",
             (user["sub"], like, like, f"%{q}%", f"%{q}%", per_page, offset),
         )
     else:
@@ -54,7 +67,8 @@ async def list_patients(
         total_count = (await count_cursor.fetchone())[0]
 
         cursor = await db.execute(
-            "SELECT * FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name, first_name LIMIT ? OFFSET ?",
+            f"""SELECT p.*, (SELECT MAX(consultation_date) FROM consultations WHERE patient_id = p.id) AS last_visit
+                FROM patients p WHERE p.doctor_id = ? AND p.is_active = 1 {order_clause} LIMIT ? OFFSET ?""",
             (user["sub"], per_page, offset),
         )
 
@@ -68,6 +82,7 @@ async def list_patients(
             "request": request, "user": user, "active": "patients",
             "patients": patients, "search": q,
             "page": page, "total_pages": total_pages, "total_count": total_count,
+            "sort_by": sort_by, "sort_order": sort_order,
         },
     )
 
@@ -351,3 +366,47 @@ async def add_history(
     )
     await db.commit()
     return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
+
+
+@router.get("/{patient_id}/brochure.pdf")
+async def patient_brochure_pdf(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ? AND is_active = 1", (patient_id, user["sub"]))
+    row = await cursor.fetchone()
+    if not row:
+        return RedirectResponse(url="/patients", status_code=302)
+    patient = dict(row)
+
+    cursor = await db.execute(
+        "SELECT * FROM medical_history WHERE patient_id = ? ORDER BY date_recorded DESC", (patient_id,)
+    )
+    history = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT * FROM appointments WHERE patient_id = ? AND status NOT IN ('annule','absent') ORDER BY start_datetime ASC LIMIT 10",
+        (patient_id,)
+    )
+    appointments = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT * FROM prescriptions WHERE patient_id = ? ORDER BY prescription_date DESC LIMIT 3",
+        (patient_id,)
+    )
+    rx_rows = [dict(r) for r in await cursor.fetchall()]
+    for rx in rx_rows:
+        cursor2 = await db.execute(
+            "SELECT * FROM prescription_items WHERE prescription_id = ?", (rx["id"],)
+        )
+        rx["items"] = [dict(i) for i in await cursor2.fetchall()]
+
+    from services.pdf_service import generate_patient_brochure_pdf
+    pdf_bytes = generate_patient_brochure_pdf(patient, history, appointments, rx_rows)
+    filename = f"fiche_{patient['last_name'].lower()}_{patient['first_name'].lower()}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )

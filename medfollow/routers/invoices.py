@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 from datetime import date
@@ -141,11 +141,6 @@ async def create_invoice(request: Request, db: aiosqlite.Connection = Depends(ge
     tiers_payant = form.get("tiers_payant") == "on"
 
     today = date.today()
-    cursor = await db.execute(
-        "SELECT COUNT(*) FROM invoices WHERE strftime('%Y', invoice_date) = ? ", (str(today.year),)
-    )
-    count = (await cursor.fetchone())[0]
-    invoice_number = _generate_invoice_number(today.year, count)
 
     # Calculate total from items
     total = 0.0
@@ -162,11 +157,27 @@ async def create_invoice(request: Request, db: aiosqlite.Connection = Depends(ge
             items.append((desc, qty, price, item_total, int(act_id) if act_id else None))
         idx += 1
 
-    cursor = await db.execute(
-        """INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, tiers_payant, notes) VALUES (?, ?, ?, ?, ?, ?)""",
-        (invoice_number, patient_id, doctor_id, total, tiers_payant, notes or None),
-    )
-    invoice_id = cursor.lastrowid
+    # Use a retry loop to handle concurrent invoice number generation
+    from aiosqlite import IntegrityError
+    invoice_id = None
+    for attempt in range(3):
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM invoices WHERE strftime('%Y', invoice_date) = ?", (str(today.year),)
+        )
+        count = (await cursor.fetchone())[0] + attempt
+        invoice_number = _generate_invoice_number(today.year, count)
+        try:
+            cursor = await db.execute(
+                """INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, tiers_payant, notes) VALUES (?, ?, ?, ?, ?, ?)""",
+                (invoice_number, patient_id, doctor_id, total, tiers_payant, notes or None),
+            )
+            invoice_id = cursor.lastrowid
+            break
+        except IntegrityError:
+            continue
+    if invoice_id is None:
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse("Erreur: impossible de générer un numéro de facture unique.", status_code=500)
 
     for desc, qty, price, item_total, act_id in items:
         await db.execute(
@@ -203,6 +214,80 @@ async def view_invoice(request: Request, invoice_id: int, db: aiosqlite.Connecti
         "invoices/detail.html",
         {"request": request, "user": user, "active": "invoices", "invoice": invoice, "items": items, "payments": payments},
     )
+
+
+@router.get("/export.csv")
+async def export_invoices_csv(
+    request: Request,
+    status: Optional[str] = None,
+    date_from: str = "",
+    date_to: str = "",
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    uid = user["sub"]
+    base_where = "WHERE i.doctor_id = ?"
+    params: list = [uid]
+
+    if status:
+        base_where += " AND i.status = ?"
+        params.append(status)
+    if date_from:
+        base_where += " AND i.invoice_date >= ?"
+        params.append(date_from)
+    if date_to:
+        base_where += " AND i.invoice_date <= ?"
+        params.append(date_to)
+
+    query = f"""SELECT i.invoice_number, p.first_name || ' ' || p.last_name AS patient_name,
+                       i.invoice_date, i.total_amount, i.paid_amount, i.status
+                FROM invoices i
+                JOIN patients p ON i.patient_id = p.id
+                {base_where} ORDER BY i.invoice_date DESC"""
+
+    cursor = await db.execute(query, params)
+    rows = await cursor.fetchall()
+
+    import io, csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Numéro", "Patient", "Date", "Montant", "Payé", "Statut"])
+    status_labels = {
+        "emise": "Émise", "payee": "Payée",
+        "partiellement_payee": "Partiellement payée", "annulee": "Annulée",
+    }
+    for row in rows:
+        writer.writerow([row[0], row[1], row[2], row[3], row[4], status_labels.get(row[5], row[5])])
+
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=factures.csv"},
+    )
+
+
+@router.post("/{invoice_id}/cancel")
+async def cancel_invoice(request: Request, invoice_id: int, db: aiosqlite.Connection = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    cursor = await db.execute(
+        "SELECT id FROM invoices WHERE id = ? AND doctor_id = ?",
+        (invoice_id, user["sub"]),
+    )
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/invoices", status_code=302)
+
+    await db.execute(
+        "UPDATE invoices SET status = 'annulee', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (invoice_id,),
+    )
+    await db.commit()
+    return RedirectResponse(url=f"/invoices/{invoice_id}", status_code=302)
 
 
 @router.post("/{invoice_id}/pay")

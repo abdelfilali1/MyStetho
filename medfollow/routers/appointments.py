@@ -319,6 +319,13 @@ async def update_status(
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
+    cursor = await db.execute(
+        "SELECT id FROM appointments WHERE id = ? AND doctor_id = ?",
+        (appointment_id, user["sub"]),
+    )
+    if not await cursor.fetchone():
+        return JSONResponse(status_code=403, content={"error": "Accès refusé"})
+
     await db.execute(
         "UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? ",
         (status, appointment_id),
@@ -336,6 +343,13 @@ async def delete_appointment(
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+
+    cursor = await db.execute(
+        "SELECT id FROM appointments WHERE id = ? AND doctor_id = ?",
+        (appointment_id, user["sub"]),
+    )
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/appointments", status_code=302)
 
     # Keep downstream records valid when an appointment has already been used.
     await db.execute(

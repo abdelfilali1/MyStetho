@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Fiche médecin — Doctivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles/main.css"/>
+<style>
+.breadcrumb {
+  padding: 24px 0 0;
+  font-size: 13px; color: var(--text-muted);
+  display: flex; gap: 8px; align-items: center;
+}
+.breadcrumb a:hover { color: var(--text); }
+.breadcrumb .sep { opacity: 0.45; }
+
+/* ── Profile header ──────────────────────── */
+.profile-head {
+  padding: 32px 0 40px;
+  border-bottom: 1px solid var(--border);
+}
+.ph-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 28px;
+  align-items: flex-start;
+}
+.ph-info h1 {
+  font-family: var(--font-serif);
+  font-size: 40px; line-height: 1.05;
+  letter-spacing: -0.01em; font-weight: 400;
+  margin-bottom: 6px;
+}
+.ph-spec { font-size: 16px; color: var(--text-muted); margin-bottom: 14px; }
+.ph-meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.ph-loc { display: flex; align-items: center; gap: 6px; color: var(--text-soft); font-size: 14px; }
+.ph-loc svg { width: 14px; height: 14px; }
+.ph-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.ph-actions { display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
+.ph-actions .dv-btn { width: 100%; padding: 12px 18px; justify-content: center; font-size: 14.5px; }
+
+/* ── Body ────────────────────────────────── */
+.body-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 48px;
+  padding: 40px 0 80px;
+}
+.section-block { margin-bottom: 36px; }
+.section-block h3 {
+  font-family: var(--font-serif);
+  font-size: 22px; font-weight: 400;
+  margin-bottom: 14px; letter-spacing: -0.005em;
+}
+.section-block p { color: var(--text-muted); line-height: 1.65; font-size: 15px; }
+
+.info-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.info-cell { padding: 16px 18px; background: var(--surface); }
+.info-label {
+  font-size: 12px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted);
+  margin-bottom: 4px; font-weight: 500;
+}
+.info-value { font-size: 14.5px; color: var(--text); }
+
+.lang-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.lang-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13.5px;
+}
+
+/* ── Contact box ─────────────────────────── */
+.contact-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  position: sticky; top: 84px;
+}
+.contact-box h3 {
+  font-family: var(--font-serif);
+  font-size: 20px; font-weight: 400;
+  margin-bottom: 18px;
+}
+.locked-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.locked-row:last-of-type { border-bottom: none; }
+.locked-icon {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.locked-icon svg { width: 16px; height: 16px; }
+.locked-info { flex: 1; min-width: 0; }
+.locked-label { font-size: 12px; color: var(--text-muted); margin-bottom: 3px; }
+.locked-val { font-size: 14px; font-weight: 500; }
+.locked-val.blur { filter: blur(5px); user-select: none; color: var(--text-soft); }
+.unlock-btn {
+  margin-top: 18px;
+  width: 100%;
+  padding: 12px;
+  justify-content: center;
+}
+
+/* ── Similar doctors ─────────────────────── */
+.similar-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none; color: var(--text);
+  transition: all 0.15s;
+}
+.similar-card:hover .similar-name { color: var(--accent); }
+.similar-card:last-child { border-bottom: none; }
+.similar-info { flex: 1; min-width: 0; }
+.similar-name { font-size: 14.5px; font-weight: 500; }
+.similar-spec { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.similar-note { font-size: 13px; color: var(--text-soft); margin-top: 4px; }
+
+/* ── Rating breakdown ────────────────────── */
+.rating-big {
+  display: flex; align-items: center; gap: 24px;
+  margin-bottom: 20px;
+}
+.rating-num {
+  font-family: var(--font-serif);
+  font-size: 56px; line-height: 1;
+  color: var(--text);
+}
+.rating-bars { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.rating-bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.rating-bar-track { flex: 1; height: 5px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.rating-bar-fill { height: 100%; background: var(--gold); border-radius: 999px; }
+
+/* ── Not found ───────────────────────────── */
+.not-found { text-align: center; padding: 96px 32px; }
+.not-found h2 { font-family: var(--font-serif); font-size: 32px; font-weight: 400; margin-bottom: 12px; }
+
+/* ── Responsive ──────────────────────────── */
+@media (max-width: 900px) {
+  .body-grid { grid-template-columns: 1fr; }
+  .contact-box { position: static; }
+  .ph-grid { grid-template-columns: auto 1fr; }
+  .ph-actions { grid-column: 1/-1; flex-direction: row; flex-wrap: wrap; }
+  .ph-actions .dv-btn { flex: 1; min-width: 140px; }
+}
+@media (max-width: 640px) {
+  .ph-info h1 { font-size: 28px; }
+  .info-grid { grid-template-columns: 1fr; }
+  .rating-big { flex-direction: column; align-items: flex-start; gap: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="dv-header">
+  <div class="dv-header-inner">
+    <a href="index.html" class="dv-logo">
+      <img src="assets/logo.png" alt="Doctivo"/>
+      <span class="dv-logo-sub">Annuaire</span>
+    </a>
+    <nav class="dv-nav">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+    </nav>
+    <div class="dv-header-spacer"></div>
+    <a href="#" class="dv-btn dv-btn-ghost dv-btn-sm">Référencer mon cabinet</a>
+  </div>
+</header>
+
+<div id="pageBody"></div>
+
+<!-- FOOTER -->
+<footer class="dv-footer">
+  <div class="dv-footer-inner">
+    <div>
+      <a href="index.html" class="dv-logo" style="margin-bottom:12px;">
+        <img src="assets/logo.png" alt="Doctivo" style="height:28px;"/>
+        <span class="dv-logo-sub">Annuaire</span>
+      </a>
+      <p class="dv-footer-tagline">L'annuaire de référence des médecins au Maroc.</p>
+    </div>
+    <div>
+      <h4>Annuaire</h4>
+      <ul>
+        <li><a href="annuaire.html">Tous les médecins</a></li>
+        <li><a href="annuaire.html?ville=Casablanca">Casablanca</a></li>
+        <li><a href="annuaire.html?ville=Rabat">Rabat</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Doctivo</h4>
+      <ul>
+        <li><a href="#">À propos</a></li>
+        <li><a href="#">Référencer mon cabinet</a></li>
+        <li><a href="#">Mentions légales</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Spécialités</h4>
+      <ul id="footerSpecs"></ul>
+    </div>
+  </div>
+  <div class="dv-footer-bottom">
+    <span>© 2026 Doctivo — Annuaire médical au Maroc</span>
+    <span>La santé, mieux organisée.</span>
+  </div>
+</footer>
+
+<!-- CONTACT MODAL -->
+<div class="dv-overlay" id="contactOverlay" onclick="closeModal(event)">
+  <div class="dv-modal">
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const docId = parseInt(params.get('id') || '1');
+let currentDoc = null;
+
+// Footer specs populated after meta load
+async function init() {
+  // Skeleton while loading
+  document.getElementById('pageBody').innerHTML = `
+    <div class="dv-container" style="padding:48px 0;">
+      <div class="dv-skel" style="width:260px;height:20px;margin-bottom:32px;border-radius:6px;"></div>
+      <div class="profile-head">
+        <div class="ph-grid">
+          <div class="dv-skel" style="width:80px;height:80px;border-radius:50%;"></div>
+          <div>
+            <div class="dv-skel" style="width:280px;height:32px;margin-bottom:12px;border-radius:6px;"></div>
+            <div class="dv-skel" style="width:160px;height:16px;border-radius:6px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  let doc, meta, similar;
+  try {
+    [doc, meta] = await Promise.all([
+      fetch(`/api/doctors/${docId}`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+      fetch('/api/meta').then(r => r.json()),
+    ]);
+    currentDoc = doc;
+    const simRes = await fetch(`/api/doctors?spec=${encodeURIComponent(doc.specialite)}&limit=4`).then(r => r.json());
+    similar = (simRes.doctors || simRes.items || simRes).filter(d => d.id !== doc.id).slice(0, 3);
+  } catch (_) {
+    document.getElementById('pageBody').innerHTML = `
+      <div class="dv-container">
+        <div class="not-found">
+          <h2>Médecin introuvable</h2>
+          <p style="color:var(--text-muted);margin-bottom:24px;">Ce praticien n'est pas dans notre annuaire.</p>
+          <a href="annuaire.html" class="dv-btn dv-btn-accent">Retour à l'annuaire</a>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Footer specs
+  const fs = document.getElementById('footerSpecs');
+  meta.specialites.slice(0, 5).forEach(s => {
+    fs.innerHTML += `<li><a href="annuaire.html?spec=${encodeURIComponent(s)}">${s}</a></li>`;
+  });
+
+  document.title = `Dr. ${doc.prenom} ${doc.nom} — ${doc.specialite} · Doctivo`;
+
+  const ratingDist = [
+    { stars: 5, pct: Math.round(doc.note * 15) },
+    { stars: 4, pct: Math.round((5 - doc.note) * 30 + 10) },
+    { stars: 3, pct: 7 },
+    { stars: 2, pct: 3 },
+    { stars: 1, pct: 2 },
+  ];
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="dv-container">
+      <div class="breadcrumb">
+        <a href="index.html">Accueil</a>
+        <span class="sep">›</span>
+        <a href="annuaire.html">Annuaire</a>
+        <span class="sep">›</span>
+        <a href="annuaire.html?spec=${encodeURIComponent(doc.specialite)}">${doc.specialite}</a>
+        <span class="sep">›</span>
+        <span>Dr. ${doc.prenom} ${doc.nom}</span>
+      </div>
+
+      <div class="profile-head">
+        <div class="ph-grid">
+          ${avatarHTML(doc, 80)}
+          <div class="ph-info">
+            <h1>Dr. ${doc.prenom} ${doc.nom}</h1>
+            <div class="ph-spec">${doc.specialite}</div>
+            <div class="ph-meta">
+              <span class="ph-loc">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M8 14s5-4.5 5-8.5a5 5 0 10-10 0C3 9.5 8 14 8 14z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="6" r="1.4" fill="currentColor"/></svg>
+                ${doc.adresse}
+              </span>
+            </div>
+            <div class="ph-badges">
+              ${doc.verifie ? verifiedHTML() : ''}
+              ${doc.conventionne ? `<span class="dv-badge dv-badge-conv">Conventionné CNSS</span>` : ''}
+              <span class="dv-badge">${doc.type}</span>
+            </div>
+          </div>
+          <div class="ph-actions">
+            <button class="dv-btn dv-btn-accent" onclick="openContact(${doc.id})">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2h12v9a1 1 0 01-1 1H3a1 1 0 01-1-1V2z" stroke="currentColor" stroke-width="1.3"/><path d="M2 2l6 5 6-5" stroke="currentColor" stroke-width="1.3"/></svg>
+              Demander le contact
+            </button>
+            <button class="dv-btn dv-btn-ghost" onclick="openContact(${doc.id})">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4a1 1 0 011-1h8a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.3"/><path d="M5 8h6M5 5h3M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Prendre rendez-vous
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="body-grid">
+        <div>
+          <div class="section-block">
+            <h3>À propos</h3>
+            <p>${doc.bio || 'Praticien expérimenté, consulte sur rendez-vous.'}</p>
+          </div>
+          <div class="section-block">
+            <h3>Informations pratiques</h3>
+            <div class="info-grid">
+              <div class="info-cell">
+                <div class="info-label">Spécialité</div>
+                <div class="info-value">${doc.specialite}</div>
+              </div>
+              <div class="info-cell">
+                <div class="info-label">Type d'établissement</div>
+                <div class="info-value">${doc.type}</div>
+              </div>
+              <div class="info-cell">
+                <div class="info-label">Ville</div>
+                <div class="info-value">${doc.ville}${doc.quartier ? ' — ' + doc.quartier : ''}</div>
+              </div>
+              <div class="info-cell">
+                <div class="info-label">Conventionnement</div>
+                <div class="info-value">${doc.conventionne ? '✓ Conventionné CNSS / Mutuelle' : 'Non conventionné'}</div>
+              </div>
+              <div class="info-cell" style="grid-column:1/-1;">
+                <div class="info-label">Adresse</div>
+                <div class="info-value">${doc.adresse}</div>
+              </div>
+            </div>
+          </div>
+          <div class="section-block">
+            <h3>Langues parlées</h3>
+            <div class="lang-list">
+              ${doc.langues.map(l => `<span class="lang-tag">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 2c-1.5 2-2 4-2 6s.5 4 2 6M8 2c1.5 2 2 4 2 6s-.5 4-2 6M2 8h12" stroke="currentColor" stroke-width="1.3"/></svg>
+                ${l}
+              </span>`).join('')}
+            </div>
+          </div>
+          <div class="section-block">
+            <h3>Avis patients</h3>
+            <div class="rating-big">
+              <div class="rating-num">${doc.note}</div>
+              <div>
+                <div>${starsHTML(doc.note, doc.avis)}</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Basé sur ${doc.avis} avis vérifiés</div>
+              </div>
+            </div>
+            <div class="rating-bars">
+              ${ratingDist.map(r => `
+                <div class="rating-bar-row">
+                  <span style="min-width:14px;">${r.stars}</span>
+                  <span style="color:var(--gold);">★</span>
+                  <div class="rating-bar-track">
+                    <div class="rating-bar-fill" style="width:${r.pct}%;"></div>
+                  </div>
+                  <span style="min-width:28px;">${r.pct}%</span>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="contact-box">
+            <h3>Coordonnées</h3>
+            <div class="locked-row">
+              <div class="locked-icon">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 4a1 1 0 011-1h8a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.3"/><path d="M2 4l6 5 6-5" stroke="currentColor" stroke-width="1.3"/></svg>
+              </div>
+              <div class="locked-info">
+                <div class="locked-label">Email</div>
+                <div class="locked-val blur" id="docEmail">${doc.email || 'contact@cabinet.ma'}</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--text-soft);">
+                <path d="M11 7V5a3 3 0 00-6 0v2M5 7h6a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="locked-row">
+              <div class="locked-icon">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 3h3l1.5 3.5-2 1.2A9.5 9.5 0 009.3 11l1.2-2L14 10.5V14a1 1 0 01-1 1C5 15 1 9 1 4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="locked-info">
+                <div class="locked-label">Téléphone</div>
+                <div class="locked-val blur" id="docTel">${doc.tel || '06 XX XX XX XX'}</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--text-soft);">
+                <path d="M11 7V5a3 3 0 00-6 0v2M5 7h6a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <button class="dv-btn dv-btn-accent unlock-btn" onclick="openContact(${doc.id})">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11 7V5a3 3 0 00-6 0v2M5 7h6a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V8a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              Débloquer les coordonnées
+            </button>
+            <p style="font-size:12px;color:var(--text-soft);margin-top:12px;line-height:1.5;">
+              🔒 Vos informations ne seront partagées qu'avec ce praticien.
+            </p>
+          </div>
+
+          ${similar.length ? `
+          <div style="margin-top:28px;">
+            <h4 style="font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:12px;">Praticiens similaires</h4>
+            ${similar.map(s => `
+              <a href="medecin.html?id=${s.id}" class="similar-card">
+                ${avatarHTML(s, 40)}
+                <div class="similar-info">
+                  <div class="similar-name">Dr. ${s.prenom} ${s.nom}</div>
+                  <div class="similar-spec">${s.specialite} · ${s.ville}</div>
+                  <div class="similar-note">★ ${s.note} (${s.avis} avis)</div>
+                </div>
+              </a>`).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Modal ─────────────────────────────────
+function openContact(id) {
+  if (!currentDoc) return;
+  const d = currentDoc;
+  document.getElementById('modalContent').innerHTML = `
+    <div class="dv-modal-header">
+      <div>
+        <div class="dv-modal-title">Demande de contact</div>
+        <div class="dv-modal-subtitle">Dr. ${d.prenom} ${d.nom} · ${d.specialite} · ${d.ville}</div>
+      </div>
+      <button class="dv-modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form class="dv-modal-form" onsubmit="submitContact(event,${id})">
+      <div class="dv-modal-row">
+        <div class="dv-form-group"><label class="dv-label">Prénom *</label><input class="dv-input" name="prenom" required placeholder="Votre prénom"/></div>
+        <div class="dv-form-group"><label class="dv-label">Nom *</label><input class="dv-input" name="nom" required placeholder="Votre nom"/></div>
+      </div>
+      <div class="dv-form-group"><label class="dv-label">Email *</label><input class="dv-input" type="email" name="email" required placeholder="votre@email.ma"/></div>
+      <div class="dv-form-group"><label class="dv-label">Téléphone</label><input class="dv-input" type="tel" name="tel" placeholder="06 XX XX XX XX"/></div>
+      <div class="dv-form-group">
+        <label class="dv-label">Raison de la demande *</label>
+        <select class="dv-select" name="raison" required>
+          <option value="">Sélectionnez…</option>
+          <option>Prise de rendez-vous</option>
+          <option>Demande d'information</option>
+          <option>Deuxième avis médical</option>
+          <option>Urgence médicale</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div class="dv-form-group"><label class="dv-label">Message (optionnel)</label><textarea class="dv-textarea" name="message" placeholder="Précisez votre demande…"></textarea></div>
+      <button type="submit" class="dv-btn dv-btn-accent" style="width:100%;padding:12px;">Envoyer la demande</button>
+      <p class="dv-modal-footer">🔒 Vos coordonnées sont transmises uniquement au médecin. Réponse garantie sous 24 h.</p>
+    </form>`;
+  document.getElementById('contactOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function submitContact(e, id) {
+  e.preventDefault();
+  const d = currentDoc;
+  const form = e.target;
+  const fd = new FormData(form);
+  try {
+    await apiPost('/api/contact', {
+      doctor_id: id,
+      prenom: fd.get('prenom'),
+      nom: fd.get('nom'),
+      email: fd.get('email'),
+      tel: fd.get('tel') || '',
+      raison: fd.get('raison'),
+      message: fd.get('message') || '',
+    });
+    // Unblur contact info after submit
+    document.getElementById('docEmail')?.classList.remove('blur');
+    document.getElementById('docTel')?.classList.remove('blur');
+  } catch (_) {}
+  document.getElementById('modalContent').innerHTML = `
+    <div class="dv-modal-header" style="justify-content:flex-end;">
+      <button class="dv-modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="dv-success">
+      <div class="dv-success-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Demande envoyée !</h3>
+      <p>Votre demande a été transmise à <strong>Dr. ${d.prenom} ${d.nom}</strong>.<br/>
+      Vous recevrez un email de confirmation sous 24 h.<br/>
+      <span style="color:var(--text-soft);">Les coordonnées ont été débloquées.</span></p>
+      <button class="dv-btn dv-btn-ghost" style="margin-top:24px;" onclick="closeModal()">Fermer</button>
+    </div>`;
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('contactOverlay')) return;
+  document.getElementById('contactOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+init();
+</script>
+</body>
+</html>

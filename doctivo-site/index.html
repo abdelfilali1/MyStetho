@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctivo — La santé, mieux organisée</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .mac-browser { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.07); }
+    .mac-bar { background: #e2e2e2; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
+    .mac-dots { display: flex; gap: 7px; }
+    .mac-dots span { width: 12px; height: 12px; border-radius: 50%; }
+    .mac-dots span:nth-child(1) { background: #ff5f57; }
+    .mac-dots span:nth-child(2) { background: #ffbd2e; }
+    .mac-dots span:nth-child(3) { background: #28c840; }
+    .mac-url-bar { flex: 1; background: white; border-radius: 6px; padding: 4px 14px; font-size: 12px; color: #888; text-align: center; border: 1px solid #ddd; }
+    .mac-browser img { width: 100%; display: block; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav nav-transparent" data-transparent="true">
+  <div class="nav-logo">
+    <img src="img/logo.png" alt="Doctivo">
+    <span class="nav-logo-name">Doctivo</span>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="active">Accueil</a>
+    <a href="fonctionnalites.html">Fonctionnalités</a>
+    <a href="specialites.html">Spécialités</a>
+    <a href="demo.html">Démonstration</a>
+    <a href="tarifs.html">Tarifs</a>
+  </div>
+  <div class="nav-cta">
+    <a href="contact.html" class="btn btn-outline btn-sm">Connexion</a>
+    <a href="contact.html" class="btn btn-primary btn-sm">Demander une démo</a>
+  </div>
+  <div class="nav-hamburger">
+    <span></span><span></span><span></span>
+  </div>
+  <div class="nav-mobile">
+    <a href="index.html" class="nav-mobile-link active">Accueil</a>
+    <a href="fonctionnalites.html" class="nav-mobile-link">Fonctionnalités</a>
+    <a href="specialites.html" class="nav-mobile-link">Spécialités</a>
+    <a href="demo.html" class="nav-mobile-link">Démonstration</a>
+    <a href="tarifs.html" class="nav-mobile-link">Tarifs</a>
+    <div class="nav-mobile-divider"></div>
+    <div class="nav-mobile-ctas">
+      <a href="contact.html" class="btn btn-outline">Connexion</a>
+      <a href="contact.html" class="btn btn-primary">Demander une démo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-badge animate-hero">
+          <span></span> Disponible pour les dentistes — v1.0
+        </div>
+        <h1 class="animate-hero-delay">
+          Le logiciel qui pense<br>comme un <em>médecin</em>
+        </h1>
+        <p class="lead animate-hero-delay-2">
+          Doctivo centralise votre cabinet en une seule plateforme intelligente —
+          dossiers patients, agenda, odontogramme, ordonnances et facturation.
+          Conçu pour les praticiens exigeants.
+        </p>
+        <div class="hero-actions animate-hero-delay-2">
+          <a href="contact.html" class="btn btn-primary btn-lg">Demander une démonstration</a>
+          <a href="demo.html" class="btn btn-white btn-lg">Voir l'application →</a>
+        </div>
+        <div class="hero-social-proof animate-hero-delay-2">
+          <div class="hero-avatars">
+            <span>DK</span><span>AB</span><span>MR</span><span>SB</span>
+          </div>
+          <p><strong>+40 praticiens</strong> en phase pilote</p>
+        </div>
+      </div>
+
+      <!-- APP MOCKUP -->
+      <div class="mockup-wrapper">
+        <div class="float-pill pill-1">
+          <div class="pill-icon" style="background:#dcfce7;">✅</div>
+          <div><div style="font-size:11px;color:#15803d;">Dossier patient mis à jour</div><div style="font-size:9px;color:#64748b;">Consultation enregistrée ✓</div></div>
+        </div>
+        <div class="float-pill pill-2">
+          <div class="pill-icon" style="background:#dbeafe;">📅</div>
+          <div><div style="font-size:11px;color:#1d4ed8;">3 RDV aujourd'hui</div><div style="font-size:9px;color:#64748b;">Prochain : 14h30</div></div>
+        </div>
+        <div class="float-pill pill-3">
+          <div class="pill-icon" style="background:#fef3c7;">💊</div>
+          <div><div style="font-size:11px;color:#d97706;">Ordonnance générée</div><div style="font-size:9px;color:#64748b;">PDF prêt à imprimer</div></div>
+        </div>
+
+        <div class="mac-browser">
+          <div class="mac-bar">
+            <div class="mac-dots"><span></span><span></span><span></span></div>
+            <div class="mac-url-bar">app.doctivo.ma/agenda</div>
+          </div>
+          <img src="img/Agenda.png" alt="Agenda Doctivo">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-section">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item reveal">
+        <div class="stat-num"><span class="counter" data-target="100" data-suffix="%">0%</span></div>
+        <div class="stat-label">Web — aucune installation requise</div>
+      </div>
+      <div class="stat-item reveal reveal-delay-1">
+        <div class="stat-num"><span class="counter" data-target="7" data-suffix=" modules">0</span></div>
+        <div class="stat-label">Intégrés dans une seule plateforme</div>
+      </div>
+      <div class="stat-item reveal reveal-delay-2">
+        <div class="stat-num"><span class="counter" data-target="5000" data-suffix="+">0</span></div>
+        <div class="stat-label">Médicaments dans la base de données</div>
+      </div>
+      <div class="stat-item reveal reveal-delay-3">
+        <div class="stat-num"><span class="counter" data-target="32" data-suffix=" dents">0</span></div>
+        <div class="stat-label">Suivies individuellement par patient</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES OVERVIEW -->
+<section class="section features-section">
+  <div class="container">
+    <div class="features-intro reveal">
+      <div class="overline">Tout ce dont vous avez besoin</div>
+      <h2 style="margin-top:8px;">Une plateforme complète,<br>pensée pour les praticiens</h2>
+      <p class="lead mt-16">Fini les logiciels fragmentés. Doctivo regroupe tout votre workflow clinique et administratif en un seul espace fluide.</p>
+    </div>
+    <div class="grid-3">
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon" style="background:#dbeafe;color:#1d4ed8;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        </div>
+        <h3>Dossiers patients complets</h3>
+        <p>Antécédents médicaux, consultations, ordonnances, documents et suivi dentaire — tout centralisé en une fiche unifiée.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Antécédents</span>
+          <span class="feature-tag">Documents</span>
+          <span class="feature-tag">Ordonnances</span>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon" style="background:#dcfce7;color:#15803d;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h3>Agenda intelligent</h3>
+        <p>Calendrier interactif avec gestion des statuts, créneaux, types de rendez-vous et rappels. Vue journalière, hebdomadaire ou mensuelle.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Calendrier</span>
+          <span class="feature-tag">Statuts</span>
+          <span class="feature-tag">Types de RDV</span>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon" style="background:#fef3c7;color:#d97706;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>Ordonnances numériques</h3>
+        <p>Base de 5 000+ médicaments marocains. Génération PDF instantanée avec dosage, fréquence et durée. Historique complet par patient.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">5000+ médicaments</span>
+          <span class="feature-tag">PDF</span>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon" style="background:#ede9fe;color:#7c3aed;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        </div>
+        <h3>Facturation & paiements</h3>
+        <p>Génération automatique de numéros, suivi des paiements multiples, statistiques de chiffre d'affaires mensuel et annuel.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Numérotation auto</span>
+          <span class="feature-tag">Stats CA</span>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2" style="border-color: rgba(28,140,248,0.25); background: linear-gradient(160deg,#f0f9ff,#fff);">
+        <div class="feature-icon" style="background:#dbeafe;color:#1d4ed8;">🦷</div>
+        <h3>Odontogramme interactif</h3>
+        <p>Schéma dentaire complet avec conditions par dent, traitements liés aux rendez-vous, et vue endodontique avec mesure des canaux.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">FDI 32 dents</span>
+          <span class="feature-tag">Endodontie</span>
+          <span class="feature-tag">Traitements</span>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon" style="background:#fce7f3;color:#be185d;">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <h3>Messagerie interne</h3>
+        <p>Communication sécurisée entre praticiens du cabinet. Fils de discussion avec contexte patient, pièces jointes et statut de lecture.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Sécurisé</span>
+          <span class="feature-tag">Contexte patient</span>
+        </div>
+      </div>
+    </div>
+    <div class="text-center mt-48 reveal">
+      <a href="fonctionnalites.html" class="btn btn-dark btn-lg">Explorer toutes les fonctionnalités →</a>
+    </div>
+  </div>
+</section>
+
+<!-- DENTAL SPOTLIGHT -->
+<section class="dental-section">
+  <div class="container">
+    <div class="dental-grid" style="max-width:680px;">
+      <div>
+        <div class="overline reveal" style="color:#60a5fa;">Spécialité dentaire</div>
+        <h2 class="reveal" style="margin-top:8px;color:white;">Conçu dès le départ<br>pour les <em style="font-style:normal;color:#60a5fa;">dentistes</em></h2>
+        <p class="lead reveal" style="color:rgba(255,255,255,0.65);margin-top:16px;">
+          Doctivo est la première version d'une plateforme qui évoluera vers plusieurs spécialités médicales.
+          Aujourd'hui, elle offre les outils les plus avancés pour la dentisterie moderne.
+        </p>
+        <ul class="dental-feature-list reveal">
+          <li><span class="check">✓</span><div><strong>Odontogramme double vue</strong> — Disposition en vue carrée, Odontogramme en vue circulaire. Conditions par dent en un clic.</div></li>
+          <li><span class="check">✓</span><div><strong>Endodontie avancée</strong> — Suivi des canaux par dent (longueur estimée, de travail, finale). Statuts : localisé → mesuré → préparé → obturé.</div></li>
+          <li><span class="check">✓</span><div><strong>Traitements liés aux RDV</strong> — Chaque traitement dentaire crée automatiquement un rendez-vous dans l'agenda.</div></li>
+          <li><span class="check">✓</span><div><strong>Médicaments dentaires</strong> — Base filtrée pour les dentistes : anesthésiques, antibiotiques, antalgiques spécialisés.</div></li>
+          <li><span class="check">✓</span><div><strong>Antécédents médicaux structurés</strong> — Diabète, HTA, allergies, anticoagulants — pré-remplis depuis la fiche patient.</div></li>
+        </ul>
+        <div class="mt-48 reveal">
+          <a href="specialites.html" class="btn btn-white btn-lg">Voir le détail dentaire →</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SPECIALTIES COMING -->
+<section class="section specialties-section">
+  <div class="container">
+    <div class="text-center mb-64 reveal">
+      <div class="overline">Feuille de route</div>
+      <h2 style="margin-top:8px;">Aujourd'hui dentistes.<br>Demain, toutes les spécialités.</h2>
+      <p class="lead mt-16">Doctivo est conçu comme une plateforme évolutive. La v1 est dédiée aux dentistes — les spécialités suivantes arrivent.</p>
+    </div>
+    <div class="grid-4">
+      <div class="specialty-card active reveal">
+        <div class="specialty-icon">🦷</div>
+        <span class="badge badge-green" style="margin-bottom:12px;">Disponible</span>
+        <h4>Dentisterie</h4>
+        <p>Odontogramme, endodontie, traitements, schémas dentaires</p>
+      </div>
+      <div class="specialty-card reveal reveal-delay-1">
+        <div class="specialty-icon">❤️</div>
+        <span class="badge badge-coming" style="margin-bottom:12px;">Bientôt</span>
+        <h4>Cardiologie</h4>
+        <p>ECG intégré, suivi tensionnel, médicaments cardio</p>
+      </div>
+      <div class="specialty-card reveal reveal-delay-2">
+        <div class="specialty-icon">👁️</div>
+        <span class="badge badge-coming" style="margin-bottom:12px;">Bientôt</span>
+        <h4>Ophtalmologie</h4>
+        <p>Schéma oculaire, acuité visuelle, verres correcteurs</p>
+      </div>
+      <div class="specialty-card reveal reveal-delay-3">
+        <div class="specialty-icon">🩺</div>
+        <span class="badge badge-coming" style="margin-bottom:12px;">Bientôt</span>
+        <h4>Médecine générale</h4>
+        <p>Consultations, constantes, formulaires personnalisés</p>
+      </div>
+    </div>
+    <div class="text-center mt-48 reveal">
+      <a href="specialites.html" class="btn btn-outline btn-lg">Voir toute la feuille de route →</a>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section process-section">
+  <div class="container">
+    <div class="text-center mb-64 reveal">
+      <div class="overline">Mise en route</div>
+      <h2 style="margin-top:8px;">Opérationnel en moins de 10 minutes</h2>
+    </div>
+    <div class="process-steps">
+      <div class="process-step reveal">
+        <div class="process-num">1</div>
+        <h4>Créez votre compte</h4>
+        <p>Renseignez votre spécialité et les informations du cabinet. Aucune installation.</p>
+      </div>
+      <div class="process-step reveal reveal-delay-1">
+        <div class="process-num">2</div>
+        <h4>Importez vos patients</h4>
+        <p>Ajoutez vos patients manuellement ou via le formulaire rapide. Dossiers complets en 30 secondes.</p>
+      </div>
+      <div class="process-step reveal reveal-delay-2">
+        <div class="process-num">3</div>
+        <h4>Gérez votre agenda</h4>
+        <p>Planifiez vos rendez-vous, gérez les statuts et recevez votre vue du jour à l'ouverture.</p>
+      </div>
+      <div class="process-step reveal reveal-delay-3">
+        <div class="process-num">4</div>
+        <h4>Travaillez sereinement</h4>
+        <p>Consultations, ordonnances, facturation — tout suit naturellement.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section testimonials-section">
+  <div class="container">
+    <div class="text-center mb-64 reveal">
+      <div class="overline">Ils nous font confiance</div>
+      <h2 style="margin-top:8px;">Ce que disent les praticiens</h2>
+    </div>
+    <div class="grid-3">
+      <div class="testimonial-card reveal">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-quote">L'odontogramme interactif m'a changé la vie. Je vois l'état de chaque dent en un coup d'œil, et les traitements se retrouvent directement dans mon agenda.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar" style="background:linear-gradient(135deg,#1c8cf8,#0f76d9);">DK</div>
+          <div>
+            <div class="testimonial-name">Dr. Karim Drissi</div>
+            <div class="testimonial-role">Chirurgien-dentiste · Casablanca</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card reveal reveal-delay-1">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-quote">La gestion des ordonnances est bluffante. Je recherche le médicament, j'ajuste le dosage, et le PDF est prêt à imprimer. Fini les ordonnances manuscrites.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar" style="background:linear-gradient(135deg,#22c55e,#15803d);">SB</div>
+          <div>
+            <div class="testimonial-name">Dr. Salma Bensouda</div>
+            <div class="testimonial-role">Chirurgien-dentiste · Rabat</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card reveal reveal-delay-2">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-quote">Avoir toute la fiche patient — informations, antécédents, ordonnances, dents — sur une seule page, c'est exactement ce dont j'avais besoin pour gagner du temps.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">MR</div>
+          <div>
+            <div class="testimonial-name">Dr. Mohamed Razi</div>
+            <div class="testimonial-role">Omnipraticien dentaire · Marrakech</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <div class="overline" style="color:#60a5fa;margin-bottom:16px;">Prêt à commencer ?</div>
+    <h2>Transformez votre cabinet<br>dès aujourd'hui</h2>
+    <p>Demandez une démonstration gratuite. Notre équipe vous accompagne dans la prise en main.</p>
+    <div class="cta-actions">
+      <a href="contact.html" class="btn btn-primary btn-lg">Demander une démo gratuite</a>
+      <a href="tarifs.html" class="btn btn-white btn-lg">Voir les tarifs</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <img src="img/logo.png" alt="Doctivo">
+          <span>Doctivo</span>
+        </div>
+        <p>La plateforme de gestion de cabinet médicale de nouvelle génération. Pensée pour les praticiens exigeants.</p>
+        <div style="margin-top:20px;display:flex;gap:12px;">
+          <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;">in</div>
+          <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;">𝕏</div>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h5>Produit</h5>
+        <ul>
+          <li><a href="fonctionnalites.html">Fonctionnalités</a></li>
+          <li><a href="specialites.html">Spécialités</a></li>
+          <li><a href="demo.html">Démonstration</a></li>
+          <li><a href="tarifs.html">Tarifs</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Spécialités</h5>
+        <ul>
+          <li><a href="specialites.html">Dentisterie ✓</a></li>
+          <li><a href="#">Cardiologie (bientôt)</a></li>
+          <li><a href="#">Ophtalmologie (bientôt)</a></li>
+          <li><a href="#">Médecine générale (bientôt)</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Contact</h5>
+        <ul>
+          <li><a href="contact.html">Demander une démo</a></li>
+          <li><a href="contact.html">Support</a></li>
+          <li><a href="#">Mentions légales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 Doctivo. Tous droits réservés.</p>
+      <p>La santé, mieux organisée.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

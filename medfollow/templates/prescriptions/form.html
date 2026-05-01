@@ -60,23 +60,13 @@
                             </div>
                             <div class="form-group">
                                 <label>Posologie *</label>
-                                <select name="med_dosage_{{ loop.index0 }}" required>
-                                    <option value="">— Choisir —</option>
-                                    {% for d in ['1 comprimé', '2 comprimés', '1/2 comprimé', '1 gélule', '2 gélules', '1 sachet', '1 cuillère à café', '1 cuillère à soupe', '1 application', '1 bain de bouche', '5 ml', '10 ml'] %}
-                                    <option value="{{ d }}" {{ 'selected' if item.dosage == d }}>{{ d }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" name="med_dosage_{{ loop.index0 }}" required list="dosage-list" placeholder="ex: 1 comprimé" value="{{ item.dosage or '' }}">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Fréquence *</label>
-                                <select name="med_frequency_{{ loop.index0 }}" required>
-                                    <option value="">— Choisir —</option>
-                                    {% for f in ['1 fois/jour', '2 fois/jour', '3 fois/jour', '4 fois/jour', 'Matin et soir', 'Le matin', 'Le soir', 'Au coucher', 'Toutes les 6h', 'Toutes les 8h', 'Toutes les 12h', 'Si douleur', 'Si besoin'] %}
-                                    <option value="{{ f }}" {{ 'selected' if item.frequency == f }}>{{ f }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" name="med_frequency_{{ loop.index0 }}" required list="freq-list" placeholder="ex: 2 fois/jour" value="{{ item.frequency or '' }}">
                             </div>
                             <div class="form-group">
                                 <label>Durée</label>
@@ -120,23 +110,13 @@
                             </div>
                             <div class="form-group">
                                 <label>Posologie *</label>
-                                <select name="med_dosage_0" required>
-                                    <option value="">— Choisir —</option>
-                                    {% for d in ['1 comprimé', '2 comprimés', '1/2 comprimé', '1 gélule', '2 gélules', '1 sachet', '1 cuillère à café', '1 cuillère à soupe', '1 application', '1 bain de bouche', '5 ml', '10 ml'] %}
-                                    <option value="{{ d }}">{{ d }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" name="med_dosage_0" required list="dosage-list" placeholder="ex: 1 comprimé">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Fréquence *</label>
-                                <select name="med_frequency_0" required>
-                                    <option value="">— Choisir —</option>
-                                    {% for f in ['1 fois/jour', '2 fois/jour', '3 fois/jour', '4 fois/jour', 'Matin et soir', 'Le matin', 'Le soir', 'Au coucher', 'Toutes les 6h', 'Toutes les 8h', 'Toutes les 12h', 'Si douleur', 'Si besoin'] %}
-                                    <option value="{{ f }}">{{ f }}</option>
-                                    {% endfor %}
-                                </select>
+                                <input type="text" name="med_frequency_0" required list="freq-list" placeholder="ex: 2 fois/jour">
                             </div>
                             <div class="form-group">
                                 <label>Durée</label>
@@ -166,6 +146,18 @@
                     {% endif %}
                 </div>
                 <button type="button" class="btn btn-outline btn-sm" onclick="addMedication()">+ Ajouter un médicament</button>
+                <datalist id="dosage-list">
+                    <option value="1 comprimé"><option value="2 comprimés"><option value="3 comprimés">
+                    <option value="1/2 comprimé"><option value="1 gélule"><option value="2 gélules">
+                    <option value="1 sachet"><option value="1 cuillère à café"><option value="1 cuillère à soupe">
+                    <option value="1 application"><option value="1 bain de bouche"><option value="5 ml"><option value="10 ml">
+                </datalist>
+                <datalist id="freq-list">
+                    <option value="1 fois/jour"><option value="2 fois/jour"><option value="3 fois/jour"><option value="4 fois/jour">
+                    <option value="Matin et soir"><option value="Le matin"><option value="Le soir"><option value="Au coucher">
+                    <option value="Toutes les 4h"><option value="Toutes les 6h"><option value="Toutes les 8h"><option value="Toutes les 12h">
+                    <option value="Si douleur"><option value="Si besoin"><option value="1 semaine sur 2">
+                </datalist>
                 <!-- medication search uses /prescriptions/medications/search API -->
             </div>
         </div>
@@ -216,8 +208,8 @@
 {% block scripts %}
 <script>
 let medIndex = {{ items|length if items else 1 }};
-const dosageOptions = ['1 comprimé','2 comprimés','1/2 comprimé','1 gélule','2 gélules','1 sachet','1 cuillère à café','1 cuillère à soupe','1 application','1 bain de bouche','5 ml','10 ml'].map(d => `<option value="${d}">${d}</option>`).join('');
-const freqOptions = ['1 fois/jour','2 fois/jour','3 fois/jour','4 fois/jour','Matin et soir','Le matin','Le soir','Au coucher','Toutes les 6h','Toutes les 8h','Toutes les 12h','Si douleur','Si besoin'].map(f => `<option value="${f}">${f}</option>`).join('');
+const dosageOptions = ''; // unused — now using datalist
+const freqOptions = '';   // unused — now using datalist
 const durationOptions = ['3 jours','5 jours','7 jours','10 jours','14 jours','21 jours','1 mois','2 mois','3 mois','6 mois',"Jusqu'à amélioration",'Traitement continu'].map(d => `<option value="${d}">${d}</option>`).join('');
 const qtyOptions = Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
 
@@ -243,19 +235,13 @@ function addMedication() {
             </div>
             <div class="form-group">
                 <label>Posologie *</label>
-                <select name="med_dosage_${idx}" required>
-                    <option value="">— Choisir —</option>
-                    ${dosageOptions}
-                </select>
+                <input type="text" name="med_dosage_${idx}" required list="dosage-list" placeholder="ex: 1 comprimé">
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Fréquence *</label>
-                <select name="med_frequency_${idx}" required>
-                    <option value="">— Choisir —</option>
-                    ${freqOptions}
-                </select>
+                <input type="text" name="med_frequency_${idx}" required list="freq-list" placeholder="ex: 2 fois/jour">
             </div>
             <div class="form-group">
                 <label>Durée</label>

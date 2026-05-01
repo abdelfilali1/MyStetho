@@ -12,12 +12,14 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def create_token(user_id: int, email: str, role: str, specialty: str = None) -> str:
+def create_token(user_id: int, email: str, role: str, specialty: str = None, first_name: str = "", last_name: str = "") -> str:
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
         "specialty": specialty,
+        "first_name": first_name or "",
+        "last_name": last_name or "",
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=JWT_ALGORITHM)

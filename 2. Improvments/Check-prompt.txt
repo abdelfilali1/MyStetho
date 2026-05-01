@@ -1,0 +1,3 @@
+go to the local host http://localhost:8000 to do the checks and do extensive functional testing and quality testing, suggest all the improvments (improvments, prompt for claude code for this improvment not the code but explain what is the problem), I want you to simulate the experience of a user and optimize for efficence and better experience.
+Consolidate this in Daily-Suggestion.md with the date of the suggestion. when updating this file, keep the older lines and put the day of the lines 
+Dont do any changes in the code. Dont push to git

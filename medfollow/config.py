@@ -40,10 +40,23 @@ def _load_or_create_secret_key() -> str:
         open(_SECRET_KEY_FILE, "w").write(key)
         return key
     except OSError:
-        # Fallback for read-only filesystems in some deployment environments.
+        # Fallback for read-only filesystems (e.g. Railway ephemeral FS).
+        print(
+            "\n⚠️  WARNING: MEDFOLLOW_SECRET_KEY is not set and the secret key file "
+            "could not be written. A new random key will be generated on every restart, "
+            "invalidating all user sessions. Set MEDFOLLOW_SECRET_KEY as an environment "
+            "variable in your deployment platform (Railway → Variables).\n"
+        )
         return secrets.token_hex(32)
 
 SECRET_KEY = _load_or_create_secret_key()
+if not os.environ.get("MEDFOLLOW_SECRET_KEY"):
+    import os as _os
+    if not _os.path.exists(_SECRET_KEY_FILE):
+        print(
+            "\n⚠️  WARNING: MEDFOLLOW_SECRET_KEY env variable not set. "
+            "Set it in Railway → Variables to persist sessions across deploys.\n"
+        )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 8
 

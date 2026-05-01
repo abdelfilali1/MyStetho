@@ -84,10 +84,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-info">
-                <div class="user-avatar">{{ user.email[0]|upper }}</div>
+                <div class="user-avatar">{{ (user.first_name or user.email)[0]|upper }}</div>
                 <div class="user-details">
-                    <span class="user-name">{{ user.email }}</span>
-                    <span class="user-role">{{ user.role }}</span>
+                    <span class="user-name">{% if user.first_name or user.last_name %}Dr. {{ user.first_name }} {{ user.last_name }}{% else %}{{ user.email }}{% endif %}</span>
+                    <span class="user-role">{{ user.email }}</span>
                 </div>
             </div>
             <a href="/logout" class="logout-btn">Deconnexion</a>
