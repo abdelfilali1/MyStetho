@@ -216,6 +216,16 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
     )
     prescriptions = [dict(r) for r in await cursor.fetchall()]
 
+    cursor = await db.execute(
+        "SELECT * FROM documents WHERE patient_id = ? ORDER BY created_at DESC LIMIT 20", (patient_id,)
+    )
+    documents = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT * FROM feuilles_soin WHERE patient_id = ? ORDER BY created_at DESC LIMIT 30", (patient_id,)
+    )
+    feuilles_soin = [dict(r) for r in await cursor.fetchall()]
+
     from datetime import datetime
     now_year = datetime.now().year
     user_specialty = user.get("specialty", "") or ""
@@ -249,7 +259,7 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
             "request": request, "user": user, "active": "patients",
             "patient": patient, "history": history,
             "appointments": appointments, "consultations": consultations,
-            "prescriptions": prescriptions,
+            "prescriptions": prescriptions, "documents": documents, "feuilles_soin": feuilles_soin,
             "now_year": now_year, "is_dentist": is_dentist,
             "teeth_data_json": teeth_data_json,
             "endo_summary_json": endo_summary_json,

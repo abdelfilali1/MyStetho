@@ -10,34 +10,55 @@
 {% endblock %}
 
 {% block head %}
-{% if is_dentist %}
-<link rel="stylesheet" href="/static/js/odontogram-view.iife.css?v=20260316-12">
 <style>
-/* ===== CSS copié exactement depuis dental/chart.html ===== */
+/* ===== Onglets fiche patient — tous utilisateurs ===== */
 .view-toggle-bar {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 8px;
+    max-width: 100%; overflow: hidden;
 }
 .view-segmented {
     display: flex; gap: 0;
     background: var(--gray-100); border-radius: 11px;
     padding: 4px; border: 1px solid var(--gray-200);
     flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
+    max-width: 100%; box-sizing: border-box;
+    scrollbar-width: none;
 }
+.view-segmented::-webkit-scrollbar { display: none; }
 .view-btn {
     padding: 6px 14px; border: none; border-radius: 8px;
     font-size: 12px; font-weight: 600; cursor: pointer;
     color: var(--gray-500); background: transparent;
     transition: all 0.18s; white-space: nowrap;
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
 }
 .view-btn.active {
     background: white; color: var(--gray-900);
     box-shadow: 0 1px 6px rgba(0,0,0,0.12);
 }
 .view-btn-sep {
-    width: 1px; background: var(--gray-300); margin: 4px 2px; align-self: stretch;
+    width: 1px; background: var(--gray-300); margin: 4px 2px; align-self: stretch; flex-shrink: 0;
 }
+/* Combobox antécédents */
+.hist-combo-wrap { position: relative; flex: 2; }
+.hist-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1.5px solid var(--gray-200);
+    border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    z-index: 300; max-height: 220px; overflow-y: auto;
+}
+.hist-opt {
+    padding: 9px 14px; font-size: 13px; cursor: pointer;
+    color: var(--gray-800); border-bottom: 1px solid var(--gray-100);
+}
+.hist-opt:last-child { border-bottom: none; }
+.hist-opt:hover { background: var(--primary-light); color: var(--primary-dark); }
+</style>
+{% if is_dentist %}
+<link rel="stylesheet" href="/static/js/odontogram-view.iife.css?v=20260316-12">
+<style>
+/* ===== CSS dentiste — copié depuis dental/chart.html ===== */
 .odo-stats {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 8px; margin-bottom: 8px;
@@ -198,14 +219,20 @@
 <!-- Barre d'onglets -->
 <div class="view-toggle-bar no-print" style="margin-bottom:20px;">
     <div class="view-segmented">
-        <button class="view-btn active" id="btn-info"    onclick="switchTab('info')">Informations</button>
-        <button class="view-btn"         id="btn-hist"   onclick="switchTab('hist')">Antécédents</button>
-        <button class="view-btn"         id="btn-appts"  onclick="switchTab('appts')">Rendez-vous</button>
-        <button class="view-btn"         id="btn-consult" onclick="switchTab('consult')">Consultations</button>
+        <button class="view-btn active" id="btn-info"   onclick="switchTab('info')">Informations</button>
+        <button class="view-btn"        id="btn-appts"  onclick="switchTab('appts')">RDV & Consultations</button>
         <div class="view-btn-sep"></div>
         <button class="view-btn" id="btn-ordonnance" onclick="switchTab('ordonnance')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             Ordonnances
+        </button>
+        <button class="view-btn" id="btn-documents" onclick="switchTab('documents')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Documents
+        </button>
+        <button class="view-btn" id="btn-mutuelle" onclick="switchTab('mutuelle')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Mutuelle
         </button>
         {% if is_dentist %}
         <div class="view-btn-sep"></div>
@@ -280,11 +307,9 @@
             {% endif %}
         </div>
     </div>
-</div>
 
-<!-- ===== ONGLET : ANTÉCÉDENTS ===== -->
-<div id="view-hist" style="display:none;">
-    <div class="card">
+    <!-- Antécédents (fusionné avec Informations) -->
+    <div class="card" style="margin-top: 16px; overflow: visible;">
         <div class="card-header"><h3>Antécédents médicaux</h3></div>
         <div class="card-body">
             {% if history %}
@@ -313,8 +338,14 @@
                             <option value="allergy">Allergie</option>
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 2;">
-                        <input type="text" name="description" required placeholder="Description...">
+                    <div class="form-group hist-combo-wrap">
+                        <input type="text" name="description" id="hist-desc-input"
+                               required autocomplete="off"
+                               placeholder="Sélectionner ou saisir..."
+                               oninput="histFilter(this.value)"
+                               onfocus="histShow()"
+                               onblur="setTimeout(histHide,200)">
+                        <div id="hist-dropdown" class="hist-dropdown" style="display:none;"></div>
                     </div>
                     <div class="form-group">
                         <input type="date" name="date_recorded">
@@ -326,10 +357,13 @@
     </div>
 </div>
 
-<!-- ===== ONGLET : RENDEZ-VOUS ===== -->
+<!-- ===== ONGLET : RDV & CONSULTATIONS ===== -->
 <div id="view-appts" style="display:none;">
     <div class="card">
-        <div class="card-header"><h3>Derniers rendez-vous</h3></div>
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Rendez-vous</h3>
+            <a href="/agenda?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouveau RDV</a>
+        </div>
         <div class="card-body">
             {% if appointments %}
             <table class="table">
@@ -351,12 +385,12 @@
             {% endif %}
         </div>
     </div>
-</div>
 
-<!-- ===== ONGLET : CONSULTATIONS ===== -->
-<div id="view-consult" style="display:none;">
-    <div class="card">
-        <div class="card-header"><h3>Dernières consultations</h3></div>
+    <div class="card" style="margin-top: 16px;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Consultations</h3>
+            <a href="/consultations/new?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouvelle consultation</a>
+        </div>
         <div class="card-body">
             {% if consultations %}
             <table class="table">
@@ -410,6 +444,122 @@
             {% endif %}
         </div>
     </div>
+</div>
+
+<!-- ===== ONGLET : DOCUMENTS ===== -->
+<div id="view-documents" style="display:none;">
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Documents</h3>
+            <a href="/documents/upload?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Ajouter un document</a>
+        </div>
+        <div class="card-body">
+            {% if documents %}
+            <table class="table">
+                <thead>
+                    <tr><th>Titre</th><th>Catégorie</th><th>Date</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for d in documents %}
+                    <tr>
+                        <td>{{ d.title }}</td>
+                        <td><span class="badge">{{ d.category or '—' }}</span></td>
+                        <td>{{ (d.created_at or '')[:10] }}</td>
+                        <td><a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="margin-top: 12px;">
+                <a href="/documents?patient_id={{ patient.id }}" class="btn btn-outline btn-sm">Voir dans le module Documents</a>
+            </div>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucun document enregistré</p>
+            <div style="margin-top: 8px;">
+                <a href="/documents?patient_id={{ patient.id }}" class="btn btn-outline btn-sm">Voir le module Documents</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ===== ONGLET : MUTUELLE ===== -->
+<div id="view-mutuelle" style="display:none;">
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Mutuelle / Assurance</h3>
+            <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+        </div>
+        <div class="card-body">
+            <div class="info-grid" style="margin-bottom: 20px;">
+                <div class="info-item">
+                    <span class="info-label">Mutuelle / Assurance</span>
+                    <span class="info-value">{{ patient.insurance_name or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">N° Adhérent</span>
+                    <span class="info-value">{{ patient.insurance_number or '—' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">N° Série</span>
+                    <span class="info-value">{{ patient.insurance_serial or '—' }}</span>
+                </div>
+            </div>
+            <a href="/mutuelle/" class="btn btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Ouvrir module mutuelle (NGAP)
+            </a>
+        </div>
+    </div>
+
+    {% if feuilles_soin %}
+    <div class="card" style="margin-top:16px;">
+        <div class="card-header"><h3>Documents enregistrés</h3></div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr><th>Date</th><th>Type</th><th>Détail</th><th>Total</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for f in feuilles_soin %}
+                    <tr>
+                        <td>{{ f.date_soin or (f.created_at or '')[:10] }}</td>
+                        <td>
+                            {% if f.mutuelle == 'Note' %}
+                                <span class="badge" style="background:#f3e6ff;color:#7c00c9;">Note d'honor.</span>
+                            {% else %}
+                                <span class="badge">{{ f.mutuelle }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if f.mutuelle == 'Note' %}
+                                {{ f.nom_beneficiaire or '—' }}
+                            {% else %}
+                                {{ 'Exécution' if f.type_feuille == 'execution' else 'Entente préalable' }} — {{ f.nom_beneficiaire or '—' }}
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ '%.2f'|format(f.total_montant or 0) }} Dh</strong></td>
+                        <td style="display:flex;gap:6px;align-items:center;">
+                            <a href="/mutuelle/feuille/{{ f.id }}/view" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Aperçu
+                            </a>
+                            <a href="/mutuelle/feuille/{{ f.id }}/download" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Télécharger
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div style="margin-top:12px;padding:16px;background:var(--gray-50);border-radius:12px;color:var(--gray-500);font-size:13px;">
+        Aucune fiche de soin enregistrée pour ce patient.
+    </div>
+    {% endif %}
 </div>
 
 {% if is_dentist %}
@@ -533,6 +683,48 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// ===== Combobox antécédents =====
+const HIST_PRESETS = ["Diabète","HTA","Cardiopathie","Trouble de coagulation","Allergie médicamenteuse","Allergie au latex","Hépatite","VIH","Grossesse","Traitement anticoagulant","Bisphosphonates","Radiothérapie cervico-faciale","Prothèse valvulaire","Endocardite","Autre"];
+
+function histRender(opts) {
+    const dd = document.getElementById('hist-dropdown');
+    if (!dd) return;
+    if (!opts.length) { dd.style.display='none'; return; }
+    dd.innerHTML = opts.map(o => `<div class="hist-opt" onmousedown="histPick(event,'${o.replace(/'/g,"\\'")}')">${o}</div>`).join('');
+    dd.style.display = '';
+}
+function histFilter(q) {
+    const filtered = HIST_PRESETS.filter(o => o.toLowerCase().includes(q.toLowerCase()));
+    histRender(filtered);
+}
+function histShow() { histRender(HIST_PRESETS); }
+function histHide() { const dd = document.getElementById('hist-dropdown'); if (dd) dd.style.display='none'; }
+function histPick(e, val) {
+    e.preventDefault();
+    const inp = document.getElementById('hist-desc-input');
+    if (inp) inp.value = val;
+    histHide();
+}
+
+// ===== Tab switching — available for all users =====
+const PATIENT_TABS = ['info','appts','ordonnance','documents','mutuelle'];
+const DENTAL_TABS  = ['layout','odontogram','endo'];
+const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
+let reactLayoutMounted = false, reactOdoMounted = false, endoGridBuilt = false;
+
+function switchTab(tab) {
+    ALL_TABS.forEach(t => {
+        const el  = document.getElementById('view-' + t);
+        const btn = document.getElementById('btn-' + t);
+        if (el)  el.style.display  = (t === tab) ? '' : 'none';
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'layout'     && !reactLayoutMounted) { buildStats('stats-row-layout'); mountReactOdontogram('react-odo-root-layout', 'square'); reactLayoutMounted = true; }
+    if (tab === 'odontogram' && !reactOdoMounted)    { buildStats('stats-row-odo');    mountReactOdontogram('react-odo-root-odo', 'circle');  reactOdoMounted = true; }
+    if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
+}
+</script>
 {% if is_dentist %}
 <div id="overlay" onclick="closePanel()"></div>
 <div id="panel">
@@ -607,25 +799,7 @@
 
 <script src="/static/js/odontogram-view.iife.js?v=20260316-12"></script>
 <script>
-// ===== ONGLETS PATIENT =====
-const PATIENT_TABS = ['info','hist','appts','consult','ordonnance'];
-const DENTAL_TABS  = ['layout','odontogram','endo'];
-const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
-let reactLayoutMounted = false, reactOdoMounted = false, endoGridBuilt = false;
-
-function switchTab(tab) {
-    ALL_TABS.forEach(t => {
-        const el  = document.getElementById('view-' + t);
-        const btn = document.getElementById('btn-' + t);
-        if (el)  el.style.display  = (t === tab) ? '' : 'none';
-        if (btn) btn.classList.toggle('active', t === tab);
-    });
-    if (tab === 'layout'     && !reactLayoutMounted) { buildStats('stats-row-layout'); mountReactOdontogram('react-odo-root-layout', 'square'); reactLayoutMounted = true; }
-    if (tab === 'odontogram' && !reactOdoMounted)    { buildStats('stats-row-odo');    mountReactOdontogram('react-odo-root-odo', 'circle');  reactOdoMounted = true; }
-    if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
-}
-
-// ===== DONNÉES (copié depuis chart.html) =====
+// ===== DONNÉES DENTAIRES =====
 const PATIENT_ID = {{ patient.id }};
 const teethData  = {{ teeth_data_json | safe }};
 const endoSummary = {{ endo_summary_json | safe }};

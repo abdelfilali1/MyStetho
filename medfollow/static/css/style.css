@@ -364,10 +364,11 @@ body.mobile-nav-open {
 /* ===== MAIN AREAS ===== */
 .content {
     margin-left: var(--sidebar-width);
-    width: 100%;
+    width: calc(100% - var(--sidebar-width));
     padding: 30px;
     max-width: 1320px;
     animation: reveal-up 0.5s ease;
+    box-sizing: border-box;
 }
 
 .content-full {
@@ -1204,6 +1205,7 @@ tr.unread td {
 
     .content {
         margin-left: 0;
+        width: 100%;
         max-width: none;
         padding: 14px 12px 18px;
     }
@@ -1328,6 +1330,7 @@ tr.unread td {
 
     .content {
         margin-left: 0;
+        width: 100%;
         max-width: 100%;
         padding: 12px;
     }

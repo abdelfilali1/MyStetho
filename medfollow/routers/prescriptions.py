@@ -56,33 +56,21 @@ async def search_medications(
         return JSONResponse(status_code=401, content=[])
     if not q or len(q.strip()) < 1:
         return JSONResponse(content=[])
-    user_specialty = user.get("specialty", "") or ""
-    is_dentist = "dent" in user_specialty.lower()
     term = q.strip().lower()
-    if is_dentist:
-        cursor = await db.execute(
-            """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
-                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as starts_rank,
-                      CASE WHEN specialty='dentiste' THEN 0 ELSE 1 END as spec_rank
-               FROM medications
-               WHERE LOWER(name) LIKE ?
-               ORDER BY starts_rank, spec_rank, name
-               LIMIT 100""",
-            (f"{term}%", f"%{term}%"),
-        )
-    else:
-        cursor = await db.execute(
-            """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
-                      CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as starts_rank,
-                      0 as spec_rank
-               FROM medications
-               WHERE specialty = 'general' AND LOWER(name) LIKE ?
-               ORDER BY starts_rank, name
-               LIMIT 100""",
-            (f"{term}%", f"%{term}%"),
-        )
+    cursor = await db.execute(
+        """SELECT id, name, COALESCE(form,'') as form, COALESCE(lab,'') as lab,
+                  CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END as starts_rank
+           FROM medications
+           WHERE LOWER(name) LIKE ?
+           ORDER BY starts_rank, name
+           LIMIT 100""",
+        (f"{term}%", f"%{term}%"),
+    )
     rows = await cursor.fetchall()
-    return JSONResponse(content=[dict(r) for r in rows])
+    return JSONResponse(
+        content=[dict(r) for r in rows],
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/new", response_class=HTMLResponse)

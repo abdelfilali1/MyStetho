@@ -412,6 +412,10 @@
     </div>
     <div class="m-footer">
       <button class="btn btn-outline" onclick="closeFeuille()">Annuler</button>
+      <button class="btn btn-outline" id="btn-save-feuille" onclick="saveFeuille()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Enregistrer
+      </button>
       <button class="btn btn-primary" id="btn-print-feuille" onclick="printFeuille()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Imprimer la feuille de soins
@@ -431,6 +435,12 @@
 
       <div class="form-section">
         <h4>Informations essentielles</h4>
+        <div class="fg">
+          <label>Patient <span class="req">*</span></label>
+          <select id="n-pat-select" onchange="noteSelectPatient(this.value)" style="width:100%;padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:9px;font-size:.875rem;color:var(--gray-800);background:#fff;">
+            <option value="">— Sélectionner un patient —</option>
+          </select>
+        </div>
         <div class="fg">
           <label>Nom du patient <span class="req">*</span></label>
           <input type="text" id="n-patient" placeholder="Nom et prénom du patient">
@@ -510,6 +520,10 @@
     </div>
     <div class="m-footer">
       <button class="btn btn-outline" onclick="closeNote()">Annuler</button>
+      <button class="btn btn-outline" id="btn-save-note" onclick="saveNote()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Enregistrer
+      </button>
       <button class="btn btn-primary" onclick="printNote()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Imprimer la note
@@ -902,9 +916,12 @@ window.patKeydown = function(e) {
     }
 };
 
+let _selectedPatientId = null;
+
 window.selectPatient = function(idx) {
     const p = ALL_PATIENTS[idx];
     if (!p) return;
+    _selectedPatientId = p.id;
     document.getElementById('f-nom').value = p.nom;
     if (p.dob) document.getElementById('f-ddn').value = p.dob;
     document.getElementById('f-cin').value = p.cin || '';
@@ -919,6 +936,7 @@ window.selectPatient = function(idx) {
 };
 
 window.clearPatient = function() {
+    _selectedPatientId = null;
     const txt = document.getElementById('pat-trigger-text');
     txt.textContent = 'Sélectionner un patient…';
     txt.classList.add('placeholder');
@@ -1022,9 +1040,23 @@ function renderNoteActes() {
            <tr class="total"><td colspan="4"><strong>TOTAL</strong></td><td class="right"><strong>${total.toFixed(2)} Dh</strong></td></tr>
          </tbody></table>`;
 }
+let _selectedPatientIdNote = null;
+
+window.noteSelectPatient = function(idx) {
+    if (!idx) { _selectedPatientIdNote = null; document.getElementById('n-patient').value = ''; return; }
+    const p = ALL_PATIENTS[parseInt(idx)];
+    if (!p) return;
+    _selectedPatientIdNote = p.id;
+    document.getElementById('n-patient').value = p.nom;
+};
+
 window.openNote = function() {
     if (!treatments.length) return;
     document.getElementById('n-date').value = TODAY;
+    _selectedPatientIdNote = null;
+    const sel = document.getElementById('n-pat-select');
+    sel.innerHTML = '<option value="">— Sélectionner un patient —</option>' +
+        ALL_PATIENTS.map((p, i) => `<option value="${i}">${esc(p.nom)}</option>`).join('');
     loadNoteDoctor();
     renderNoteActes();
     document.getElementById('modal-note').style.display = 'flex';
@@ -1105,6 +1137,106 @@ function renderVerso(svgTmpl, soins) {
     return s;
 }
 
+window.saveFeuille = async function() {
+    const missing = missingFeuilleFields();
+    if (missing.length) {
+        missing.forEach(id => {
+            const el = document.getElementById(id); el.classList.add('err');
+            const e = document.getElementById(id+'-err'); if (e) e.style.display='';
+        }); updateFeuilleStatus(); return;
+    }
+    if (!_selectedPatientId) {
+        alert('Veuillez sélectionner un patient dans la liste pour enregistrer la fiche.');
+        return;
+    }
+    const btn = document.getElementById('btn-save-feuille');
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Enregistrement…';
+
+    const isCNSS = document.getElementById('f-mutuelle').value === 'CNSS';
+    const lien = document.getElementById('f-lien').value;
+    const sexeVal = document.getElementById('f-sexe').value;
+    const typeSoin = document.getElementById('f-type-soin').value;
+    const fiche = {
+        type_fds:         document.getElementById('f-type').value === 'entente' ? 'entente' : 'execution',
+        nom_beneficiaire: document.getElementById('f-nom').value,
+        ddn:              document.getElementById('f-ddn').value,
+        cin:              document.getElementById('f-cin').value,
+        parente:          (['conjoint','enfant'].includes(lien)) ? lien : 'assure',
+        sexe:             (['feminin','femelle','female'].includes(sexeVal)) ? 'femelle' : 'male',
+        inpe:             document.getElementById('f-inpe').value,
+        numero_entente:   document.getElementById('f-entente').value,
+        type_soin:        (['prothese','odf','autres'].includes(typeSoin)) ? typeSoin : 'soins',
+        ville:            document.getElementById('f-ville').value,
+        date:             document.getElementById('f-date').value,
+    };
+
+    let html_content = '';
+    try {
+        const [rectoTmpl, versoTmpl] = await Promise.all([
+            loadSvg(isCNSS ? 'cnss_recto.svg' : 'cnops_recto.svg'),
+            loadSvg(isCNSS ? 'cnss_verso.svg' : 'cnops_verso.svg'),
+        ]);
+        const recto = renderRecto(rectoTmpl, fiche);
+        const verso = renderVerso(versoTmpl, treatments);
+        html_content = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Feuille de soins</title>
+<style>
+@page{size:A4 landscape;margin:0}
+html,body{margin:0;padding:0;background:#fff}
+body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pp{width:297mm;height:210mm;margin:0;page-break-after:always;break-after:page;overflow:hidden}
+.pp:last-child{page-break-after:auto;break-after:auto}
+.pp>svg{display:block;width:297mm;height:210mm}
+</style></head><body>
+<div class="pp">${recto}</div>
+<div class="pp">${verso}</div>
+</body></html>`;
+    } catch(genErr) {
+        console.error('HTML generation failed:', genErr);
+    }
+
+    const data = {
+        patient_id:       _selectedPatientId,
+        mutuelle:         document.getElementById('f-mutuelle').value,
+        type_feuille:     document.getElementById('f-type').value,
+        nom_beneficiaire: document.getElementById('f-nom').value,
+        ddn:              document.getElementById('f-ddn').value,
+        cin:              document.getElementById('f-cin').value,
+        sexe:             sexeVal,
+        lien_assure:      lien,
+        inpe:             document.getElementById('f-inpe').value,
+        type_soin:        typeSoin,
+        numero_entente:   document.getElementById('f-entente').value,
+        ville:            document.getElementById('f-ville').value,
+        date_soin:        document.getElementById('f-date').value,
+        total_montant:    treatments.reduce((s, t) => s + (t.montant || 0), 0),
+        actes:            treatments,
+        html_content,
+    };
+    try {
+        const resp = await fetch('/mutuelle/feuille/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+        if (result.ok) {
+            closeFeuille();
+            window.open('/mutuelle/feuille/' + result.id + '/view', '_blank');
+        } else {
+            alert('Erreur lors de l\'enregistrement.');
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Erreur réseau.');
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
+    }
+};
+
 window.printFeuille = async function() {
     const missing = missingFeuilleFields();
     if (missing.length) {
@@ -1170,21 +1302,26 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 };
 
 // ==============================
-// PRINT — NOTE D'HONORAIRES (HTML)
+// PRINT / SAVE — NOTE D'HONORAIRES (HTML)
 // ==============================
-window.printNote = function() {
+function validateNote() {
     const patient = document.getElementById('n-patient').value.trim();
     const num = document.getElementById('n-num').value.trim();
     const date = document.getElementById('n-date').value;
-    const paiement = document.getElementById('n-paiement').value;
-    if (!patient||!num||!date||!paiement) {
-        ['n-patient','n-num','n-date'].forEach(id=>{
+    if (!patient || !num || !date) {
+        ['n-patient','n-num','n-date'].forEach(id => {
             if (!document.getElementById(id).value.trim()) {
                 document.getElementById(id).classList.add('err');
-                const e=document.getElementById(id+'-err'); if(e) e.style.display='';
+                const e = document.getElementById(id+'-err'); if (e) e.style.display = '';
             }
-        }); return;
+        });
+        return null;
     }
+    return { patient, num, date, paiement: document.getElementById('n-paiement').value };
+}
+
+function buildNoteHtml(fields) {
+    const { patient, num, date, paiement } = fields;
     const praticien = document.getElementById('n-praticien').value.trim();
     const specialite = document.getElementById('n-specialite').value.trim();
     const adresse = document.getElementById('n-adresse').value.trim();
@@ -1194,11 +1331,11 @@ window.printNote = function() {
     const ice = document.getElementById('n-ice').value.trim();
     const ifVal = document.getElementById('n-if').value.trim();
     const cnss = document.getElementById('n-cnss').value.trim();
-    const hasDoc = !!(praticien||adresse);
-    const total = treatments.reduce((s,t)=>s+t.montant,0);
-    const dateStr = new Date(date+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
-    const footerParts = [adresse, ville?`${ville}`:'', tel?`Tél: ${tel}`:'', inpe?`INPE: ${inpe}`:'', ice?`ICE: ${ice}`:'', ifVal?`IF: ${ifVal}`:'', cnss?`CNSS: ${cnss}`:''].filter(Boolean);
-    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    const hasDoc = !!(praticien || adresse);
+    const total = treatments.reduce((s, t) => s + t.montant, 0);
+    const dateStr = new Date(date+'T00:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+    const footerParts = [adresse, ville, tel?`Tél: ${tel}`:'', inpe?`INPE: ${inpe}`:'', ice?`ICE: ${ice}`:'', ifVal?`IF: ${ifVal}`:'', cnss?`CNSS: ${cnss}`:''].filter(Boolean);
+    return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
 <title>Note d'Honoraires</title>
 <style>
 @page{size:A4;margin:0}
@@ -1232,8 +1369,7 @@ ${hasDoc?`<div class="doc-header"><div class="name">${praticien}</div><div class
   <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Date</th><th>Montant</th></tr></thead>
   <tbody>
     ${treatments.map(t=>`<tr>
-      <td>${t.code}</td>
-      <td>${t.libelle}</td>
+      <td>${t.code}</td><td>${t.libelle}</td>
       <td>${t.toothNumber||'—'}</td>
       <td>${new Date(t.date+'T00:00:00').toLocaleDateString('fr-FR')}</td>
       <td class="right">${t.montant.toFixed(2)} DH</td>
@@ -1246,12 +1382,62 @@ ${hasDoc?`<div class="doc-header"><div class="name">${praticien}</div><div class
   <div class="sig-box">Signature du patient<div class="sig-line"></div></div>
   <div class="sig-box">Cachet et signature du praticien<div class="sig-line"></div></div>
 </div>
-${hasDoc&&footerParts.length?`<div class="page-footer">${footerParts.join(' · ')}</div>`:''}
+${hasDoc && footerParts.length ? `<div class="page-footer">${footerParts.join(' · ')}</div>` : ''}
 </body></html>`;
-    const w = window.open('','_blank');
+}
+
+window.printNote = function() {
+    const fields = validateNote();
+    if (!fields) return;
+    const html = buildNoteHtml(fields);
+    const w = window.open('', '_blank');
     if (!w) { alert('Autorisez les pop-ups pour imprimer.'); return; }
     w.document.write(html); w.document.close();
-    w.onload = ()=>{ w.focus(); w.print(); };
+    w.onload = () => { w.focus(); w.print(); };
+};
+
+window.saveNote = async function() {
+    const fields = validateNote();
+    if (!fields) return;
+    if (!_selectedPatientIdNote) {
+        alert('Veuillez sélectionner un patient dans la liste pour enregistrer.');
+        return;
+    }
+    const btn = document.getElementById('btn-save-note');
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Enregistrement…';
+    const html_content = buildNoteHtml(fields);
+    const data = {
+        patient_id:    _selectedPatientIdNote,
+        nom_patient:   fields.patient,
+        numero_note:   fields.num,
+        date_soin:     fields.date,
+        mode_paiement: fields.paiement,
+        total_montant: treatments.reduce((s, t) => s + t.montant, 0),
+        actes:         treatments,
+        html_content,
+    };
+    try {
+        const resp = await fetch('/mutuelle/note/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+        if (result.ok) {
+            closeNote();
+            window.open('/mutuelle/feuille/' + result.id + '/view', '_blank');
+        } else {
+            alert('Erreur lors de l\'enregistrement.');
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Erreur réseau.');
+        btn.disabled = false;
+        btn.innerHTML = 'Enregistrer';
+    }
 };
 
 // ==============================

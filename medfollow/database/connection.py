@@ -443,6 +443,38 @@ async def init_db():
     """)
     await db.commit()
 
+    # Feuilles de soin mutuelle
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS feuilles_soin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id TEXT NOT NULL,
+            mutuelle TEXT NOT NULL,
+            type_feuille TEXT NOT NULL,
+            nom_beneficiaire TEXT,
+            ddn TEXT,
+            cin TEXT,
+            sexe TEXT,
+            lien_assure TEXT,
+            inpe TEXT,
+            type_soin TEXT,
+            numero_entente TEXT,
+            ville TEXT,
+            date_soin TEXT,
+            total_montant REAL DEFAULT 0,
+            actes_json TEXT,
+            html_path TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+    # Migration: ajouter html_path si absent (DBs existantes)
+    try:
+        await db.execute("ALTER TABLE feuilles_soin ADD COLUMN html_path TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     # Learning content cache
     await db.execute("""
         CREATE TABLE IF NOT EXISTS learning_content_cache (

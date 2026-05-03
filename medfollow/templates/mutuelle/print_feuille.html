@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Feuille de soins</title>
+<style>
+@page { size: A4 landscape; margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; font-family: sans-serif; }
+body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pp { width: 297mm; height: 210mm; margin: 0; page-break-after: always; break-after: page; overflow: hidden; }
+.pp:last-child { page-break-after: auto; break-after: auto; }
+.pp > svg { display: block; width: 297mm; height: 210mm; }
+#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; gap: 16px; font-size: 15px; color: #475569; }
+#loading svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media print { #loading { display: none !important; } }
+</style>
+</head>
+<body>
+<div id="loading">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1c8cf8" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+    Génération de la feuille de soins…
+</div>
+<div id="pages" style="display:none;"></div>
+
+<script>
+const DATA  = {{ feuille_json | safe }};
+const ACTES = {{ actes_json | safe }};
+</script>
+<script>
+{% raw %}
+const svgCache = {};
+async function loadSvg(name) {
+    if (svgCache[name]) return svgCache[name];
+    const r = await fetch(`/static/ngap/${name}`);
+    const t = (await r.text()).replace(/\\r/g, '');
+    svgCache[name] = t;
+    return t;
+}
+function escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function parseDateParts(s) {
+    let p = (s||'').replace(/\//g,'-').split('-');
+    if (p.length !== 3) p = ['','',''];
+    else if (p[0].length > 2) { const t = p[0]; p[0] = p[2]; p[2] = t; }
+    return { jour: p[0]||'', mois: p[1]||'', annee: p[2]||'' };
+}
+function stripScript(svg) { return svg.replace(/^[\s\S]*?(?=<svg)/,''); }
+function renderRecto(svgTmpl, fiche) {
+    let s = stripScript(svgTmpl);
+    s = s.replace(/style="display:\{\$fiche\.([a-z_]+)\s*==\s*["']([^"']+)["']\s*\?\s*'inline'\s*:\s*'none'\}"/g,
+        (_,f,v) => `style="display:${fiche[f]===v?'inline':'none'}"`);
+    s = s.replace(/\{getDateObject\(\$fiche\.(ddn|date)\)\.(jour|mois|annee)\}/g,
+        (_,f,part) => escHtml(parseDateParts(fiche[f])[part]));
+    s = s.replace(/\{\$fiche\.([a-z_]+)\}/g, (_,f) => escHtml(fiche[f] ?? ''));
+    return s;
+}
+function buildToothMap(soins) {
+    const m = new Map();
+    for (const s of soins) {
+        const teeth = (s.toothNumber||'').split(/[^0-9]+/).filter(t => parseInt(t) > 10);
+        for (const t of teeth) {
+            const codes = m.get(t) || [];
+            if (!codes.includes(s.code)) codes.push(s.code);
+            m.set(t, codes);
+        }
+    }
+    return m;
+}
+function evalIdx(expr, idx) {
+    const e = expr.replace(/idx/g, String(idx)).trim();
+    if (!/^[0-9+\-*/().?:><=\s]+$/.test(e)) return null;
+    try { const v = Function('"use strict";return('+e+');')(); return typeof v === 'number' && isFinite(v) ? String(v) : null; } catch { return null; }
+}
+function renderVerso(svgTmpl, soins) {
+    let s = stripScript(svgTmpl);
+    s = s.replace(/\{#each soins as soin, idx\}([\s\S]*?)\{\/each\}/g, (_, tmpl) =>
+        soins.map((soin, idx) => tmpl
+            .replace(/\{([^{}]*idx[^{}]*)\}/g, (_,e) => evalIdx(e,idx) || _)
+            .replace(/\{soin\.dent\}/g,    escHtml(soin.toothNumber||''))
+            .replace(/\{soin\.code\}/g,    escHtml(soin.code||''))
+            .replace(/\{soin\.date\}/g,    escHtml(soin.date||''))
+            .replace(/\{soin\.lettre\}/g,  escHtml(soin.lettre||''))
+            .replace(/\{soin\.cotation\}/g,escHtml(String(soin.cotation||'')))
+            .replace(/\{soin\.valeur\}/g,  escHtml(String(soin.valeure_lettre||'')))
+            .replace(/\{soin\.montant\}/g, escHtml(String(soin.montant||'')))
+        ).join('')
+    );
+    const tm = buildToothMap(soins);
+    s = s.replace(/display=\{showArray\[(\d+)\]\s*\?\s*'inline'\s*:\s*'none'\}/g,
+        (_,t) => `display="${tm.has(t)?'inline':'none'}"`);
+    s = s.replace(/\{showTextArray\[(\d+)\]\.join\(" "\)\}/g,
+        (_,t) => escHtml((tm.get(t)||[]).join(' ')));
+    return s;
+}
+async function generate() {
+    const isCNSS = DATA.mutuelle === 'CNSS';
+    const fiche = {
+        type_fds:         DATA.type_feuille === 'entente' ? 'entente' : 'execution',
+        nom_beneficiaire: DATA.nom_beneficiaire || '',
+        ddn:              DATA.ddn || '',
+        cin:              DATA.cin || '',
+        parente:          (['conjoint','enfant'].includes(DATA.lien_assure)) ? DATA.lien_assure : 'assure',
+        sexe:             (['feminin','femelle','female'].includes(DATA.sexe)) ? 'femelle' : 'male',
+        inpe:             DATA.inpe || '',
+        numero_entente:   DATA.numero_entente || '',
+        type_soin:        (['prothese','odf','autres'].includes(DATA.type_soin)) ? DATA.type_soin : 'soins',
+        ville:            DATA.ville || '',
+        date:             DATA.date_soin || '',
+    };
+    const [rectoTmpl, versoTmpl] = await Promise.all([
+        loadSvg(isCNSS ? 'cnss_recto.svg' : 'cnops_recto.svg'),
+        loadSvg(isCNSS ? 'cnss_verso.svg' : 'cnops_verso.svg'),
+    ]);
+    const recto = renderRecto(rectoTmpl, fiche);
+    const verso = renderVerso(versoTmpl, ACTES);
+    const pages = document.getElementById('pages');
+    pages.innerHTML = `<div class="pp">${recto}</div><div class="pp">${verso}</div>`;
+    pages.style.display = '';
+    document.getElementById('loading').style.display = 'none';
+    window.print();
+}
+document.addEventListener('DOMContentLoaded', generate);
+{% endraw %}
+</script>
+</body>
+</html>
