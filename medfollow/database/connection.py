@@ -443,4 +443,14 @@ async def init_db():
     """)
     await db.commit()
 
+    # Learning content cache
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS learning_content_cache (
+            course_id    INTEGER PRIMARY KEY,
+            content_json TEXT NOT NULL,
+            fetched_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     await db.close()

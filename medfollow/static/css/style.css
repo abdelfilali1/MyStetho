@@ -1817,6 +1817,610 @@ tr.unread td {
 .page-header-left { display: flex; flex-direction: column; gap: 2px; }
 .page-header-right { display: flex; gap: 8px; align-items: center; }
 
+/* ===== LEARNING MODULE ===== */
+
+/* Filter bar */
+.learning-filters {
+    margin-bottom: 14px;
+}
+.learning-filter-form {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+}
+.learning-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+}
+.learning-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+    pointer-events: none;
+}
+.learning-search-input {
+    width: 100%;
+    padding: 9px 12px 9px 34px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    outline: none;
+    transition: border-color .15s;
+}
+.learning-search-input:focus {
+    border-color: var(--primary);
+    background: #fff;
+}
+.learning-filter-selects {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.learning-select {
+    padding: 8px 12px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    outline: none;
+    cursor: pointer;
+    transition: border-color .15s;
+}
+.learning-select:focus {
+    border-color: var(--primary);
+}
+
+/* Category chips */
+.learning-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.chip {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.7);
+    border: 1.5px solid var(--gray-200);
+    color: var(--gray-600);
+    text-decoration: none;
+    transition: all .15s;
+    cursor: pointer;
+}
+.chip:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary-dark);
+}
+.chip-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* Course grid */
+.course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+/* Course card */
+.course-card {
+    background: var(--panel-strong);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.course-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-medium);
+    border-color: var(--card-color, var(--primary));
+}
+.course-card-thumb {
+    height: 140px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--card-color, #1c8cf8) 85%, #000), color-mix(in srgb, var(--card-color, #1c8cf8) 60%, #111));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 16px;
+}
+.course-icon {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+.course-card-category {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.25);
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+.course-card-body {
+    padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.course-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.35;
+}
+.course-card-desc {
+    font-size: 12.5px;
+    color: var(--gray-500);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex: 1;
+}
+.course-card-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.course-duration, .course-chapters-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--gray-500);
+    font-weight: 600;
+}
+.course-source-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--gray-400);
+    font-style: italic;
+    margin-top: 2px;
+}
+
+/* Level badges */
+.course-level {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.course-level-debutant {
+    background: var(--success-light);
+    color: var(--success);
+}
+.course-level-intermediaire {
+    background: var(--warning-light);
+    color: var(--warning);
+}
+.course-level-avance {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+/* Course detail layout */
+.course-detail-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 20px;
+    align-items: start;
+}
+.course-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Detail hero */
+.course-detail-hero {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--card-color, #1c8cf8) 90%, #000), color-mix(in srgb, var(--card-color, #1c8cf8) 55%, #111));
+    border-radius: 16px;
+    padding: 28px 28px 28px 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    box-shadow: var(--shadow-medium);
+    color: #fff;
+}
+.course-detail-hero-icon {
+    font-size: 4rem;
+    line-height: 1;
+    flex-shrink: 0;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
+}
+.course-detail-hero-info {
+    flex: 1;
+}
+.course-detail-cat {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.7);
+    display: block;
+    margin-bottom: 6px;
+}
+.course-detail-title {
+    font-family: "Sora", sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 10px;
+    line-height: 1.3;
+}
+.course-detail-desc {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.55;
+    margin-bottom: 14px;
+}
+.course-detail-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.course-detail-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    color: rgba(255,255,255,0.9);
+}
+.course-detail-hero .course-level {
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+}
+
+/* Key points */
+.course-key-points {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.course-key-points li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 13.5px;
+    color: var(--gray-700);
+    line-height: 1.5;
+}
+.course-key-points li::before {
+    content: "✓";
+    color: var(--success);
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Chapter list */
+.course-chapters-list {
+    list-style: none;
+    counter-reset: chapter;
+}
+.course-chapter-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    transition: background .15s;
+}
+.course-chapter-item:last-child {
+    border-bottom: none;
+}
+.course-chapter-item:hover {
+    background: var(--gray-50);
+}
+.chapter-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.chapter-title {
+    font-size: 13.5px;
+    color: var(--gray-700);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+/* Detail sidebar */
+.course-detail-sidebar {
+    position: sticky;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.course-source-card .card-body {
+    padding: 20px;
+}
+.course-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-100);
+    gap: 8px;
+}
+.course-stat-row:last-child {
+    border-bottom: none;
+}
+.course-stat-label {
+    font-size: 12.5px;
+    color: var(--gray-500);
+    font-weight: 600;
+}
+.course-stat-value {
+    font-size: 13px;
+    color: var(--gray-800);
+    font-weight: 700;
+}
+
+/* ── Wikipedia article reader ──────────────────────────────── */
+
+.wiki-badge {
+    background: rgba(255,255,255,0.18);
+    gap: 5px;
+}
+
+/* Intro card */
+.wiki-intro-card {
+    border-left: 3px solid var(--primary);
+}
+.wiki-intro {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--gray-700);
+}
+.wiki-intro p { margin-bottom: 12px; }
+.wiki-intro p:last-child { margin-bottom: 0; }
+
+/* Accordion sections */
+.wiki-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.wiki-section {
+    background: var(--panel-strong);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(11,45,90,0.07);
+}
+.wiki-section-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: background .15s;
+}
+.wiki-section-toggle:hover {
+    background: var(--gray-50);
+}
+.wiki-section-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.wiki-section-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-800);
+}
+.wiki-toggle-icon {
+    flex-shrink: 0;
+    color: var(--gray-400);
+    transition: transform .2s;
+}
+.wiki-section-toggle.open .wiki-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Accordion body */
+.wiki-section-body {
+    display: none;
+    padding: 0 18px 18px;
+    border-top: 1px solid var(--gray-100);
+}
+.wiki-section-body.open {
+    display: block;
+}
+
+/* Article content styles */
+.wiki-content {
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--gray-700);
+    padding-top: 14px;
+}
+.wiki-content p {
+    margin-bottom: 12px;
+}
+.wiki-content p:last-child {
+    margin-bottom: 0;
+}
+.wiki-content h2, .wiki-content h3, .wiki-content h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin: 16px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--gray-100);
+}
+.wiki-content ul, .wiki-content ol {
+    padding-left: 20px;
+    margin-bottom: 12px;
+}
+.wiki-content li {
+    margin-bottom: 5px;
+}
+.wiki-content b, .wiki-content strong {
+    color: var(--gray-900);
+    font-weight: 700;
+}
+.wiki-content dl { margin-bottom: 12px; }
+.wiki-content dt { font-weight: 700; color: var(--gray-800); }
+.wiki-content dd { padding-left: 16px; color: var(--gray-600); margin-bottom: 6px; }
+
+/* Tables inside articles */
+.wiki-content table, .wiki-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin: 12px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+.wiki-content th, .wiki-content td {
+    padding: 8px 12px;
+    border: 1px solid var(--gray-200);
+    text-align: left;
+    vertical-align: top;
+}
+.wiki-content th {
+    background: var(--gray-100);
+    font-weight: 700;
+    color: var(--gray-800);
+}
+.wiki-content tr:nth-child(even) td {
+    background: var(--gray-50);
+}
+
+/* Attribution */
+.wiki-attribution {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--gray-400);
+    padding: 10px 4px;
+    margin-bottom: 8px;
+}
+.wiki-attribution a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.wiki-attribution a:hover {
+    text-decoration: underline;
+}
+
+/* Table of contents */
+.wiki-toc {
+    list-style: none;
+    padding: 0;
+}
+.wiki-toc li {
+    border-bottom: 1px solid var(--gray-100);
+}
+.wiki-toc li:last-child { border-bottom: none; }
+.wiki-toc a {
+    display: block;
+    padding: 9px 16px;
+    font-size: 12.5px;
+    color: var(--gray-600);
+    text-decoration: none;
+    transition: background .12s, color .12s;
+}
+.wiki-toc a:hover {
+    background: var(--gray-50);
+    color: var(--primary);
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+    .course-detail-layout {
+        grid-template-columns: 1fr;
+    }
+    .course-detail-sidebar {
+        position: static;
+    }
+    .course-detail-hero {
+        flex-direction: column;
+        gap: 14px;
+    }
+    .course-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+@media (max-width: 540px) {
+    .course-grid {
+        grid-template-columns: 1fr;
+    }
+    .learning-filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 /* ===== btn-secondary ===== */
 .btn-secondary {
     color: var(--gray-700);

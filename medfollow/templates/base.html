@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260316-13">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260503-15">
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -64,6 +64,13 @@
                 <a href="/mutuelle">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     <span>Mutuelle NGAP</span>
+                </a>
+            </li>
+            <li class="nav-separator"></li>
+            <li class="{% if active == 'learning' %}active{% endif %}">
+                <a href="/learning">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><line x1="12" y1="6" x2="16" y2="6"/><line x1="12" y1="10" x2="16" y2="10"/><line x1="12" y1="14" x2="16" y2="14"/></svg>
+                    <span>Formation Continue</span>
                 </a>
             </li>
             <li class="nav-separator"></li>

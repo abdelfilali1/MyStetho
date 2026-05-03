@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }} — Formation Continue — Doctivo{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/learning">Formation Continue</a><span class="breadcrumb-sep">/</span>
+    <span>{{ course.title }}</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="course-detail-layout">
+
+    <!-- Main -->
+    <div class="course-detail-main">
+
+        <!-- Hero -->
+        <div class="course-detail-hero" style="--card-color: {{ course.color }};">
+            <div class="course-detail-hero-icon">{{ course.icon }}</div>
+            <div class="course-detail-hero-info">
+                <span class="course-detail-cat">{{ course.category }}</span>
+                <h1 class="course-detail-title">{{ course.title }}</h1>
+                <p class="course-detail-desc">{{ course.description }}</p>
+                <div class="course-detail-badges">
+                    <span class="course-level course-level-{{ course.level }}">{{ level_labels[course.level] }}</span>
+                    {% if wiki_content %}
+                    <span class="course-detail-badge">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                        {{ wiki_content.sections | length }} sections
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if wiki_content %}
+
+        <!-- Intro -->
+        {% if wiki_content.intro %}
+        <div class="card wiki-intro-card">
+            <div class="card-body wiki-intro">{{ wiki_content.intro | safe }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Accordion sections -->
+        <div class="wiki-sections">
+            {% for section in wiki_content.sections %}
+            <div class="wiki-section" id="section-{{ loop.index }}">
+                <button class="wiki-section-toggle {% if loop.first %}open{% endif %}" onclick="toggleSection(this)" type="button">
+                    <span class="wiki-section-num">{{ loop.index }}</span>
+                    <span class="wiki-section-title">{{ section.title }}</span>
+                    <svg class="wiki-toggle-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="wiki-section-body {% if loop.first %}open{% endif %}">
+                    <div class="wiki-content">{{ section.html | safe }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="course-detail-sidebar">
+
+        <div class="card">
+            <div class="card-body">
+                <div class="course-stat-row">
+                    <span class="course-stat-label">Spécialité</span>
+                    <span class="course-stat-value">{{ course.category }}</span>
+                </div>
+                <div class="course-stat-row">
+                    <span class="course-stat-label">Niveau</span>
+                    <span class="course-level course-level-{{ course.level }}">{{ level_labels[course.level] }}</span>
+                </div>
+                {% if wiki_content %}
+                <div class="course-stat-row">
+                    <span class="course-stat-label">Sections</span>
+                    <span class="course-stat-value">{{ wiki_content.sections | length }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Table of contents -->
+        {% if wiki_content and wiki_content.sections %}
+        <div class="card">
+            <div class="card-header">
+                <h4 style="font-size:13px;font-weight:700;color:var(--gray-700);">Sommaire</h4>
+            </div>
+            <div class="card-body" style="padding:8px 0;">
+                <ol class="wiki-toc">
+                    {% for section in wiki_content.sections %}
+                    <li>
+                        <a href="#section-{{ loop.index }}" onclick="openSection({{ loop.index }})">{{ section.title }}</a>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+        {% endif %}
+
+        <a href="/learning" class="btn btn-secondary" style="width:100%;justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            Retour aux cours
+        </a>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSection(btn) {
+    const isOpen = btn.classList.contains('open');
+    btn.classList.toggle('open', !isOpen);
+    btn.nextElementSibling.classList.toggle('open', !isOpen);
+}
+function openSection(i) {
+    const s = document.getElementById('section-' + i);
+    if (!s) return;
+    s.querySelector('.wiki-section-toggle').classList.add('open');
+    s.querySelector('.wiki-section-body').classList.add('open');
+    setTimeout(() => s.scrollIntoView({behavior:'smooth', block:'start'}), 100);
+}
+</script>
+{% endblock %}

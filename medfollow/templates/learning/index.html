@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Formation Continue — Doctivo{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>Formation Continue</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-left">
+        <h2>Formation Continue</h2>
+        <p class="subtitle">{{ total_count }} cours disponible{% if total_count > 1 %}s{% endif %} · Dentisterie</p>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<div class="learning-filters card">
+    <form method="GET" class="learning-filter-form" id="filter-form">
+        <div class="learning-search-wrap">
+            <svg class="learning-search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" name="q" value="{{ q }}" placeholder="Rechercher un cours…" class="learning-search-input" autocomplete="off">
+        </div>
+        <div class="learning-filter-selects">
+            <select name="category" class="learning-select" onchange="this.form.submit()">
+                <option value="">Toutes les spécialités</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select name="level" class="learning-select" onchange="this.form.submit()">
+                <option value="">Tous les niveaux</option>
+                {% for lk, lv in level_labels.items() %}
+                <option value="{{ lk }}" {% if selected_level == lk %}selected{% endif %}>{{ lv }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            {% if q or selected_category or selected_level %}
+            <a href="/learning" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Category chips -->
+<div class="learning-chips">
+    <a href="/learning" class="chip {% if not selected_category and not selected_level and not q %}chip-active{% endif %}">Tous</a>
+    {% for cat in categories %}
+    <a href="/learning?category={{ cat | replace(' ', '+') }}" class="chip {% if selected_category == cat %}chip-active{% endif %}">{{ cat }}</a>
+    {% endfor %}
+</div>
+
+<!-- Course grid -->
+{% if courses %}
+<div class="course-grid">
+    {% for c in courses %}
+    <a href="/learning/{{ c.id }}" class="course-card" style="--card-color: {{ c.color }};">
+        <div class="course-card-thumb">
+            <span class="course-icon">{{ c.icon }}</span>
+            <div class="course-card-category">{{ c.category }}</div>
+        </div>
+        <div class="course-card-body">
+            <h3 class="course-card-title">{{ c.title }}</h3>
+            <p class="course-card-desc">{{ c.description }}</p>
+            <div class="course-card-meta">
+                <span class="course-level course-level-{{ c.level }}">{{ level_labels[c.level] }}</span>
+                <span class="course-duration">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    {{ c.duration_hours }}h
+                </span>
+                <span class="course-chapters-count">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                    {{ c.chapters | length }} chapitres
+                </span>
+            </div>
+            <div class="course-source-label">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                {{ c.source_name }}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding:48px;text-align:center;">
+    <p style="font-size:2rem;margin-bottom:12px;">🔍</p>
+    <p style="color:var(--gray-500);font-size:15px;">Aucun cours trouvé pour ces critères.</p>
+    <a href="/learning" class="btn btn-outline btn-sm" style="margin-top:16px;">Voir tous les cours</a>
+</div>
+{% endif %}
+{% endblock %}
