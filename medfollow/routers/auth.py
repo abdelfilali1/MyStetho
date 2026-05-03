@@ -116,6 +116,8 @@ async def create_user(
             "form": {"email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone}
         })
 
+    if role == "admin" and email != "abdelfilaliansary@gmail.com":
+        return error("Le rôle admin est réservé à l'administrateur principal")
     if not specialty:
         return error("Veuillez choisir une spécialité")
     if password != password_confirm:
@@ -160,6 +162,12 @@ async def setup(
     count = (await cursor.fetchone())[0]
     if count > 0:
         return RedirectResponse(url="/login", status_code=302)
+
+    if email != "abdelfilaliansary@gmail.com":
+        return templates.TemplateResponse(
+            "setup.html",
+            {"request": request, "error": "Seul l'administrateur principal peut créer le premier compte"},
+        )
 
     if not specialty:
         return templates.TemplateResponse(
@@ -221,6 +229,9 @@ async def update_user(
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg, "form": form_data, "editing": True
         })
+
+    if role == "admin" and email != "abdelfilaliansary@gmail.com":
+        return error("Le rôle admin est réservé à l'administrateur principal")
 
     if password:
         if password != password_confirm:

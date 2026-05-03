@@ -427,4 +427,20 @@ async def init_db():
     except Exception:
         pass
 
+    # NGAP acts table
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS ngap_acts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            categorie TEXT NOT NULL,
+            libelle TEXT NOT NULL,
+            lettre TEXT NOT NULL,
+            cotation REAL NOT NULL DEFAULT 0,
+            cotation_bis REAL NOT NULL DEFAULT 0,
+            valeure_lettre REAL NOT NULL DEFAULT 0,
+            remarques TEXT DEFAULT ''
+        )
+    """)
+    await db.commit()
+
     await db.close()

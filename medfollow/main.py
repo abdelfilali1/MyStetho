@@ -24,7 +24,7 @@ def _calc_age(dob_str):
         return ""
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle
 
 
 @asynccontextmanager
@@ -51,7 +51,7 @@ _global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _global_templates.env.globals["now_year"] = date.today().year
 
 # Patch all router template envs to include now_year and calc_age filter
-for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental]:
+for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle]:
     if hasattr(mod, 'templates'):
         mod.templates.env.globals["now_year"] = date.today().year
         mod.templates.env.filters["calc_age"] = _calc_age
@@ -71,6 +71,7 @@ app.include_router(documents.router)
 app.include_router(messages.router)
 app.include_router(invoices.router)
 app.include_router(dental.router)
+app.include_router(mutuelle.router)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1282 @@
+{% extends "base.html" %}
+{% block title %}Mutuelle — NGAP Maroc — Doctivo{% endblock %}
+
+{% block head %}
+<style>
+/* ===== MUTUELLE MODULE ===== */
+.mutuelle-layout {
+    display: grid;
+    grid-template-columns: 1fr 390px;
+    gap: 24px;
+    align-items: start;
+    padding-bottom: 60px;
+}
+.mutuelle-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.mutuelle-header h2 { font-size:1.45rem; font-weight:700; }
+.mutuelle-header .subtitle { color:var(--gray-500); font-size:.875rem; margin-top:2px; }
+.acts-badge { background:var(--primary-light); color:var(--primary-dark); font-size:.75rem; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+
+/* Search */
+.mutuelle-search-row { display:flex; gap:10px; margin-bottom:14px; align-items:center; }
+.mutuelle-search-wrap { position:relative; flex:1; }
+.mutuelle-search-wrap svg { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--gray-400); pointer-events:none; }
+.mutuelle-search { width:100%; padding:10px 14px 10px 42px; border:1.5px solid var(--gray-200); border-radius:10px; background:#fff; font-size:.9375rem; color:var(--gray-800); transition:border-color .15s; }
+.mutuelle-search:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+.search-count-pill { font-size:.8rem; color:var(--gray-500); white-space:nowrap; min-width:70px; text-align:right; }
+
+/* Category chips */
+.category-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
+.cat-chip { padding:5px 14px; font-size:.8125rem; font-weight:600; border:1.5px solid var(--gray-200); border-radius:100px; background:transparent; color:var(--gray-600); cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:5px; }
+.cat-chip .chip-count { font-size:.7rem; background:var(--gray-100); color:var(--gray-500); padding:1px 6px; border-radius:10px; }
+.cat-chip:hover { border-color:var(--gray-400); background:var(--gray-50); }
+.cat-chip.active { background:var(--gray-800); border-color:var(--gray-800); color:#fff; }
+.cat-chip.active .chip-count { background:rgba(255,255,255,.2); color:#fff; }
+
+/* Act items */
+.acts-list { display:flex; flex-direction:column; gap:6px; }
+.act-item { background:#fff; border:1.5px solid var(--gray-100); border-radius:10px; padding:12px 14px; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .1s; user-select:none; }
+.act-item:hover { border-color:var(--primary); box-shadow:0 2px 10px rgba(28,140,248,.12); transform:translateY(-1px); }
+.act-item.at-limit { opacity:.5; cursor:not-allowed; pointer-events:none; }
+.act-code { font-family:"Courier New",monospace; font-size:.8rem; font-weight:700; background:var(--primary-light); color:var(--primary-dark); padding:3px 8px; border-radius:6px; white-space:nowrap; min-width:54px; text-align:center; }
+.act-code.lz { background:#fff0e6; color:#c95d00; }
+.act-code.lc { background:#e6f7ee; color:#0a7c43; }
+.act-code.lv { background:#f3e6ff; color:#7c00c9; }
+.act-body { min-width:0; }
+.act-libelle { font-size:.875rem; font-weight:500; color:var(--gray-800); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.act-formula { font-size:.75rem; color:var(--gray-500); margin-top:3px; }
+.act-price { font-size:.9rem; font-weight:700; color:var(--gray-800); white-space:nowrap; text-align:right; }
+.no-results { text-align:center; padding:60px 20px; color:var(--gray-400); font-size:.9rem; }
+
+/* Right panel */
+.treatments-panel { position:sticky; top:24px; background:#fff; border:1.5px solid var(--gray-200); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-soft); }
+.panel-header { padding:16px 18px 14px; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.panel-header h3 { font-size:.9375rem; font-weight:700; }
+.panel-counter { font-size:.75rem; font-weight:700; padding:3px 9px; border-radius:20px; background:var(--gray-100); color:var(--gray-600); }
+.panel-counter.limit { background:var(--danger-light); color:var(--danger); }
+.treatments-list { padding:8px 0; max-height:380px; overflow-y:auto; }
+.treatment-row { padding:10px 18px; display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:start; border-bottom:1px solid var(--gray-50); }
+.treatment-row:last-child { border-bottom:none; }
+.t-code { font-family:"Courier New",monospace; font-size:.72rem; font-weight:700; background:var(--primary-light); color:var(--primary-dark); padding:2px 6px; border-radius:5px; white-space:nowrap; margin-top:1px; }
+.t-info { min-width:0; }
+.t-libelle { font-size:.8125rem; font-weight:500; color:var(--gray-700); line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.t-meta { margin-top:3px; font-size:.72rem; color:var(--gray-400); }
+.t-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.t-amount { font-size:.875rem; font-weight:700; color:var(--gray-800); white-space:nowrap; }
+.t-delete { background:none; border:none; cursor:pointer; color:var(--gray-300); padding:2px; border-radius:4px; transition:color .15s; }
+.t-delete:hover { color:var(--danger); }
+.empty-panel { padding:40px 18px; text-align:center; color:var(--gray-400); }
+.empty-panel svg { opacity:.35; margin-bottom:8px; }
+.empty-panel p { font-size:.8125rem; }
+.limit-banner { margin:0 18px 8px; padding:8px 12px; background:var(--danger-light); color:var(--danger); border-radius:8px; font-size:.8rem; font-weight:500; }
+.panel-footer { border-top:1.5px solid var(--gray-100); padding:14px 18px; }
+.panel-total { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+.panel-total span { font-size:.875rem; color:var(--gray-500); }
+.panel-total strong { font-size:1.1rem; font-weight:800; color:var(--gray-900); }
+.panel-actions { display:flex; flex-direction:column; gap:8px; }
+.btn-feuille { width:100%; padding:10px; background:var(--primary); color:#fff; border:none; border-radius:9px; font-size:.875rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .15s; }
+.btn-feuille:hover { background:var(--primary-dark); }
+.btn-feuille:disabled { opacity:.4; cursor:not-allowed; }
+.btn-note { width:100%; padding:9px; background:transparent; color:var(--gray-600); border:1.5px solid var(--gray-200); border-radius:9px; font-size:.8125rem; font-weight:600; cursor:pointer; transition:all .15s; }
+.btn-note:hover { border-color:var(--primary); color:var(--primary); }
+.btn-note:disabled { opacity:.3; cursor:not-allowed; }
+.btn-reset-panel { width:100%; padding:8px; background:transparent; color:var(--gray-400); border:none; font-size:.75rem; cursor:pointer; transition:color .15s; }
+.btn-reset-panel:hover { color:var(--danger); }
+.btn-reset-panel:disabled { opacity:.3; cursor:not-allowed; }
+
+/* ===== MODALS ===== */
+.m-overlay { position:fixed; inset:0; background:rgba(20,32,51,.55); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .15s; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.m-box { background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:92vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,.22); animation:slideUp .2s; }
+.m-box.wide { max-width:680px; }
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.m-header { padding:20px 24px 16px; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:#fff; z-index:1; }
+.m-header h3 { font-size:1rem; font-weight:700; }
+.m-close { background:none; border:none; cursor:pointer; color:var(--gray-400); font-size:1.4rem; line-height:1; padding:2px 6px; border-radius:6px; transition:color .15s; }
+.m-close:hover { color:var(--danger); }
+.m-body { padding:20px 24px; }
+.m-footer { padding:14px 24px 20px; border-top:1px solid var(--gray-100); display:flex; gap:10px; justify-content:flex-end; position:sticky; bottom:0; background:#fff; }
+.m-selected-act { background:var(--gray-50); border:1px solid var(--gray-100); border-radius:10px; padding:12px 14px; margin-bottom:16px; display:flex; align-items:center; gap:12px; }
+.m-act-code { font-family:"Courier New",monospace; font-size:.9rem; font-weight:700; background:var(--primary-light); color:var(--primary-dark); padding:4px 10px; border-radius:7px; white-space:nowrap; }
+.m-act-libelle { font-size:.875rem; font-weight:500; color:var(--gray-800); line-height:1.4; }
+.m-act-montant { font-size:.9rem; font-weight:700; color:var(--primary); white-space:nowrap; margin-left:auto; }
+.m-helper { font-size:.8rem; color:var(--gray-500); background:var(--gray-50); padding:8px 12px; border-radius:8px; margin-bottom:14px; line-height:1.5; }
+
+/* Form fields */
+.fg { margin-bottom:14px; }
+.fg label { display:block; font-size:.8125rem; font-weight:600; color:var(--gray-700); margin-bottom:5px; }
+.fg label span.req { color:var(--danger); margin-left:2px; }
+.fg input, .fg select { width:100%; padding:9px 12px; border:1.5px solid var(--gray-200); border-radius:9px; font-size:.875rem; color:var(--gray-800); background:#fff; transition:border-color .15s; }
+.fg input:focus, .fg select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+.fg input.err, .fg select.err { border-color:var(--danger); }
+.fg .err-msg { font-size:.75rem; color:var(--danger); margin-top:3px; }
+.fg-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.fg-row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.form-section { margin-bottom:20px; }
+.form-section h4 { font-size:.8125rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--gray-400); margin-bottom:12px; padding-bottom:6px; border-bottom:1px solid var(--gray-100); }
+.checkbox-row { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:.8125rem; color:var(--gray-600); cursor:pointer; user-select:none; }
+.checkbox-row input[type=checkbox] { width:15px; height:15px; cursor:pointer; }
+.print-status { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:7px; font-size:.8rem; font-weight:600; }
+.print-status.ready { background:#d6f8ec; color:#0a7c43; }
+.print-status.not-ready { background:var(--warning-light); color:var(--warning); }
+.collapsible-toggle { background:none; border:none; cursor:pointer; color:var(--primary); font-size:.8125rem; font-weight:600; padding:0; display:flex; align-items:center; gap:5px; margin-bottom:12px; }
+
+/* Tooth selector */
+.tooth-selector { margin-bottom:16px; }
+.tooth-tabs { display:flex; gap:4px; margin-bottom:12px; }
+.tooth-tab { padding:5px 14px; font-size:.8rem; font-weight:600; border:1.5px solid var(--gray-200); border-radius:7px; background:transparent; cursor:pointer; color:var(--gray-500); transition:all .15s; }
+.tooth-tab.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.tooth-grid { display:flex; flex-direction:column; gap:4px; align-items:center; }
+.tooth-row { display:flex; gap:3px; }
+.tooth-sep { width:1.5px; background:var(--gray-200); margin:0 4px; border-radius:1px; }
+.tooth-btn { width:32px; height:32px; border-radius:6px; border:1.5px solid var(--gray-200); background:#fff; font-size:.72rem; font-weight:700; color:var(--gray-600); cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; }
+.tooth-btn:hover { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
+.tooth-btn.selected { background:var(--primary); border-color:var(--primary); color:#fff; }
+.tooth-btn.disabled { opacity:.35; cursor:not-allowed; }
+.tooth-row-label { font-size:.65rem; font-weight:700; color:var(--gray-300); width:32px; text-align:center; letter-spacing:.03em; }
+.tooth-clear { background:none; border:none; cursor:pointer; font-size:.75rem; color:var(--gray-400); text-decoration:underline; margin-top:4px; }
+
+/* Note actes list */
+.note-actes { border:1px solid var(--gray-100); border-radius:9px; overflow:hidden; margin-bottom:14px; }
+.note-actes table { width:100%; border-collapse:collapse; font-size:.8125rem; }
+.note-actes th { padding:7px 10px; background:var(--gray-50); font-weight:700; color:var(--gray-500); text-align:left; font-size:.75rem; }
+.note-actes td { padding:8px 10px; border-top:1px solid var(--gray-50); color:var(--gray-700); }
+.note-actes td.right { text-align:right; font-weight:600; }
+.note-actes tr.total td { font-weight:800; color:var(--gray-900); background:var(--gray-50); border-top:2px solid var(--gray-200); }
+
+/* Patient combobox */
+.pat-combo { position:relative; margin-bottom:14px; }
+.pat-combo-label { display:block; font-size:.8125rem; font-weight:600; color:var(--gray-700); margin-bottom:5px; }
+.pat-combo-trigger { width:100%; padding:9px 36px 9px 12px; border:1.5px solid var(--gray-200); border-radius:9px; font-size:.875rem; color:var(--gray-800); background:#fff; cursor:pointer; text-align:left; position:relative; transition:border-color .15s; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.pat-combo-trigger:hover { border-color:var(--gray-400); }
+.pat-combo-trigger.open { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); border-radius:9px 9px 0 0; }
+.pat-combo-trigger .trigger-text { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pat-combo-trigger .trigger-text.placeholder { color:var(--gray-400); }
+.pat-combo-trigger .trigger-chevron { flex-shrink:0; transition:transform .15s; color:var(--gray-400); }
+.pat-combo-trigger.open .trigger-chevron { transform:rotate(180deg); }
+.pat-combo-trigger .trigger-clear { flex-shrink:0; background:none; border:none; cursor:pointer; color:var(--gray-300); font-size:1.1rem; line-height:1; padding:0 2px; border-radius:3px; }
+.pat-combo-trigger .trigger-clear:hover { color:var(--danger); }
+.pat-combo-panel { position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid var(--primary); border-top:none; border-radius:0 0 9px 9px; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:200; }
+.pat-combo-search { padding:8px 10px; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; gap:8px; }
+.pat-combo-search svg { flex-shrink:0; color:var(--gray-400); }
+.pat-combo-search input { flex:1; border:none; outline:none; font-size:.875rem; color:var(--gray-800); background:transparent; }
+.pat-combo-list { max-height:220px; overflow-y:auto; }
+.pat-item { padding:8px 12px; cursor:pointer; font-size:.875rem; color:var(--gray-700); border-bottom:1px solid var(--gray-50); display:flex; align-items:baseline; gap:10px; }
+.pat-item:last-child { border-bottom:none; }
+.pat-item:hover, .pat-item.kbd-active { background:var(--primary-light); color:var(--primary-dark); }
+.pat-item .pat-name { font-weight:600; flex:1; }
+.pat-item .pat-dob { font-size:.72rem; color:var(--gray-400); white-space:nowrap; }
+.pat-no-results { padding:12px; text-align:center; color:var(--gray-400); font-size:.8125rem; }
+
+/* Responsive */
+@media (max-width:920px) { .mutuelle-layout { grid-template-columns:1fr; } .treatments-panel { position:static; } }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <span>Mutuelle — NGAP</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mutuelle-header">
+    <div>
+        <h2>Mutuelle &amp; NGAP Maroc</h2>
+        <p class="subtitle">Nomenclature Générale des Actes Professionnels — CNOPS / CNSS</p>
+    </div>
+    <span class="acts-badge">{{ total_acts }} actes référencés</span>
+</div>
+
+<div class="mutuelle-layout">
+
+  <!-- LEFT: acts browser -->
+  <div class="acts-column">
+    <div class="mutuelle-search-row">
+      <div class="mutuelle-search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" class="mutuelle-search" id="act-search" placeholder="Rechercher un acte ou un code…" autocomplete="off">
+      </div>
+      <span class="search-count-pill" id="search-count"></span>
+    </div>
+    <div class="category-chips" id="cat-chips">
+      <button class="cat-chip active" data-cat="">Tous <span class="chip-count" id="chip-all">{{ total_acts }}</span></button>
+      {% for cat in categories %}
+      <button class="cat-chip" data-cat="{{ cat }}">{{ cat }} <span class="chip-count">0</span></button>
+      {% endfor %}
+    </div>
+    <div class="acts-list" id="acts-list"></div>
+  </div>
+
+  <!-- RIGHT: treatments panel -->
+  <div class="treatments-panel" id="treatments-panel">
+    <div class="panel-header">
+      <h3>Traitements effectués</h3>
+      <span class="panel-counter" id="panel-counter">0 / 9</span>
+    </div>
+    <div id="limit-banner" class="limit-banner" style="display:none">
+      <strong>Limite atteinte.</strong> 9 traitements max par feuille de soins.
+    </div>
+    <div class="treatments-list" id="treatments-list">
+      <div class="empty-panel" id="empty-state">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+        <p>Cliquez sur un acte pour l'ajouter</p>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <div class="panel-total">
+        <span>Total</span>
+        <strong id="panel-total">0,00 Dh</strong>
+      </div>
+      <div class="panel-actions">
+        <button class="btn-feuille" id="btn-feuille" disabled onclick="openFeuille()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Feuille de soins (CNOPS/CNSS)
+        </button>
+        <button class="btn-note" id="btn-note" disabled onclick="openNote()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Note d'Honoraires
+        </button>
+        <button class="btn-reset-panel" id="btn-reset" disabled onclick="resetAll()">Réinitialiser</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL 1: ADD TREATMENT ===== -->
+<div class="m-overlay" id="modal-add" style="display:none" onclick="if(event.target===this)closeAdd()">
+  <div class="m-box">
+    <div class="m-header">
+      <h3>Ajouter un traitement</h3>
+      <button class="m-close" onclick="closeAdd()">×</button>
+    </div>
+    <div class="m-body">
+      <div class="m-selected-act" id="add-act-info"></div>
+      <div id="add-tooth-section" style="display:none">
+        <div class="m-helper" id="add-tooth-helper"></div>
+        <div class="tooth-selector">
+          <div class="tooth-tabs">
+            <button class="tooth-tab active" onclick="setDentition('permanent')">Dents permanentes</button>
+            <button class="tooth-tab" onclick="setDentition('primary')">Dents temporaires</button>
+          </div>
+          <div class="tooth-grid" id="tooth-grid"></div>
+          <button class="tooth-clear" onclick="clearTeeth()">Effacer la sélection</button>
+        </div>
+      </div>
+      <div id="add-no-tooth-msg" class="m-helper" style="display:none"></div>
+      <div class="fg-row">
+        <div class="fg">
+          <label>Date <span class="req">*</span></label>
+          <input type="date" id="add-date">
+        </div>
+        <div class="fg">
+          <label>Montant facturé (Dh) <span class="req">*</span></label>
+          <input type="number" id="add-montant" min="0" step="0.01">
+        </div>
+      </div>
+    </div>
+    <div class="m-footer">
+      <button class="btn btn-outline" onclick="closeAdd()">Annuler</button>
+      <button class="btn btn-primary" id="btn-add-confirm" onclick="confirmAdd()">Ajouter le traitement</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL 2: FEUILLE DE SOINS ===== -->
+<div class="m-overlay" id="modal-feuille" style="display:none" onclick="if(event.target===this)closeFeuille()">
+  <div class="m-box wide">
+    <div class="m-header">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h3>Feuille de soins</h3>
+        <div class="print-status" id="feuille-status"></div>
+      </div>
+      <button class="m-close" onclick="closeFeuille()">×</button>
+    </div>
+    <div class="m-body">
+
+      <div class="form-section">
+        <h4>Type de la feuille de soins</h4>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Mutuelle <span class="req">*</span></label>
+            <select id="f-mutuelle" onchange="feuilleChanged()">
+              <option value="CNOPS">CNOPS</option>
+              <option value="CNSS">CNSS</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Type <span class="req">*</span></label>
+            <select id="f-type" onchange="feuilleChanged()">
+              <option value="execution">Exécution</option>
+              <option value="entente">Entente préalable</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Bénéficiaire</h4>
+        <div class="pat-combo" id="pat-combo">
+          <span class="pat-combo-label">Patient</span>
+          <button type="button" class="pat-combo-trigger" id="pat-combo-trigger" onclick="patToggle()">
+            <span class="trigger-text placeholder" id="pat-trigger-text">Sélectionner un patient…</span>
+            <button type="button" class="trigger-clear" id="pat-trigger-clear" onclick="event.stopPropagation();clearPatient()" style="display:none" title="Effacer la sélection">×</button>
+            <svg class="trigger-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="pat-combo-panel" id="pat-combo-panel" style="display:none">
+            <div class="pat-combo-search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input type="text" id="pat-combo-q" placeholder="Rechercher un patient…" autocomplete="off"
+                oninput="patFilter(this.value)" onkeydown="patKeydown(event)">
+            </div>
+            <div class="pat-combo-list" id="pat-combo-list"></div>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Nom du bénéficiaire <span class="req">*</span></label>
+          <input type="text" id="f-nom" placeholder="Nom et prénom" oninput="feuilleChanged()">
+          <div class="err-msg" id="f-nom-err" style="display:none">Requis</div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Date de naissance <span class="req">*</span></label>
+            <input type="date" id="f-ddn" oninput="feuilleChanged()">
+            <div class="err-msg" id="f-ddn-err" style="display:none">Requis</div>
+          </div>
+          <div class="fg">
+            <label>CIN <span class="req">*</span></label>
+            <input type="text" id="f-cin" placeholder="Ex: AB123456" oninput="feuilleChanged()">
+            <div class="err-msg" id="f-cin-err" style="display:none">Requis</div>
+          </div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Sexe <span class="req">*</span></label>
+            <select id="f-sexe" onchange="feuilleChanged()">
+              <option value="male">Masculin</option>
+              <option value="feminin">Féminin</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Lien avec l'assuré <span class="req">*</span></label>
+            <select id="f-lien" onchange="feuilleChanged()">
+              <option value="assure">Lui-même (assuré)</option>
+              <option value="conjoint">Conjoint</option>
+              <option value="enfant">Enfant</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Médecin traitant</h4>
+        <div class="fg-row">
+          <div class="fg">
+            <label>INPE <span class="req">*</span></label>
+            <input type="text" id="f-inpe" placeholder="N° INPE" oninput="feuilleChanged()">
+            <div class="err-msg" id="f-inpe-err" style="display:none">Requis</div>
+          </div>
+          <div class="fg">
+            <label>Type de déclaration <span class="req">*</span></label>
+            <select id="f-type-soin" onchange="feuilleChanged()">
+              <option value="soins">Soins</option>
+              <option value="prothese">Prothèse</option>
+              <option value="odf">ODF (Orthodontie)</option>
+              <option value="autres">Autres</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Numéro d'entente préalable</label>
+            <input type="text" id="f-entente" placeholder="Si applicable" oninput="feuilleChanged()">
+          </div>
+          <div class="fg">
+            <label>Ville <span class="req">*</span></label>
+            <input type="text" id="f-ville" placeholder="Ville du cabinet" oninput="feuilleChanged()">
+            <div class="err-msg" id="f-ville-err" style="display:none">Requis</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Date des soins <span class="req">*</span></label>
+          <input type="date" id="f-date" oninput="feuilleChanged()">
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="f-save-inpe" onchange="saveFeuilleDoctor()"> Mémoriser l'INPE et la ville sur cet appareil
+        </label>
+      </div>
+
+      <p style="font-size:.72rem;color:var(--gray-400);line-height:1.5;margin-top:10px;">
+        Conformément à la Loi 09-08, les informations saisies sont traitées localement et ne sont pas transmises à des tiers.
+      </p>
+    </div>
+    <div class="m-footer">
+      <button class="btn btn-outline" onclick="closeFeuille()">Annuler</button>
+      <button class="btn btn-primary" id="btn-print-feuille" onclick="printFeuille()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimer la feuille de soins
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL 3: NOTE D'HONORAIRES ===== -->
+<div class="m-overlay" id="modal-note" style="display:none" onclick="if(event.target===this)closeNote()">
+  <div class="m-box wide">
+    <div class="m-header">
+      <h3>Note d'Honoraires</h3>
+      <button class="m-close" onclick="closeNote()">×</button>
+    </div>
+    <div class="m-body">
+
+      <div class="form-section">
+        <h4>Informations essentielles</h4>
+        <div class="fg">
+          <label>Nom du patient <span class="req">*</span></label>
+          <input type="text" id="n-patient" placeholder="Nom et prénom du patient">
+          <div class="err-msg" id="n-patient-err" style="display:none">Requis</div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>N° Note <span class="req">*</span></label>
+            <input type="text" id="n-num" placeholder="Ex: 2026-001">
+            <div class="err-msg" id="n-num-err" style="display:none">Requis</div>
+          </div>
+          <div class="fg">
+            <label>Date <span class="req">*</span></label>
+            <input type="date" id="n-date">
+            <div class="err-msg" id="n-date-err" style="display:none">Requis</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Mode de paiement <span class="req">*</span></label>
+          <select id="n-paiement">
+            <option value="Espèces">Espèces</option>
+            <option value="Chèque">Chèque</option>
+            <option value="Virement">Virement</option>
+            <option value="Carte bancaire">Carte bancaire</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <button class="collapsible-toggle" type="button" onclick="toggleNoteDoc()" id="note-doc-toggle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="note-doc-chevron"><polyline points="6 9 12 15 18 9"/></svg>
+          Informations du praticien (pour en-tête)
+        </button>
+        <div id="note-doc-section" style="display:none">
+          <div class="fg-row">
+            <div class="fg">
+              <label>Nom du praticien</label>
+              <input type="text" id="n-praticien" placeholder="Dr. Nom Prénom">
+            </div>
+            <div class="fg">
+              <label>Spécialité</label>
+              <input type="text" id="n-specialite" placeholder="Ex: Chirurgien Dentiste">
+            </div>
+          </div>
+          <div class="fg">
+            <label>Adresse du cabinet</label>
+            <input type="text" id="n-adresse" placeholder="Adresse complète">
+          </div>
+          <div class="fg-row">
+            <div class="fg">
+              <label>Ville</label>
+              <input type="text" id="n-ville">
+            </div>
+            <div class="fg">
+              <label>Téléphone</label>
+              <input type="tel" id="n-tel" placeholder="06XXXXXXXX">
+            </div>
+          </div>
+          <div class="fg-row3">
+            <div class="fg"><label>INPE</label><input type="text" id="n-inpe"></div>
+            <div class="fg"><label>ICE</label><input type="text" id="n-ice"></div>
+            <div class="fg"><label>IF</label><input type="text" id="n-if"></div>
+          </div>
+          <div class="fg-row">
+            <div class="fg"><label>CNSS praticien</label><input type="text" id="n-cnss"></div>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="n-save" onchange="saveNoteDoctor()"> Mémoriser ces informations
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Actes (<span id="note-actes-count">0</span>)</h4>
+        <div class="note-actes" id="note-actes-table"></div>
+      </div>
+    </div>
+    <div class="m-footer">
+      <button class="btn btn-outline" onclick="closeNote()">Annuler</button>
+      <button class="btn btn-primary" onclick="printNote()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimer la note
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+'use strict';
+
+const MAX = 9;
+const TODAY = new Date().toISOString().split('T')[0];
+const ALL_ACTS = {{ acts_json | safe }};
+const ALL_PATIENTS = {{ patients_json | safe }};
+{% raw %}
+// ==============================
+// TOOTH SELECTION LOGIC (mirrors ngap-maroc.com fA/tt functions)
+// ==============================
+const MA_NO = new Set(["C","V","D626","D627","D628","D629","D630","D631","D632","D633",
+    "D636","D637","D638","D639","D640","D641","D708","D718","D719","D722","D723",
+    "D735","D736","D737","D741","D744","D745","D746","D747","D773","D774","D775",
+    "D778","D779","D785","D913","T142","T143","T144","T145","T146","T147","T148",
+    "T149","T150","T151","T152","T153","T154","T155","T158"]);
+const NA_YES = new Set(["D634","D635","D805","T156","T157","T159"]);
+const SA_NO_CAT = new Set(["Consultation","Orthopédie Dento-faciale",
+    "Prothèse restauratrice maxillo-faciale","Radiographie de la tête"]);
+const OVERRIDES = new Map([
+    ["D635",{mode:"multiple",min:2,max:2}],["D711",{mode:"multiple",min:1,max:null}],
+    ["D714",{mode:"single",min:1,max:1}],["D716",{mode:"single",min:1,max:1}],
+    ["D721",{mode:"multiple",min:1,max:null}],["D732",{mode:"multiple",min:2,max:2}],
+    ["D740",{mode:"multiple",min:2,max:2}],
+    ["D761",{mode:"multiple",min:1,max:3}],["D762",{mode:"multiple",min:4,max:4}],
+    ["D763",{mode:"multiple",min:5,max:5}],["D764",{mode:"multiple",min:6,max:6}],
+    ["D765",{mode:"multiple",min:7,max:7}],["D766",{mode:"multiple",min:8,max:8}],
+    ["D767",{mode:"multiple",min:9,max:9}],["D768",{mode:"multiple",min:10,max:10}],
+    ["D769",{mode:"multiple",min:11,max:11}],["D770",{mode:"multiple",min:12,max:12}],
+    ["D771",{mode:"multiple",min:13,max:13}],["D772",{mode:"multiple",min:14,max:14}],
+    ["D780",{mode:"multiple",min:1,max:null}],["D781",{mode:"multiple",min:1,max:null}],
+    ["D782",{mode:"multiple",min:1,max:null}],["D783",{mode:"multiple",min:1,max:null}],
+    ["D911",{mode:"multiple",min:1,max:2}],["D912",{mode:"multiple",min:2,max:6}],
+    ["T156",{mode:"multiple",min:1,max:3}],["T157",{mode:"multiple",min:1,max:3}],
+    ["T159",{mode:"multiple",min:1,max:3}],
+]);
+const EA = [
+    /par dent\b/,/dent d[ée]pulp[ée]e/,/d'une dent/,/de deux dents/,
+    /dents suivantes/,/dent lact[ée]ale/,/dent permanente/,/dent incluse/,
+    /dent surnuméraire/,/dent ectopique/,/canine incluse/,/groupe inciso-canin/,
+    /groupe pr[eé]molaires/,/groupe molaires/,/ancrage radiculaire/,/couronne/,
+    /\bbridge\b/,/\binlay\b/,/\bonlay\b/,/\bfacette\b/,/dent [aà] tenon/,
+    /[eé]dentement/,/mainteneur d'espace/,/remin[eé]ralisation une [aà] deux dents/,
+    /remin[eé]ralisation de 2 [aà] 6 dents/,/[eé]tanch[eé]ification par dent/,
+    /retroalv[eé]olaire.*par dent/,/par [eé]l[eé]ment/
+];
+const LA = [
+    /anesth[eé]sie g[eé]n[eé]rale/,/par arcade/,/proth[eè]se adjointe totale/,
+    /bilan complet en t[eé]l[eé]radiographie/,
+    /examen radiographique panoramique de la totalit/,
+    /h[eé]morragie post.?op[eé]ratoire/,/d[eé]sinsertion musculaire/,
+    /plancher de la bouche/,/greffe cutan[eé]e/,/moulage facial/
+];
+function norm(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+function getRule(act) {
+    const code = act.code.trim();
+    if (MA_NO.has(code)) return {mode:'none'};
+    if (NA_YES.has(code)) return OVERRIDES.get(code) || {mode:'single',min:1,max:1};
+    if (SA_NO_CAT.has(act.categorie)) return {mode:'none'};
+    const lib = norm(act.libelle);
+    if (EA.some(r => r.test(lib))) return OVERRIDES.get(code) || {mode:'single',min:1,max:1};
+    if (LA.some(r => r.test(lib))) return {mode:'none'};
+    return {mode:'none'};
+}
+function helperText(rule) {
+    if (rule.mode === 'none') return "Ce traitement n'est pas rattaché à une dent précise.";
+    if (rule.mode === 'single') return "Choisissez une seule dent pour ce traitement.";
+    if (rule.max !== null && rule.min === rule.max) return `Choisissez exactement ${rule.min} dent(s) pour ce traitement.`;
+    if (rule.max !== null) return `Choisissez entre ${rule.min} et ${rule.max} dents pour ce traitement.`;
+    return "Choisissez une ou plusieurs dents pour ce traitement.";
+}
+function isSelectionValid(rule, teeth) {
+    if (rule.mode === 'none') return true;
+    const n = teeth.length;
+    if (n < (rule.min || 1)) return false;
+    if (rule.max !== null && n > rule.max) return false;
+    return true;
+}
+
+// ==============================
+// STATE
+// ==============================
+let treatments = [];
+let activeCat = '';
+let searchQ = '';
+let selectedAct = null;   // act being added
+let addTeeth = [];        // selected teeth in add modal
+let addDentition = 'permanent'; // current dentition tab
+
+// ==============================
+// CATEGORY COUNTS
+// ==============================
+const catCounts = {};
+ALL_ACTS.forEach(a => { catCounts[a.categorie] = (catCounts[a.categorie] || 0) + 1; });
+document.querySelectorAll('#cat-chips .cat-chip').forEach(btn => {
+    const cat = btn.dataset.cat;
+    if (cat) { const s = btn.querySelector('.chip-count'); if(s) s.textContent = catCounts[cat]||0; }
+});
+
+// ==============================
+// ACTS LIST
+// ==============================
+function filtered() {
+    const q = searchQ.toLowerCase().trim();
+    return ALL_ACTS.filter(a => {
+        if (activeCat && a.categorie !== activeCat) return false;
+        if (!q) return true;
+        return a.libelle.toLowerCase().includes(q) || a.code.toLowerCase().includes(q);
+    });
+}
+function renderActs() {
+    const list = document.getElementById('acts-list');
+    const results = filtered();
+    document.getElementById('search-count').textContent =
+        searchQ ? `${results.length} résultat${results.length!==1?'s':''}` : '';
+    if (!results.length) {
+        list.innerHTML = '<div class="no-results">Aucun acte trouvé.</div>';
+        return;
+    }
+    const atLimit = treatments.length >= MAX;
+    list.innerHTML = results.map(a => {
+        const m = a.cotation * a.valeure_lettre;
+        const lc = a.lettre==='Z'?'lz':a.lettre==='C'?'lc':a.lettre==='V'?'lv':'';
+        const formula = a.cotation > 0 ? `${a.cotation} ${a.lettre} × ${a.valeure_lettre} Dh` : 'Devis praticien';
+        return `<div class="act-item${atLimit?' at-limit':''}" onclick="openAdd(${a.id||ALL_ACTS.indexOf(a)})">
+            <span class="act-code ${lc}">${esc(a.code)}</span>
+            <div class="act-body"><div class="act-libelle">${esc(a.libelle)}</div><div class="act-formula">${formula}</div></div>
+            <div class="act-price">${a.cotation>0?m.toFixed(2)+'<small style="font-size:.7rem;font-weight:500;color:var(--gray-400);margin-left:2px">Dh</small>':'—'}</div>
+        </div>`;
+    }).join('');
+}
+
+// ==============================
+// ADD TREATMENT MODAL
+// ==============================
+window.openAdd = function(idx) {
+    if (treatments.length >= MAX) return;
+    selectedAct = ALL_ACTS[idx] || ALL_ACTS.find((_,i)=>i===idx);
+    addTeeth = [];
+    addDentition = 'permanent';
+    const rule = getRule(selectedAct);
+    const montant = +(selectedAct.cotation * selectedAct.valeure_lettre).toFixed(2);
+
+    // Act info
+    document.getElementById('add-act-info').innerHTML =
+        `<span class="m-act-code">${esc(selectedAct.code)}</span>
+         <div class="m-act-libelle">${esc(selectedAct.libelle)}</div>
+         <span class="m-act-montant">${montant>0?montant.toFixed(2)+' Dh':'—'}</span>`;
+
+    // Tooth section
+    const toothSec = document.getElementById('add-tooth-section');
+    const noToothMsg = document.getElementById('add-no-tooth-msg');
+    if (rule.mode !== 'none') {
+        toothSec.style.display = '';
+        noToothMsg.style.display = 'none';
+        document.getElementById('add-tooth-helper').textContent = helperText(rule);
+        renderToothGrid();
+    } else {
+        toothSec.style.display = 'none';
+        noToothMsg.style.display = '';
+        noToothMsg.textContent = helperText(rule);
+    }
+
+    document.getElementById('add-date').value = TODAY;
+    document.getElementById('add-montant').value = montant > 0 ? montant : '';
+    updateAddBtn();
+    document.getElementById('modal-add').style.display = 'flex';
+};
+window.closeAdd = function() {
+    document.getElementById('modal-add').style.display = 'none';
+    selectedAct = null; addTeeth = [];
+};
+window.confirmAdd = function() {
+    if (!selectedAct) return;
+    const rule = getRule(selectedAct);
+    if (!isSelectionValid(rule, addTeeth)) return;
+    const date = document.getElementById('add-date').value;
+    const montant = parseFloat(document.getElementById('add-montant').value) || 0;
+    treatments.push({
+        _id: Date.now() + Math.random(),
+        code: selectedAct.code,
+        libelle: selectedAct.libelle,
+        lettre: selectedAct.lettre,
+        cotation: selectedAct.cotation,
+        valeure_lettre: selectedAct.valeure_lettre,
+        toothNumber: addTeeth.sort((a,b)=>parseInt(a)-parseInt(b)).join(' '),
+        date, montant,
+    });
+    closeAdd();
+    renderAll();
+};
+function updateAddBtn() {
+    if (!selectedAct) return;
+    const rule = getRule(selectedAct);
+    document.getElementById('btn-add-confirm').disabled = !isSelectionValid(rule, addTeeth);
+}
+
+// Tooth grid
+const PERM = {
+    upper: [['18','17','16','15','14','13','12','11'],['21','22','23','24','25','26','27','28']],
+    lower: [['48','47','46','45','44','43','42','41'],['31','32','33','34','35','36','37','38']],
+};
+const PRIM = {
+    upper: [['55','54','53','52','51'],['61','62','63','64','65']],
+    lower: [['85','84','83','82','81'],['71','72','73','74','75']],
+};
+window.setDentition = function(d) {
+    addDentition = d;
+    document.querySelectorAll('.tooth-tab').forEach((t,i)=>t.classList.toggle('active',i===(d==='permanent'?0:1)));
+    renderToothGrid();
+};
+window.clearTeeth = function() { addTeeth = []; renderToothGrid(); updateAddBtn(); };
+function renderToothGrid() {
+    const rule = selectedAct ? getRule(selectedAct) : {mode:'none'};
+    const teeth = addDentition === 'permanent' ? PERM : PRIM;
+    const grid = document.getElementById('tooth-grid');
+    function row(nums, label) {
+        return `<div style="display:flex;align-items:center;gap:2px;">
+            <span class="tooth-row-label">${label}</span>
+            <div class="tooth-row">${nums.map(n=>{
+                const sel = addTeeth.includes(n);
+                const disabled = !sel && rule.max !== null && addTeeth.length >= rule.max;
+                return `<button class="tooth-btn${sel?' selected':''}${disabled?' disabled':''}"
+                    onclick="toggleTooth('${n}')" title="Dent ${n}">${n}</button>`;
+            }).join('')}</div>
+        </div>`;
+    }
+    grid.innerHTML = `
+        <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px;">
+            <div>${teeth.upper[0].map(n=>{ const s=addTeeth.includes(n); const d=!s&&rule.max!==null&&addTeeth.length>=rule.max; return `<button class="tooth-btn${s?' selected':''}${d?' disabled':''}" onclick="toggleTooth('${n}')">${n}</button>`; }).join('')}</div>
+            <div class="tooth-sep" style="height:32px"></div>
+            <div>${teeth.upper[1].map(n=>{ const s=addTeeth.includes(n); const d=!s&&rule.max!==null&&addTeeth.length>=rule.max; return `<button class="tooth-btn${s?' selected':''}${d?' disabled':''}" onclick="toggleTooth('${n}')">${n}</button>`; }).join('')}</div>
+        </div>
+        <div style="height:6px;border-left:1px dashed var(--gray-200);margin:2px auto;width:0"></div>
+        <div style="display:flex;gap:4px;align-items:center;margin-top:2px;">
+            <div>${teeth.lower[0].map(n=>{ const s=addTeeth.includes(n); const d=!s&&rule.max!==null&&addTeeth.length>=rule.max; return `<button class="tooth-btn${s?' selected':''}${d?' disabled':''}" onclick="toggleTooth('${n}')">${n}</button>`; }).join('')}</div>
+            <div class="tooth-sep" style="height:32px"></div>
+            <div>${teeth.lower[1].map(n=>{ const s=addTeeth.includes(n); const d=!s&&rule.max!==null&&addTeeth.length>=rule.max; return `<button class="tooth-btn${s?' selected':''}${d?' disabled':''}" onclick="toggleTooth('${n}')">${n}</button>`; }).join('')}</div>
+        </div>`;
+}
+window.toggleTooth = function(n) {
+    if (!selectedAct) return;
+    const rule = getRule(selectedAct);
+    if (addTeeth.includes(n)) {
+        addTeeth = addTeeth.filter(t=>t!==n);
+    } else {
+        if (rule.mode === 'single') { addTeeth = [n]; }
+        else if (rule.max !== null && addTeeth.length >= rule.max) { return; }
+        else { addTeeth.push(n); }
+    }
+    renderToothGrid();
+    updateAddBtn();
+};
+
+// ==============================
+// PANEL
+// ==============================
+function renderPanel() {
+    const list = document.getElementById('treatments-list');
+    const empty = document.getElementById('empty-state');
+    const counter = document.getElementById('panel-counter');
+    const banner = document.getElementById('limit-banner');
+    const btnF = document.getElementById('btn-feuille');
+    const btnN = document.getElementById('btn-note');
+    const btnR = document.getElementById('btn-reset');
+
+    counter.textContent = `${treatments.length} / ${MAX}`;
+    counter.className = 'panel-counter' + (treatments.length >= MAX ? ' limit' : '');
+    banner.style.display = treatments.length >= MAX ? '' : 'none';
+    btnF.disabled = btnN.disabled = btnR.disabled = treatments.length === 0;
+
+    list.querySelectorAll('.treatment-row').forEach(el=>el.remove());
+    if (!treatments.length) { empty.style.display=''; document.getElementById('panel-total').textContent='0,00 Dh'; return; }
+    empty.style.display = 'none';
+
+    let total = 0;
+    treatments.forEach(t => {
+        total += t.montant;
+        const row = document.createElement('div');
+        row.className = 'treatment-row';
+        row.innerHTML = `<span class="t-code">${esc(t.code)}</span>
+            <div class="t-info">
+                <div class="t-libelle">${esc(t.libelle)}</div>
+                <div class="t-meta">${t.toothNumber?'Dent '+esc(t.toothNumber)+' · ':''} ${new Date(t.date+'T00:00:00').toLocaleDateString('fr-MA')}</div>
+            </div>
+            <div class="t-right">
+                <span class="t-amount">${t.montant.toFixed(2)} Dh</span>
+                <button class="t-delete" data-id="${t._id}" title="Supprimer">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L12 12M12 4L4 12"/></svg>
+                </button>
+            </div>`;
+        list.appendChild(row);
+    });
+    list.querySelectorAll('.t-delete').forEach(btn => {
+        btn.onclick = () => { treatments = treatments.filter(t => t._id != btn.dataset.id); renderAll(); };
+    });
+    document.getElementById('panel-total').textContent = total.toFixed(2).replace('.',',') + ' Dh';
+}
+
+window.resetAll = function() {
+    if (!confirm('Réinitialiser tous les traitements ?')) return;
+    treatments = []; renderAll();
+};
+
+function renderAll() { renderActs(); renderPanel(); }
+
+// ==============================
+// PATIENT COMBOBOX
+// ==============================
+let patKbdIdx = -1;
+let patFiltered = ALL_PATIENTS.slice();
+
+function patNorm(s) { return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+
+function patRenderList() {
+    const list = document.getElementById('pat-combo-list');
+    if (!patFiltered.length) {
+        list.innerHTML = '<div class="pat-no-results">Aucun patient trouvé</div>';
+        return;
+    }
+    list.innerHTML = patFiltered.map((p, i) => {
+        const dobStr = p.dob ? new Date(p.dob+'T00:00:00').toLocaleDateString('fr-MA') : '';
+        return `<div class="pat-item" data-pidx="${ALL_PATIENTS.indexOf(p)}"
+            onmousedown="selectPatient(${ALL_PATIENTS.indexOf(p)})">
+            <span class="pat-name">${esc(p.nom)}</span>
+            ${dobStr ? `<span class="pat-dob">${dobStr}</span>` : ''}
+        </div>`;
+    }).join('');
+    patKbdIdx = -1;
+}
+
+window.patToggle = function() {
+    const panel = document.getElementById('pat-combo-panel');
+    const trigger = document.getElementById('pat-combo-trigger');
+    const isOpen = panel.style.display !== 'none';
+    if (isOpen) {
+        patClose();
+    } else {
+        patFiltered = ALL_PATIENTS.slice();
+        patRenderList();
+        panel.style.display = '';
+        trigger.classList.add('open');
+        setTimeout(() => {
+            const q = document.getElementById('pat-combo-q');
+            q.value = ''; q.focus();
+        }, 30);
+    }
+};
+
+function patClose() {
+    document.getElementById('pat-combo-panel').style.display = 'none';
+    document.getElementById('pat-combo-trigger').classList.remove('open');
+}
+
+window.patFilter = function(q) {
+    const norm = patNorm(q);
+    patFiltered = norm ? ALL_PATIENTS.filter(p => patNorm(p.nom).includes(norm)) : ALL_PATIENTS.slice();
+    patRenderList();
+};
+
+window.patKeydown = function(e) {
+    const items = document.querySelectorAll('#pat-combo-list .pat-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        patKbdIdx = Math.min(patKbdIdx + 1, items.length - 1);
+        items.forEach((el, i) => el.classList.toggle('kbd-active', i === patKbdIdx));
+        items[patKbdIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        patKbdIdx = Math.max(patKbdIdx - 1, 0);
+        items.forEach((el, i) => el.classList.toggle('kbd-active', i === patKbdIdx));
+        items[patKbdIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && patKbdIdx >= 0) {
+        e.preventDefault();
+        items[patKbdIdx].dispatchEvent(new MouseEvent('mousedown'));
+    } else if (e.key === 'Escape') {
+        patClose();
+    }
+};
+
+window.selectPatient = function(idx) {
+    const p = ALL_PATIENTS[idx];
+    if (!p) return;
+    document.getElementById('f-nom').value = p.nom;
+    if (p.dob) document.getElementById('f-ddn').value = p.dob;
+    document.getElementById('f-cin').value = p.cin || '';
+    document.getElementById('f-sexe').value = p.gender === 'F' ? 'feminin' : 'male';
+    // Update trigger label
+    const txt = document.getElementById('pat-trigger-text');
+    txt.textContent = p.nom;
+    txt.classList.remove('placeholder');
+    document.getElementById('pat-trigger-clear').style.display = '';
+    patClose();
+    feuilleChanged();
+};
+
+window.clearPatient = function() {
+    const txt = document.getElementById('pat-trigger-text');
+    txt.textContent = 'Sélectionner un patient…';
+    txt.classList.add('placeholder');
+    document.getElementById('pat-trigger-clear').style.display = 'none';
+    patClose();
+};
+
+// Close when clicking outside the combobox
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#pat-combo')) patClose();
+});
+
+// ==============================
+// FEUILLE DE SOINS MODAL
+// ==============================
+const FEUILLE_REQUIRED = ['f-nom','f-ddn','f-cin','f-inpe','f-ville','f-date'];
+function loadFeuilleDoctor() {
+    try {
+        const d = JSON.parse(localStorage.getItem('ngap_feuille_doctor') || 'null');
+        if (!d) return;
+        if (d.inpe) document.getElementById('f-inpe').value = d.inpe;
+        if (d.ville) document.getElementById('f-ville').value = d.ville;
+        document.getElementById('f-save-inpe').checked = true;
+    } catch{}
+}
+window.saveFeuilleDoctor = function() {
+    if (!document.getElementById('f-save-inpe').checked) { localStorage.removeItem('ngap_feuille_doctor'); return; }
+    localStorage.setItem('ngap_feuille_doctor', JSON.stringify({
+        inpe: document.getElementById('f-inpe').value,
+        ville: document.getElementById('f-ville').value,
+    }));
+};
+window.feuilleChanged = function() {
+    if (document.getElementById('f-save-inpe').checked) saveFeuilleDoctor();
+    updateFeuilleStatus();
+};
+function missingFeuilleFields() {
+    return FEUILLE_REQUIRED.filter(id => !document.getElementById(id).value.trim());
+}
+function updateFeuilleStatus() {
+    const missing = missingFeuilleFields();
+    const s = document.getElementById('feuille-status');
+    if (!missing.length) {
+        s.className = 'print-status ready'; s.textContent = 'Prête à imprimer';
+    } else {
+        s.className = 'print-status not-ready'; s.textContent = `${missing.length} champ(s) requis manquant(s)`;
+    }
+}
+window.openFeuille = function() {
+    if (!treatments.length) return;
+    document.getElementById('f-date').value = TODAY;
+    clearPatient();
+    loadFeuilleDoctor();
+    updateFeuilleStatus();
+    document.getElementById('modal-feuille').style.display = 'flex';
+};
+window.closeFeuille = function() { document.getElementById('modal-feuille').style.display='none'; };
+
+// ==============================
+// NOTE D'HONORAIRES MODAL
+// ==============================
+function loadNoteDoctor() {
+    try {
+        const d = JSON.parse(localStorage.getItem('ngap_note_doctor') || 'null');
+        if (!d) return;
+        ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
+            const el = document.getElementById('n-'+k);
+            if (el && d[k]) el.value = d[k];
+        });
+        document.getElementById('n-save').checked = true;
+    } catch{}
+}
+window.saveNoteDoctor = function() {
+    if (!document.getElementById('n-save').checked) { localStorage.removeItem('ngap_note_doctor'); return; }
+    const d = {};
+    ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
+        d[k] = (document.getElementById('n-'+k)||{value:''}).value;
+    });
+    localStorage.setItem('ngap_note_doctor', JSON.stringify(d));
+};
+window.toggleNoteDoc = function() {
+    const sec = document.getElementById('note-doc-section');
+    const chev = document.getElementById('note-doc-chevron');
+    const open = sec.style.display !== 'none';
+    sec.style.display = open ? 'none' : '';
+    chev.style.transform = open ? '' : 'rotate(180deg)';
+};
+function renderNoteActes() {
+    document.getElementById('note-actes-count').textContent = treatments.length;
+    const total = treatments.reduce((s,t)=>s+t.montant,0);
+    document.getElementById('note-actes-table').innerHTML =
+        `<table><thead><tr><th>Code</th><th>Acte</th><th>Dent</th><th>Date</th><th>Montant</th></tr></thead>
+         <tbody>
+           ${treatments.map(t=>`<tr>
+             <td>${esc(t.code)}</td>
+             <td>${esc(t.libelle)}</td>
+             <td>${esc(t.toothNumber||'—')}</td>
+             <td>${new Date(t.date+'T00:00:00').toLocaleDateString('fr-MA')}</td>
+             <td class="right">${t.montant.toFixed(2)} Dh</td>
+           </tr>`).join('')}
+           <tr class="total"><td colspan="4"><strong>TOTAL</strong></td><td class="right"><strong>${total.toFixed(2)} Dh</strong></td></tr>
+         </tbody></table>`;
+}
+window.openNote = function() {
+    if (!treatments.length) return;
+    document.getElementById('n-date').value = TODAY;
+    loadNoteDoctor();
+    renderNoteActes();
+    document.getElementById('modal-note').style.display = 'flex';
+};
+window.closeNote = function() { document.getElementById('modal-note').style.display='none'; };
+
+// ==============================
+// PRINT — FEUILLE DE SOINS (SVG)
+// ==============================
+const svgCache = {};
+async function loadSvg(name) {
+    if (svgCache[name]) return svgCache[name];
+    const r = await fetch(`/static/ngap/${name}`);
+    // The SVGs were extracted from a JS bundle — literal \r sequences must be stripped
+    const t = (await r.text()).replace(/\\r/g, '');
+    svgCache[name] = t;
+    return t;
+}
+function escHtml(s) {
+    return String(s??'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function parseDateParts(s) {
+    let p = (s||'').replace(/\//g,'-').split('-');
+    if (p.length!==3) p=['','',''];
+    else if (p[0].length>2) { const t=p[0]; p[0]=p[2]; p[2]=t; }
+    return {jour:p[0]||'',mois:p[1]||'',annee:p[2]||''};
+}
+function stripScript(svg) { return svg.replace(/^[\s\S]*?(?=<svg)/,''); }
+function renderRecto(svgTmpl, fiche) {
+    let s = stripScript(svgTmpl);
+    s = s.replace(/style="display:\{\$fiche\.([a-z_]+)\s*==\s*["']([^"']+)["']\s*\?\s*'inline'\s*:\s*'none'\}"/g,
+        (_,f,v)=>`style="display:${fiche[f]===v?'inline':'none'}"`);
+    s = s.replace(/\{getDateObject\(\$fiche\.(ddn|date)\)\.(jour|mois|annee)\}/g,
+        (_,f,part)=>escHtml(parseDateParts(fiche[f])[part]));
+    s = s.replace(/\{\$fiche\.([a-z_]+)\}/g, (_,f)=>escHtml(fiche[f]??''));
+    return s;
+}
+function buildToothMap(soins) {
+    const m = new Map();
+    for (const s of soins) {
+        const teeth = (s.toothNumber||'').split(/[^0-9]+/).filter(t=>parseInt(t)>10);
+        for (const t of teeth) {
+            const codes = m.get(t)||[];
+            if (!codes.includes(s.code)) codes.push(s.code);
+            m.set(t, codes);
+        }
+    }
+    return m;
+}
+function evalIdx(expr, idx) {
+    const e = expr.replace(/idx/g, String(idx)).trim();
+    if (!/^[0-9+\-*/().?:><=\s]+$/.test(e)) return null;
+    try { const v = Function('"use strict";return('+e+');')(); return typeof v==='number'&&isFinite(v)?String(v):null; } catch { return null; }
+}
+function renderVerso(svgTmpl, soins) {
+    let s = stripScript(svgTmpl);
+    // Expand {#each soins as soin, idx}...{/each}
+    s = s.replace(/\{#each soins as soin, idx\}([\s\S]*?)\{\/each\}/g, (_,tmpl)=>
+        soins.map((soin,idx)=>tmpl
+            .replace(/\{([^{}]*idx[^{}]*)\}/g,(_,e)=>evalIdx(e,idx)||_)
+            .replace(/\{soin\.dent\}/g,escHtml(soin.toothNumber||''))
+            .replace(/\{soin\.code\}/g,escHtml(soin.code||''))
+            .replace(/\{soin\.date\}/g,escHtml(soin.date||''))
+            .replace(/\{soin\.lettre\}/g,escHtml(soin.lettre||''))
+            .replace(/\{soin\.cotation\}/g,escHtml(String(soin.cotation||'')))
+            .replace(/\{soin\.valeur\}/g,escHtml(String(soin.valeure_lettre||'')))
+            .replace(/\{soin\.montant\}/g,escHtml(String(soin.montant||'')))
+        ).join('')
+    );
+    // Replace showArray / showTextArray
+    const tm = buildToothMap(soins);
+    s = s.replace(/display=\{showArray\[(\d+)\]\s*\?\s*'inline'\s*:\s*'none'\}/g,
+        (_,t)=>`display="${tm.has(t)?'inline':'none'}"`);
+    s = s.replace(/\{showTextArray\[(\d+)\]\.join\(" "\)\}/g,
+        (_,t)=>escHtml((tm.get(t)||[]).join(' ')));
+    return s;
+}
+
+window.printFeuille = async function() {
+    const missing = missingFeuilleFields();
+    if (missing.length) {
+        missing.forEach(id => {
+            const el=document.getElementById(id); el.classList.add('err');
+            const e=document.getElementById(id+'-err'); if(e) e.style.display='';
+        }); updateFeuilleStatus(); return;
+    }
+    const isCNSS = document.getElementById('f-mutuelle').value === 'CNSS';
+    const ficheRaw = {
+        mutuelle:    document.getElementById('f-mutuelle').value,
+        type:        document.getElementById('f-type').value,
+        nomBeneficiaire: document.getElementById('f-nom').value,
+        dateNaissance: document.getElementById('f-ddn').value,
+        cin:         document.getElementById('f-cin').value,
+        sexe:        document.getElementById('f-sexe').value,
+        lienAssure:  document.getElementById('f-lien').value,
+        inpe:        document.getElementById('f-inpe').value,
+        typeDeclaration: document.getElementById('f-type-soin').value,
+        numeroEntente: document.getElementById('f-entente').value,
+        ville:       document.getElementById('f-ville').value,
+        dateSoin:    document.getElementById('f-date').value,
+    };
+    // Map to $fiche fields (mirrors Wt() from original)
+    const fiche = {
+        type_fds: ficheRaw.type === 'entente' ? 'entente' : 'execution',
+        nom_beneficiaire: ficheRaw.nomBeneficiaire,
+        ddn: ficheRaw.dateNaissance,
+        cin: ficheRaw.cin,
+        parente: (['conjoint','enfant'].includes(ficheRaw.lienAssure)) ? ficheRaw.lienAssure : 'assure',
+        sexe: (['feminin','femelle','female'].includes(ficheRaw.sexe)) ? 'femelle' : 'male',
+        inpe: ficheRaw.inpe,
+        numero_entente: ficheRaw.numeroEntente,
+        type_soin: (['prothese','odf','autres'].includes(ficheRaw.typeDeclaration)) ? ficheRaw.typeDeclaration : 'soins',
+        ville: ficheRaw.ville,
+        date: ficheRaw.dateSoin,
+    };
+    try {
+        const [rectoTmpl, versoTmpl] = await Promise.all([
+            loadSvg(isCNSS ? 'cnss_recto.svg' : 'cnops_recto.svg'),
+            loadSvg(isCNSS ? 'cnss_verso.svg' : 'cnops_verso.svg'),
+        ]);
+        const recto = renderRecto(rectoTmpl, fiche);
+        const verso = renderVerso(versoTmpl, treatments);
+        const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Feuille de soins</title>
+<style>
+@page{size:A4 landscape;margin:0}
+html,body{margin:0;padding:0;background:#fff}
+body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pp{width:297mm;height:210mm;margin:0;page-break-after:always;break-after:page;overflow:hidden}
+.pp:last-child{page-break-after:auto;break-after:auto}
+.pp>svg{display:block;width:297mm;height:210mm}
+</style></head><body>
+<div class="pp">${recto}</div>
+<div class="pp">${verso}</div>
+</body></html>`;
+        const w = window.open('','_blank');
+        if (!w) { alert('Autorisez les pop-ups pour imprimer.'); return; }
+        w.document.write(html); w.document.close();
+        w.onload = ()=>{ w.focus(); w.print(); };
+    } catch(e) { console.error(e); alert('Erreur lors de la génération de la feuille.'); }
+};
+
+// ==============================
+// PRINT — NOTE D'HONORAIRES (HTML)
+// ==============================
+window.printNote = function() {
+    const patient = document.getElementById('n-patient').value.trim();
+    const num = document.getElementById('n-num').value.trim();
+    const date = document.getElementById('n-date').value;
+    const paiement = document.getElementById('n-paiement').value;
+    if (!patient||!num||!date||!paiement) {
+        ['n-patient','n-num','n-date'].forEach(id=>{
+            if (!document.getElementById(id).value.trim()) {
+                document.getElementById(id).classList.add('err');
+                const e=document.getElementById(id+'-err'); if(e) e.style.display='';
+            }
+        }); return;
+    }
+    const praticien = document.getElementById('n-praticien').value.trim();
+    const specialite = document.getElementById('n-specialite').value.trim();
+    const adresse = document.getElementById('n-adresse').value.trim();
+    const ville = document.getElementById('n-ville').value.trim();
+    const tel = document.getElementById('n-tel').value.trim();
+    const inpe = document.getElementById('n-inpe').value.trim();
+    const ice = document.getElementById('n-ice').value.trim();
+    const ifVal = document.getElementById('n-if').value.trim();
+    const cnss = document.getElementById('n-cnss').value.trim();
+    const hasDoc = !!(praticien||adresse);
+    const total = treatments.reduce((s,t)=>s+t.montant,0);
+    const dateStr = new Date(date+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+    const footerParts = [adresse, ville?`${ville}`:'', tel?`Tél: ${tel}`:'', inpe?`INPE: ${inpe}`:'', ice?`ICE: ${ice}`:'', ifVal?`IF: ${ifVal}`:'', cnss?`CNSS: ${cnss}`:''].filter(Boolean);
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Note d'Honoraires</title>
+<style>
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+body{font-family:'Times New Roman',Times,serif;padding:${hasDoc?'15mm 15mm 25mm':'0 15mm'};color:#1a1a1a;font-size:11pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.top-spacer{height:${hasDoc?'0':'15vh'}}
+h1{text-align:center;font-size:16pt;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.subtitle{text-align:center;font-size:9pt;color:#555;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #ccc}
+.doc-header{text-align:center;margin-bottom:20px}
+.doc-header .name{font-size:13pt;font-weight:bold}
+.doc-header .spec{font-size:9pt;color:#555}
+.meta{display:flex;justify-content:space-between;margin-bottom:8px;font-size:10pt}
+.patient{background:#f8f8f8;padding:8px 12px;border-left:3px solid #333;margin-bottom:16px;font-weight:bold}
+table{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:16px}
+th{padding:7px 10px;border-bottom:2px solid #333;text-align:left;font-size:9pt;text-transform:uppercase}
+td{padding:6px 10px;border-bottom:1px solid #ddd}
+td.right{text-align:right;font-weight:600}
+.total-row td{border-top:2px solid #333;border-bottom:none;font-weight:bold;font-size:11pt}
+.paiement{font-size:9pt;color:#555;margin-bottom:20px}
+.sigs{display:flex;justify-content:space-between;margin-top:30px;font-size:9pt;color:#555}
+.sig-box{width:180px;text-align:center}
+.sig-line{margin-top:40px;border-top:1px solid #999;padding-top:4px}
+.page-footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:8pt;color:#666;padding:8px 15mm;border-top:1px solid #ddd}
+</style></head><body>
+${hasDoc?`<div class="doc-header"><div class="name">${praticien}</div><div class="spec">${specialite}</div></div>`:'<div class="top-spacer"></div>'}
+<h1>NOTE D'HONORAIRES</h1>
+<div class="subtitle">CNOPS / CNSS — Fiche de soin</div>
+<div class="meta"><div>N° ${num}</div><div>Date : ${dateStr}</div></div>
+<div class="patient">Patient : ${patient}</div>
+<table>
+  <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Date</th><th>Montant</th></tr></thead>
+  <tbody>
+    ${treatments.map(t=>`<tr>
+      <td>${t.code}</td>
+      <td>${t.libelle}</td>
+      <td>${t.toothNumber||'—'}</td>
+      <td>${new Date(t.date+'T00:00:00').toLocaleDateString('fr-FR')}</td>
+      <td class="right">${t.montant.toFixed(2)} DH</td>
+    </tr>`).join('')}
+    <tr class="total-row"><td colspan="4">TOTAL</td><td class="right">${total.toFixed(2)} DH</td></tr>
+  </tbody>
+</table>
+<div class="paiement">Mode de paiement : ${paiement}</div>
+<div class="sigs">
+  <div class="sig-box">Signature du patient<div class="sig-line"></div></div>
+  <div class="sig-box">Cachet et signature du praticien<div class="sig-line"></div></div>
+</div>
+${hasDoc&&footerParts.length?`<div class="page-footer">${footerParts.join(' · ')}</div>`:''}
+</body></html>`;
+    const w = window.open('','_blank');
+    if (!w) { alert('Autorisez les pop-ups pour imprimer.'); return; }
+    w.document.write(html); w.document.close();
+    w.onload = ()=>{ w.focus(); w.print(); };
+};
+
+// ==============================
+// EVENTS + INIT
+// ==============================
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('act-search').addEventListener('input', function(){
+    searchQ = this.value; renderActs();
+});
+document.getElementById('cat-chips').addEventListener('click', function(e){
+    const btn = e.target.closest('.cat-chip'); if(!btn) return;
+    activeCat = btn.dataset.cat;
+    document.querySelectorAll('.cat-chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    searchQ=''; document.getElementById('act-search').value='';
+    renderActs();
+});
+
+// Add _id index to acts for reference
+ALL_ACTS.forEach((a,i)=>{ a._idx = i; });
+
+renderAll();
+
+})();
+{% endraw %}
+</script>
+{% endblock %}
