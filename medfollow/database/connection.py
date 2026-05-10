@@ -485,4 +485,92 @@ async def init_db():
     """)
     await db.commit()
 
+    # Migration: consultation workflow — status column
+    try:
+        await db.execute(
+            "ALTER TABLE consultations ADD COLUMN status TEXT "
+            "CHECK(status IN ('en_cours','terminee')) DEFAULT 'terminee'"
+        )
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: consultation workflow — summary column
+    try:
+        await db.execute("ALTER TABLE consultations ADD COLUMN summary TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: link antécédents to consultation session
+    try:
+        await db.execute(
+            "ALTER TABLE medical_history ADD COLUMN consultation_id INTEGER REFERENCES consultations(id)"
+        )
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: link feuilles de soin to consultation session
+    try:
+        await db.execute(
+            "ALTER TABLE feuilles_soin ADD COLUMN consultation_id INTEGER REFERENCES consultations(id)"
+        )
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: link dental treatments to consultation session
+    try:
+        await db.execute(
+            "ALTER TABLE dental_treatments ADD COLUMN consultation_id INTEGER REFERENCES consultations(id)"
+        )
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: consultation_id for endo_history
+    try:
+        await db.execute("ALTER TABLE endo_history ADD COLUMN consultation_id INTEGER REFERENCES consultations(id)")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: consultation_id for dental_condition_history
+    try:
+        await db.execute("ALTER TABLE dental_condition_history ADD COLUMN consultation_id INTEGER REFERENCES consultations(id)")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Password resets
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
+    # Invitations
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            email TEXT,
+            role TEXT NOT NULL DEFAULT 'medecin',
+            specialty TEXT,
+            created_by INTEGER REFERENCES users(id),
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME,
+            used_by INTEGER REFERENCES users(id),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     await db.close()

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Invitations — Doctivo{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb no-print">
+    <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
+    <a href="/admin/users">Utilisateurs</a><span class="breadcrumb-sep">/</span>
+    <span>Invitations</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Inviter un médecin</h2>
+        <p class="subtitle">Générez un lien d'inscription à envoyer par email ou WhatsApp</p>
+    </div>
+    <a href="/admin/users" class="btn btn-outline">Voir les utilisateurs</a>
+</div>
+
+{% if new_link %}
+<div class="card" style="margin-bottom:20px;border:2px solid var(--success,#16a34a);">
+    <div class="card-body" style="padding:20px;">
+        <p style="font-size:13px;font-weight:600;color:var(--success,#16a34a);margin:0 0 10px;">Lien d'invitation généré — valable 7 jours</p>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <input id="inv-link" type="text" value="{{ new_link }}" readonly
+                style="flex:1;padding:10px 12px;border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:13px;background:var(--gray-50,#f8fafc);font-family:monospace;">
+            <button onclick="copyLink()" class="btn btn-primary" id="copy-btn">Copier</button>
+        </div>
+        <p style="font-size:12px;color:var(--gray-500,#64748b);margin:8px 0 0;">Envoyez ce lien au médecin. Il peut l'utiliser une seule fois pour créer son compte.</p>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;">
+
+    <div class="card">
+        <div class="card-header"><h3>Nouvelle invitation</h3></div>
+        <div class="card-body">
+            <form method="POST" action="/admin/invite">
+                <div class="form-group">
+                    <label>Rôle</label>
+                    <select name="role" class="form-control" style="width:100%;padding:9px 12px;border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:13px;">
+                        <option value="medecin">Médecin</option>
+                        <option value="secretaire">Secrétaire</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top:14px;">
+                    <label>Spécialité <span style="color:var(--gray-400,#94a3b8);font-weight:400;">(optionnel)</span></label>
+                    <select name="specialty" style="width:100%;padding:9px 12px;border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:13px;">
+                        <option value="">— Laisser le médecin choisir —</option>
+                        <optgroup label="Médecine de premier recours">
+                            <option value="Médecine générale">Médecine générale</option>
+                            <option value="Médecine interne">Médecine interne</option>
+                            <option value="Médecine d'urgence">Médecine d'urgence</option>
+                        </optgroup>
+                        <optgroup label="Spécialités chirurgicales">
+                            <option value="Chirurgie générale">Chirurgie générale</option>
+                            <option value="Chirurgie orthopédique">Chirurgie orthopédique</option>
+                            <option value="Neurochirurgie">Neurochirurgie</option>
+                            <option value="Ophtalmologie">Ophtalmologie</option>
+                            <option value="ORL">ORL</option>
+                            <option value="Stomatologie">Stomatologie</option>
+                            <option value="Dentiste">Dentiste / Chirurgie dentaire</option>
+                        </optgroup>
+                        <optgroup label="Spécialités médicales">
+                            <option value="Cardiologie">Cardiologie</option>
+                            <option value="Dermatologie">Dermatologie</option>
+                            <option value="Endocrinologie">Endocrinologie / Diabétologie</option>
+                            <option value="Gastro-entérologie">Gastro-entérologie</option>
+                            <option value="Gynécologie-Obstétrique">Gynécologie / Obstétrique</option>
+                            <option value="Neurologie">Neurologie</option>
+                            <option value="Pédiatrie">Pédiatrie</option>
+                            <option value="Pneumologie">Pneumologie</option>
+                            <option value="Psychiatrie">Psychiatrie</option>
+                            <option value="Rhumatologie">Rhumatologie</option>
+                            <option value="Urologie">Urologie</option>
+                        </optgroup>
+                        <optgroup label="Autres">
+                            <option value="Radiologie">Radiologie</option>
+                            <option value="Anesthésiologie">Anesthésiologie</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top:14px;">
+                    <label>Email pré-rempli <span style="color:var(--gray-400,#94a3b8);font-weight:400;">(optionnel)</span></label>
+                    <input type="email" name="email" placeholder="medecin@exemple.ma"
+                        style="width:100%;padding:9px 12px;border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:13px;box-sizing:border-box;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:18px;">Générer le lien</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Invitations récentes</h3></div>
+        <div class="card-body" style="padding:0;">
+            {% if invitations %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Rôle</th>
+                        <th>Spécialité</th>
+                        <th>Expiration</th>
+                        <th>Statut</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invitations %}
+                    <tr>
+                        <td style="font-size:13px;">{{ inv.email }}</td>
+                        <td><span class="badge badge-{{ inv.role }}">{{ inv.role }}</span></td>
+                        <td style="font-size:12px;color:var(--gray-500);">{{ inv.specialty }}</td>
+                        <td style="font-size:12px;color:var(--gray-500);">{{ inv.expires_at }}</td>
+                        <td>
+                            {% if inv.status == 'utilisé' %}
+                            <span class="badge badge-confirme">Utilisé</span>
+                            {% elif inv.status == 'expiré' %}
+                            <span class="badge badge-error">Expiré</span>
+                            {% else %}
+                            <span class="badge badge-planifie">En attente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if inv.status == 'en attente' %}
+                            <form method="POST" action="/admin/invite/{{ inv.id }}/delete"
+                                onsubmit="return confirm('Supprimer cette invitation ?')">
+                                <button type="submit" class="btn btn-sm btn-outline" style="color:var(--danger);">Supprimer</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding:24px;">Aucune invitation générée pour l'instant</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+function copyLink() {
+    const input = document.getElementById('inv-link');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copié !';
+        btn.style.background = 'var(--success,#16a34a)';
+        setTimeout(() => { btn.textContent = 'Copier'; btn.style.background = ''; }, 2000);
+    });
+}
+</script>
+{% endblock %}

@@ -331,6 +331,13 @@ function closeCreateModal() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const _urlPid = new URLSearchParams(window.location.search).get('patient_id');
+    if (_urlPid) {
+        const sel = document.getElementById('sel-patient-a');
+        if (sel) sel.value = _urlPid;
+        openCreateModal();
+    }
+
     const calendarEl = document.getElementById('calendar');
     const isMobileView = window.matchMedia('(max-width: 900px)').matches;
 

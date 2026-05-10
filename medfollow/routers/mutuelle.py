@@ -130,11 +130,13 @@ async def save_feuille(request: Request, db: aiosqlite.Connection = Depends(get_
     if not patient_id:
         return JSONResponse({"error": "patient_id requis"}, status_code=400)
 
+    consultation_id = data.get("consultation_id") or None
+
     cursor = await db.execute(
         """INSERT INTO feuilles_soin
            (patient_id, doctor_id, mutuelle, type_feuille, nom_beneficiaire, ddn, cin, sexe,
-            lien_assure, inpe, type_soin, numero_entente, ville, date_soin, total_montant, actes_json)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            lien_assure, inpe, type_soin, numero_entente, ville, date_soin, total_montant, actes_json, consultation_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             patient_id, user["sub"],
             data.get("mutuelle"), data.get("type_feuille"),
@@ -145,6 +147,7 @@ async def save_feuille(request: Request, db: aiosqlite.Connection = Depends(get_
             data.get("ville"), data.get("date_soin"),
             data.get("total_montant", 0),
             json.dumps(data.get("actes", []), ensure_ascii=False),
+            consultation_id,
         ),
     )
     await db.commit()

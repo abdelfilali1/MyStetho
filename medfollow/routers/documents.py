@@ -74,6 +74,7 @@ async def list_documents(
 async def upload_form(
     request: Request,
     patient_id: Optional[int] = None,
+    consultation_id: Optional[int] = None,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
@@ -85,7 +86,11 @@ async def upload_form(
 
     return templates.TemplateResponse(
         "documents/upload.html",
-        {"request": request, "user": user, "active": "documents", "patients": patients, "selected_patient_id": patient_id},
+        {
+            "request": request, "user": user, "active": "documents",
+            "patients": patients, "selected_patient_id": patient_id,
+            "selected_consultation_id": consultation_id,
+        },
     )
 
 
@@ -96,6 +101,7 @@ async def upload_document(
     title: str = Form(...),
     category: str = Form(...),
     description: str = Form(""),
+    consultation_id: Optional[int] = Form(None),
     file: UploadFile = File(...),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -123,8 +129,9 @@ async def upload_document(
         f.write(content)
 
     await db.execute(
-        """INSERT INTO documents (patient_id, title, category, file_path, file_type, file_size, description, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, title, category, file_path, file.content_type, len(content),
+        """INSERT INTO documents (patient_id, consultation_id, title, category, file_path, file_type, file_size, description, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, consultation_id, title, category, file_path, file.content_type, len(content),
          description or None, user["sub"]),
     )
     await db.commit()

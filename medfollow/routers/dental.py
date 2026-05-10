@@ -52,7 +52,7 @@ TOOTH_NAMES = {
 
 
 @router.get("/{patient_id}", response_class=HTMLResponse)
-async def dental_chart(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
+async def dental_chart(request: Request, patient_id: int, consultation_id: Optional[int] = None, db: aiosqlite.Connection = Depends(get_db)):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
@@ -87,6 +87,7 @@ async def dental_chart(request: Request, patient_id: int, db: aiosqlite.Connecti
         "patient": patient, "teeth_data_json": json.dumps(teeth_data),
         "endo_summary_json": json.dumps(endo_summary),
         "base_template": base_template,
+        "consultation_id": consultation_id,
     })
 
 
@@ -117,6 +118,7 @@ async def get_tooth_data(request: Request, patient_id: int, tooth_number: int, d
 async def update_tooth_condition(
     request: Request, patient_id: int, tooth_number: int,
     condition: str = Form(...), notes: str = Form(""),
+    consultation_id: Optional[int] = Form(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
@@ -142,9 +144,9 @@ async def update_tooth_condition(
     # Log to history only when condition actually changed
     if condition != prev_condition:
         await db.execute(
-            """INSERT INTO dental_condition_history (patient_id, tooth_number, condition, notes, changed_by)
-               VALUES (?, ?, ?, ?, ?)""",
-            (patient_id, tooth_number, condition, notes or None, user["sub"])
+            """INSERT INTO dental_condition_history (patient_id, tooth_number, condition, notes, changed_by, consultation_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (patient_id, tooth_number, condition, notes or None, user["sub"], consultation_id)
         )
 
     await db.commit()
@@ -185,6 +187,7 @@ async def add_treatment(
     request: Request, patient_id: int, tooth_number: int,
     treatment_type: str = Form(...), description: str = Form(""),
     treatment_date: str = Form(""), start_time: str = Form("09:00"),
+    consultation_id: Optional[int] = Form(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
@@ -208,9 +211,9 @@ async def add_treatment(
 
     await db.execute(
         """INSERT INTO dental_treatments
-           (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, tooth_number, treatment_type, description or None, tdate, user["sub"], appointment_id)
+           (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id, consultation_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, tooth_number, treatment_type, description or None, tdate, user["sub"], appointment_id, consultation_id)
     )
     await db.commit()
     return JSONResponse(content={"ok": True})
@@ -262,6 +265,7 @@ async def add_bulk_treatment(
     description = data.get("description", "") or None
     tdate = data.get("treatment_date") or date.today().isoformat()
     stime = data.get("start_time", "09:00") or "09:00"
+    consultation_id = data.get("consultation_id")
 
     appt_type = APPT_TYPE_MAP.get(treatment_type, "consultation")
     start_dt_obj = datetime.strptime(f"{tdate} {stime}", "%Y-%m-%d %H:%M")
@@ -280,9 +284,9 @@ async def add_bulk_treatment(
     for tooth_number in ALL_TEETH:
         await db.execute(
             """INSERT INTO dental_treatments
-               (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (patient_id, tooth_number, treatment_type, description, tdate, user["sub"], appointment_id),
+               (patient_id, tooth_number, treatment_type, description, treatment_date, doctor_id, appointment_id, consultation_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (patient_id, tooth_number, treatment_type, description, tdate, user["sub"], appointment_id, consultation_id),
         )
 
     await db.commit()
@@ -344,6 +348,7 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
     body = await request.json()
     canals_data = body.get("canals", [])
     general_notes = body.get("general_notes", "")
+    consultation_id = body.get("consultation_id")
 
     for canal in canals_data:
         name = canal.get("canal_name", "")
@@ -384,23 +389,33 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
             (patient_id, tooth_number, name, est, wl, fl, status, notes or None)
         )
 
-        # Record history for changed fields
+        # Record history: changes if existing, initial values if new
+        field_map = {
+            "estimated_length": ("Longueur estimée", est),
+            "working_length": ("Longueur de travail", wl),
+            "final_length": ("Longueur finale", fl),
+            "status": ("Statut", status),
+        }
         if old_row:
             old = dict(old_row)
-            field_map = {
-                "estimated_length": ("Longueur estimée", est),
-                "working_length": ("Longueur de travail", wl),
-                "final_length": ("Longueur finale", fl),
-                "status": ("Statut", status),
-            }
             for field_key, (label, new_val) in field_map.items():
                 old_val = old.get(field_key)
                 old_str = str(old_val) if old_val is not None else None
                 new_str = str(new_val) if new_val is not None else None
                 if old_str != new_str:
                     await db.execute(
-                        "INSERT INTO endo_history (patient_id, tooth_number, canal_name, field, old_value, new_value, changed_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (patient_id, tooth_number, name, label, old_str, new_str, user["sub"])
+                        "INSERT INTO endo_history (patient_id, tooth_number, canal_name, field, old_value, new_value, changed_by, consultation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (patient_id, tooth_number, name, label, old_str, new_str, user["sub"], consultation_id)
+                    )
+        else:
+            # First-time entry: record non-null initial values
+            for field_key, (label, new_val) in field_map.items():
+                new_str = str(new_val) if new_val is not None else None
+                skip_default = (field_key == "status" and new_val == "non_localise")
+                if new_str and not skip_default:
+                    await db.execute(
+                        "INSERT INTO endo_history (patient_id, tooth_number, canal_name, field, old_value, new_value, changed_by, consultation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (patient_id, tooth_number, name, label, None, new_str, user["sub"], consultation_id)
                     )
 
     # Save general notes

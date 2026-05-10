@@ -174,5 +174,26 @@
         </div>
     </div>
 </div>
+
+{% if consultation.summary %}
+<div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Résumé de la consultation</h3></div>
+    <div class="card-body">
+        {% for block in consultation.summary.split('\n\n') %}
+        {% set lines = block.split('\n') %}
+        {% if lines|length == 1 %}
+            <p style="margin:0 0 8px;font-size:13px;color:var(--gray-700);">{{ lines[0] }}</p>
+        {% else %}
+            <div style="margin-bottom:12px;">
+                <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:var(--gray-800);">{{ lines[0] }}</p>
+                {% for item in lines[1:] %}
+                <p style="margin:0 0 2px;font-size:13px;color:var(--gray-600);padding-left:12px;">{{ item }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 

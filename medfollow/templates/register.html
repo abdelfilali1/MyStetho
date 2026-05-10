@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Créer mon compte — Doctivo{% endblock %}
+
+{% block content_full %}
+<div class="auth-container">
+    <div class="auth-card auth-card-wide">
+        <div class="auth-header">
+            <div class="brand brand-auth">
+                <img src="/static/img/logo4.png" alt="Logo Doctivo" class="brand-logo">
+                <div class="brand-copy">
+                    <h1 class="logo">Doctivo</h1>
+                    <p class="brand-tag">La santé, mieux organisée</p>
+                </div>
+            </div>
+            <p>Créez votre compte pour rejoindre la plateforme</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error" style="margin-bottom:16px;">{{ error }}</div>
+        {% if not inv %}
+        <div style="text-align:center;padding-top:8px;">
+            <p style="font-size:13px;color:var(--gray-500);">Contactez l'administrateur pour obtenir un nouveau lien d'invitation.</p>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if inv %}
+        <form method="POST" action="/register/{{ token }}" class="auth-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">Prénom <span class="required-star">*</span></label>
+                    <input type="text" id="first_name" name="first_name" required
+                        value="{{ form.first_name if form else '' }}" placeholder="Amine">
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Nom <span class="required-star">*</span></label>
+                    <input type="text" id="last_name" name="last_name" required
+                        value="{{ form.last_name if form else '' }}" placeholder="Bennani">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email professionnel <span class="required-star">*</span></label>
+                <input type="email" id="email" name="email" required
+                    value="{{ form.email if form and form.email else (inv.email or '') }}"
+                    placeholder="docteur@exemple.ma"
+                    {% if inv.email %}readonly style="background:var(--gray-50,#f8fafc);color:var(--gray-500);"{% endif %}>
+            </div>
+
+            <div class="form-group">
+                <label for="specialty">Spécialité <span class="required-star">*</span></label>
+                {% if inv.specialty %}
+                <input type="text" id="specialty" name="specialty" value="{{ inv.specialty }}" readonly
+                    style="background:var(--gray-50,#f8fafc);color:var(--gray-500);">
+                {% else %}
+                <select id="specialty" name="specialty" required>
+                    <option value="" disabled {% if not (form and form.specialty) %}selected{% endif %}>— Choisissez votre spécialité —</option>
+                    <optgroup label="Médecine de premier recours">
+                        <option value="Médecine générale" {% if form and form.specialty == 'Médecine générale' %}selected{% endif %}>Médecine générale</option>
+                        <option value="Médecine interne" {% if form and form.specialty == 'Médecine interne' %}selected{% endif %}>Médecine interne</option>
+                        <option value="Médecine d'urgence" {% if form and form.specialty == "Médecine d'urgence" %}selected{% endif %}>Médecine d'urgence</option>
+                    </optgroup>
+                    <optgroup label="Spécialités chirurgicales">
+                        <option value="Chirurgie générale" {% if form and form.specialty == 'Chirurgie générale' %}selected{% endif %}>Chirurgie générale</option>
+                        <option value="Chirurgie orthopédique" {% if form and form.specialty == 'Chirurgie orthopédique' %}selected{% endif %}>Chirurgie orthopédique</option>
+                        <option value="Neurochirurgie" {% if form and form.specialty == 'Neurochirurgie' %}selected{% endif %}>Neurochirurgie</option>
+                        <option value="Ophtalmologie" {% if form and form.specialty == 'Ophtalmologie' %}selected{% endif %}>Ophtalmologie</option>
+                        <option value="ORL" {% if form and form.specialty == 'ORL' %}selected{% endif %}>ORL</option>
+                        <option value="Stomatologie" {% if form and form.specialty == 'Stomatologie' %}selected{% endif %}>Stomatologie</option>
+                        <option value="Dentiste" {% if form and form.specialty == 'Dentiste' %}selected{% endif %}>Dentiste / Chirurgie dentaire</option>
+                    </optgroup>
+                    <optgroup label="Spécialités médicales">
+                        <option value="Cardiologie" {% if form and form.specialty == 'Cardiologie' %}selected{% endif %}>Cardiologie</option>
+                        <option value="Dermatologie" {% if form and form.specialty == 'Dermatologie' %}selected{% endif %}>Dermatologie</option>
+                        <option value="Endocrinologie" {% if form and form.specialty == 'Endocrinologie' %}selected{% endif %}>Endocrinologie / Diabétologie</option>
+                        <option value="Gastro-entérologie" {% if form and form.specialty == 'Gastro-entérologie' %}selected{% endif %}>Gastro-entérologie</option>
+                        <option value="Gynécologie-Obstétrique" {% if form and form.specialty == 'Gynécologie-Obstétrique' %}selected{% endif %}>Gynécologie / Obstétrique</option>
+                        <option value="Neurologie" {% if form and form.specialty == 'Neurologie' %}selected{% endif %}>Neurologie</option>
+                        <option value="Pédiatrie" {% if form and form.specialty == 'Pédiatrie' %}selected{% endif %}>Pédiatrie</option>
+                        <option value="Pneumologie" {% if form and form.specialty == 'Pneumologie' %}selected{% endif %}>Pneumologie</option>
+                        <option value="Psychiatrie" {% if form and form.specialty == 'Psychiatrie' %}selected{% endif %}>Psychiatrie</option>
+                        <option value="Rhumatologie" {% if form and form.specialty == 'Rhumatologie' %}selected{% endif %}>Rhumatologie</option>
+                        <option value="Urologie" {% if form and form.specialty == 'Urologie' %}selected{% endif %}>Urologie</option>
+                    </optgroup>
+                    <optgroup label="Autres">
+                        <option value="Radiologie" {% if form and form.specialty == 'Radiologie' %}selected{% endif %}>Radiologie</option>
+                        <option value="Anesthésiologie" {% if form and form.specialty == 'Anesthésiologie' %}selected{% endif %}>Anesthésiologie</option>
+                    </optgroup>
+                </select>
+                {% endif %}
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Mot de passe <span class="required-star">*</span></label>
+                    <input type="password" id="password" name="password" required minlength="10" placeholder="Min. 10 caractères">
+                    <div class="password-strength" id="pw-strength">
+                        <div class="password-strength-bar" id="pw-bar-1"></div>
+                        <div class="password-strength-bar" id="pw-bar-2"></div>
+                        <div class="password-strength-bar" id="pw-bar-3"></div>
+                        <div class="password-strength-bar" id="pw-bar-4"></div>
+                    </div>
+                    <div class="password-strength-label" id="pw-label"></div>
+                </div>
+                <div class="form-group">
+                    <label for="password_confirm">Confirmer <span class="required-star">*</span></label>
+                    <input type="password" id="password_confirm" name="password_confirm" required minlength="10" placeholder="Retapez le mot de passe">
+                    <div class="form-error" id="pw-match-error" style="display:none;">Les mots de passe ne correspondent pas</div>
+                </div>
+            </div>
+
+            <div style="background:var(--gray-50,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--gray-500);">
+                Rôle attribué : <strong>{{ inv.role }}</strong>
+                {% if inv.specialty %} · Spécialité : <strong>{{ inv.specialty }}</strong>{% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="reg-submit">Créer mon compte</button>
+        </form>
+
+        <script>
+        (function(){
+            const pw = document.getElementById('password');
+            const pwc = document.getElementById('password_confirm');
+            const bars = [1,2,3,4].map(i => document.getElementById('pw-bar-'+i));
+            const label = document.getElementById('pw-label');
+            const matchErr = document.getElementById('pw-match-error');
+            function checkStrength(v) {
+                let s = 0;
+                if (v.length >= 10) s++;
+                if (v.length >= 14) s++;
+                if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++;
+                if (/[0-9]/.test(v) && /[^a-zA-Z0-9]/.test(v)) s++;
+                const levels = ['','Faible','Moyen','Bon','Fort'];
+                const cls = ['','active-weak','active-medium','active-strong','active-strong'];
+                const colors = ['','var(--danger)','var(--warning)','var(--success)','var(--success)'];
+                bars.forEach((b,i) => { b.className = 'password-strength-bar'; if(i<s) b.classList.add(cls[s]); });
+                label.textContent = v ? levels[s] : '';
+                label.style.color = colors[s] || '';
+            }
+            pw.addEventListener('input', () => { checkStrength(pw.value); if(pwc.value) checkMatch(); });
+            function checkMatch() {
+                const bad = pwc.value && pw.value !== pwc.value;
+                matchErr.style.display = bad ? 'block' : 'none';
+                pwc.parentElement.classList.toggle('has-error', bad);
+            }
+            pwc.addEventListener('input', checkMatch);
+            pw.closest('form').addEventListener('submit', e => {
+                if (pw.value !== pwc.value) { e.preventDefault(); matchErr.style.display='block'; pwc.focus(); }
+            });
+        })();
+        </script>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

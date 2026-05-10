@@ -14,8 +14,36 @@
         <h2>Utilisateurs</h2>
         <p class="subtitle">{{ users|length }} compte{{ 's' if users|length != 1 }} enregistré{{ 's' if users|length != 1 }}</p>
     </div>
-    <a href="/admin/users/new" class="btn btn-primary">+ Nouvel utilisateur</a>
+    <div style="display:flex;gap:8px;">
+        <a href="/admin/invite" class="btn btn-outline">Inviter par lien</a>
+        <a href="/admin/users/new" class="btn btn-primary">+ Nouvel utilisateur</a>
+    </div>
 </div>
+
+{% if reset_link %}
+<div class="card" style="margin-bottom:20px;border:2px solid var(--primary,#1c8cf8);">
+    <div class="card-body" style="padding:20px;">
+        <p style="font-size:13px;font-weight:600;color:var(--primary,#1c8cf8);margin:0 0 10px;">Lien de réinitialisation pour <strong>{{ reset_user }}</strong> — valable 1 heure</p>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <input id="reset-link" type="text" value="{{ reset_link }}" readonly
+                style="flex:1;padding:10px 12px;border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:13px;background:var(--gray-50,#f8fafc);font-family:monospace;">
+            <button onclick="copyReset()" class="btn btn-primary" id="copy-reset-btn">Copier</button>
+        </div>
+        <p style="font-size:12px;color:var(--gray-500,#64748b);margin:8px 0 0;">Envoyez ce lien à l'utilisateur. Il expire après utilisation ou dans 1 heure.</p>
+    </div>
+</div>
+<script>
+function copyReset() {
+    const input = document.getElementById('reset-link');
+    input.select(); input.setSelectionRange(0,99999);
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = document.getElementById('copy-reset-btn');
+        btn.textContent = 'Copié !'; btn.style.background = 'var(--success,#16a34a)';
+        setTimeout(() => { btn.textContent = 'Copier'; btn.style.background = ''; }, 2000);
+    });
+}
+</script>
+{% endif %}
 
 <div class="card">
     <div class="card-body" style="padding: 0;">
@@ -47,6 +75,9 @@
                     <td>
                         <div style="display:flex;gap:6px;">
                             <a href="/admin/users/{{ u.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+                            <form method="POST" action="/admin/users/{{ u.id }}/reset-password-link">
+                                <button type="submit" class="btn btn-outline btn-sm" title="Générer un lien de réinitialisation">Reset MDP</button>
+                            </form>
                             <form method="POST" action="/admin/users/{{ u.id }}/toggle-active" onsubmit="return confirm('{{ 'Désactiver' if u.is_active else 'Réactiver' }} le compte de {{ u.first_name }} {{ u.last_name }} ?')">
                                 <button type="submit" class="btn btn-sm {{ 'btn-outline' if u.is_active else 'btn-success' }}" style="{{ 'color:var(--danger);' if u.is_active else '' }}">
                                     {{ 'Désactiver' if u.is_active else 'Réactiver' }}

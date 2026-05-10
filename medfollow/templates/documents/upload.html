@@ -10,6 +10,7 @@
 <div class="card" style="max-width: 600px;">
     <div class="card-body">
         <form method="POST" action="/documents/upload" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 16px;">
+            {% if selected_consultation_id %}<input type="hidden" name="consultation_id" value="{{ selected_consultation_id }}">{% endif %}
             <div class="form-group">
                 <label>Patient *</label>
                 <select name="patient_id" required>

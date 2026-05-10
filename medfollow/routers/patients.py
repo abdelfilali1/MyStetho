@@ -167,7 +167,7 @@ async def create_patient(
             return RedirectResponse(url=f"{next_url}{sep}patient_id={new_id}", status_code=302)
         return RedirectResponse(url=f"/patients/{new_id}", status_code=302)
     except Exception as e:
-        error = "Ce numéro de sécurité sociale existe déjà." if "UNIQUE" in str(e) else str(e)
+        error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {
             "first_name": first_name, "last_name": last_name, "date_of_birth": date_of_birth,
             "gender": gender, "social_security_number": social_security_number,
@@ -185,7 +185,13 @@ async def create_patient(
 
 
 @router.get("/{patient_id}", response_class=HTMLResponse)
-async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
+async def view_patient(
+    request: Request,
+    patient_id: int,
+    consultation_id: Optional[int] = None,
+    tab: str = "info",
+    db: aiosqlite.Connection = Depends(get_db),
+):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
@@ -207,7 +213,8 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
     appointments = [dict(r) for r in await cursor.fetchall()]
 
     cursor = await db.execute(
-        "SELECT * FROM consultations WHERE patient_id = ? ORDER BY consultation_date DESC LIMIT 10", (patient_id,)
+        "SELECT * FROM consultations WHERE patient_id = ? AND (status IS NULL OR status = 'terminee') ORDER BY consultation_date DESC LIMIT 10",
+        (patient_id,),
     )
     consultations = [dict(r) for r in await cursor.fetchall()]
 
@@ -225,6 +232,27 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
         "SELECT * FROM feuilles_soin WHERE patient_id = ? ORDER BY created_at DESC LIMIT 30", (patient_id,)
     )
     feuilles_soin = [dict(r) for r in await cursor.fetchall()]
+
+    # Detect active consultation session for this doctor+patient
+    active_consultation = None
+    if consultation_id:
+        cursor = await db.execute(
+            "SELECT * FROM consultations WHERE id = ? AND patient_id = ? AND doctor_id = ? AND status = 'en_cours'",
+            (consultation_id, patient_id, user["sub"]),
+        )
+        row = await cursor.fetchone()
+        if row:
+            active_consultation = dict(row)
+    if active_consultation is None:
+        cursor = await db.execute(
+            """SELECT * FROM consultations
+               WHERE patient_id = ? AND doctor_id = ? AND status = 'en_cours'
+               ORDER BY created_at DESC LIMIT 1""",
+            (patient_id, user["sub"]),
+        )
+        row = await cursor.fetchone()
+        if row:
+            active_consultation = dict(row)
 
     from datetime import datetime
     now_year = datetime.now().year
@@ -263,6 +291,8 @@ async def view_patient(request: Request, patient_id: int, db: aiosqlite.Connecti
             "now_year": now_year, "is_dentist": is_dentist,
             "teeth_data_json": teeth_data_json,
             "endo_summary_json": endo_summary_json,
+            "active_consultation": active_consultation,
+            "initial_tab": tab,
         },
     )
 
@@ -329,7 +359,7 @@ async def update_patient(
         await db.commit()
         return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
     except Exception as e:
-        error = "Ce numéro de sécurité sociale existe déjà." if "UNIQUE" in str(e) else str(e)
+        error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {"id": patient_id, "first_name": first_name, "last_name": last_name,
                         "date_of_birth": date_of_birth, "gender": gender,
                         "social_security_number": social_security_number,
@@ -364,6 +394,7 @@ async def add_history(
     type: str = Form(...),
     description: str = Form(...),
     date_recorded: str = Form(""),
+    consultation_id: Optional[int] = Form(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
@@ -371,11 +402,14 @@ async def add_history(
         return RedirectResponse(url="/login", status_code=302)
 
     await db.execute(
-        "INSERT INTO medical_history (patient_id, type, description, date_recorded) VALUES (?, ?, ?, ?)",
-        (patient_id, type, description, date_recorded or None),
+        "INSERT INTO medical_history (patient_id, type, description, date_recorded, consultation_id) VALUES (?, ?, ?, ?, ?)",
+        (patient_id, type, description, date_recorded or None, consultation_id),
     )
     await db.commit()
-    return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
+    redirect = f"/patients/{patient_id}?tab=info"
+    if consultation_id:
+        redirect += f"&consultation_id={consultation_id}"
+    return RedirectResponse(url=redirect, status_code=302)
 
 
 @router.get("/{patient_id}/brochure.pdf")

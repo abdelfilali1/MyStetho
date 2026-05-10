@@ -1196,6 +1196,7 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         console.error('HTML generation failed:', genErr);
     }
 
+    const _urlConsultationId = new URLSearchParams(window.location.search).get('consultation_id');
     const data = {
         patient_id:       _selectedPatientId,
         mutuelle:         document.getElementById('f-mutuelle').value,
@@ -1213,6 +1214,7 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
         total_montant:    treatments.reduce((s, t) => s + (t.montant || 0), 0),
         actes:            treatments,
         html_content,
+        consultation_id:  _urlConsultationId ? parseInt(_urlConsultationId) : null,
     };
     try {
         const resp = await fetch('/mutuelle/feuille/save', {
@@ -1461,6 +1463,16 @@ document.getElementById('cat-chips').addEventListener('click', function(e){
 ALL_ACTS.forEach((a,i)=>{ a._idx = i; });
 
 renderAll();
+
+// Auto-select patient and read consultation_id from URL
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('patient_id');
+    if (pid) {
+        const idx = ALL_PATIENTS.findIndex(p => String(p.id) === pid);
+        if (idx >= 0) window.selectPatient(idx);
+    }
+})();
 
 })();
 {% endraw %}

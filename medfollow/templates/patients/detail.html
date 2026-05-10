@@ -216,6 +216,47 @@
     </div>
 </div>
 
+<!-- Bandeau consultation active -->
+{% if active_consultation %}
+<div id="consultation-banner" class="no-print" style="
+    background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+    color:white;border-radius:14px;padding:14px 20px;margin-bottom:16px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    box-shadow:0 4px 20px rgba(15,23,42,.3);
+">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:#22c55e;
+                    box-shadow:0 0 0 3px rgba(34,197,94,.3);animation:pulse-dot 2s infinite;flex-shrink:0;"></div>
+        <div>
+            <span style="font-weight:700;font-size:14px;">Consultation en cours</span>
+            <span style="font-size:12px;color:rgba(148,163,184,.9);margin-left:12px;">
+                Démarrée à {{ active_consultation.consultation_date[11:16] }} &mdash; #{{ active_consultation.id }}
+            </span>
+        </div>
+    </div>
+    <button onclick="openTerminerModal()" style="
+        background:#ef4444;border:none;border-radius:9px;color:white;
+        font-size:13px;font-weight:600;padding:8px 18px;cursor:pointer;flex-shrink:0;
+    ">Terminer la consultation</button>
+</div>
+<style>
+@keyframes pulse-dot {
+  0%,100% { box-shadow:0 0 0 3px rgba(34,197,94,.3); }
+  50%      { box-shadow:0 0 0 7px rgba(34,197,94,.08); }
+}
+</style>
+{% else %}
+<div class="no-print" style="margin-bottom:16px;">
+    <form method="POST" action="/consultations/start" style="display:inline;">
+        <input type="hidden" name="patient_id" value="{{ patient.id }}">
+        <button type="submit" style="
+            background:var(--primary);border:none;border-radius:9px;color:white;
+            font-size:13px;font-weight:600;padding:9px 20px;cursor:pointer;
+        ">Démarrer la consultation</button>
+    </form>
+</div>
+{% endif %}
+
 <!-- Barre d'onglets -->
 <div class="view-toggle-bar no-print" style="margin-bottom:20px;">
     <div class="view-segmented">
@@ -283,7 +324,7 @@
                     <span class="info-value">{{ [patient.address, patient.postal_code, patient.city] | select | join(', ') or '—' }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">N° Sécu</span>
+                    <span class="info-label">N° CIN</span>
                     <span class="info-value">{{ patient.social_security_number or '—' }}</span>
                 </div>
                 <div class="info-item">
@@ -328,6 +369,7 @@
             <p class="empty-state" style="padding: 16px;">Aucun antécédent enregistré</p>
             {% endif %}
             <form method="POST" action="/patients/{{ patient.id }}/history" class="history-form">
+                {% if active_consultation %}<input type="hidden" name="consultation_id" value="{{ active_consultation.id }}">{% endif %}
                 <h4 style="margin: 16px 0 8px; font-size: 14px; color: var(--gray-600);">Ajouter un antécédent</h4>
                 <div class="form-row">
                     <div class="form-group">
@@ -362,7 +404,7 @@
     <div class="card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
             <h3>Rendez-vous</h3>
-            <a href="/agenda?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouveau RDV</a>
+            <a href="/appointments/?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouveau RDV</a>
         </div>
         <div class="card-body">
             {% if appointments %}
@@ -395,7 +437,7 @@
             {% if consultations %}
             <table class="table">
                 <thead>
-                    <tr><th>Date</th><th>Motif</th><th>Diagnostic</th></tr>
+                    <tr><th>Date</th><th>Motif</th><th>Diagnostic</th><th>Résumé</th><th></th></tr>
                 </thead>
                 <tbody>
                     {% for c in consultations %}
@@ -403,6 +445,15 @@
                         <td>{{ c.consultation_date[:10] }}</td>
                         <td>{{ c.reason or '—' }}</td>
                         <td>{{ c.diagnosis or '—' }}</td>
+                        <td>
+                            {% if c.summary %}
+                            <details style="cursor:pointer;">
+                                <summary style="font-size:12px;color:var(--primary);cursor:pointer;">Voir résumé</summary>
+                                <pre style="font-size:11px;color:var(--gray-600);white-space:pre-wrap;margin-top:6px;background:var(--gray-50);padding:8px;border-radius:6px;">{{ c.summary }}</pre>
+                            </details>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td><a href="/consultations/{{ c.id }}" class="btn btn-outline btn-sm" style="font-size:11px;">Détail</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -419,7 +470,7 @@
     <div class="card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
             <h3>Ordonnances</h3>
-            <a href="/prescriptions/new?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Ajouter une ordonnance</a>
+            <a href="/prescriptions/new?patient_id={{ patient.id }}{% if active_consultation %}&consultation_id={{ active_consultation.id }}{% endif %}" class="btn btn-primary btn-sm">+ Ajouter une ordonnance</a>
         </div>
         <div class="card-body">
             {% if prescriptions %}
@@ -451,7 +502,7 @@
     <div class="card">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
             <h3>Documents</h3>
-            <a href="/documents/upload?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Ajouter un document</a>
+            <a href="/documents/upload?patient_id={{ patient.id }}{% if active_consultation %}&consultation_id={{ active_consultation.id }}{% endif %}" class="btn btn-primary btn-sm">+ Ajouter un document</a>
         </div>
         <div class="card-body">
             {% if documents %}
@@ -505,7 +556,7 @@
                     <span class="info-value">{{ patient.insurance_serial or '—' }}</span>
                 </div>
             </div>
-            <a href="/mutuelle/" class="btn btn-primary">
+            <a href="/mutuelle/?patient_id={{ patient.id }}{% if active_consultation %}&consultation_id={{ active_consultation.id }}{% endif %}" class="btn btn-primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 Ouvrir module mutuelle (NGAP)
             </a>
@@ -680,6 +731,307 @@
 </div>
 {% endif %}
 
+{% if active_consultation %}
+<!-- ===== Modal Terminer la consultation ===== -->
+<style>
+#terminer-modal {
+    display:none;flex-direction:column;position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);background:#fff;border-radius:20px;
+    width:660px;max-width:96vw;max-height:92vh;overflow:hidden;
+    z-index:2001;box-shadow:0 32px 80px rgba(0,0,0,.22);
+}
+.term-hdr {
+    padding:18px 22px 16px;border-bottom:1px solid var(--gray-200);
+    display:flex;align-items:center;gap:14px;flex-shrink:0;
+    background:linear-gradient(135deg,#eef6ff 0%,#fff 70%);
+}
+.term-hdr-icon {
+    width:40px;height:40px;flex-shrink:0;border-radius:12px;
+    background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:18px;box-shadow:0 4px 12px rgba(28,140,248,.35);
+}
+.term-hdr-text h3 { margin:0;font-size:16px;font-weight:700;color:var(--gray-900); }
+.term-hdr-text p  { margin:3px 0 0;font-size:12px;color:var(--gray-500); }
+.term-hdr-close {
+    margin-left:auto;background:none;border:none;cursor:pointer;
+    width:30px;height:30px;border-radius:8px;display:flex;align-items:center;
+    justify-content:center;color:var(--gray-400);font-size:17px;transition:background .15s,color .15s;
+}
+.term-hdr-close:hover { background:var(--gray-100);color:var(--gray-700); }
+.term-body { overflow-y:auto;flex:1; }
+.term-preview {
+    margin:14px 22px 0;padding:12px 14px;background:var(--gray-50);
+    border-radius:12px;border:1px solid var(--gray-200);
+}
+.term-preview-title {
+    font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;
+    letter-spacing:.7px;margin-bottom:8px;
+}
+.term-badges { display:flex;flex-wrap:wrap;gap:6px; }
+.term-badge {
+    display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+    border-radius:20px;font-size:12px;font-weight:500;
+}
+.term-badge.blue   { background:#dbeafe;color:#1e40af; }
+.term-badge.green  { background:#dcfce7;color:#166534; }
+.term-badge.amber  { background:#fef3c7;color:#92400e; }
+.term-badge.purple { background:#ede9fe;color:#5b21b6; }
+.term-badge.pink   { background:#fce7f3;color:#9d174d; }
+.term-badge.gray   { background:var(--gray-100);color:var(--gray-500);font-style:italic; }
+.term-form { padding:16px 22px 4px; }
+.term-section-title {
+    font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;
+    letter-spacing:.7px;margin:0 0 12px;padding-bottom:6px;
+    border-bottom:1px solid var(--gray-100);
+}
+.term-field { margin-bottom:14px;position:relative; }
+.term-label { font-size:12px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:5px; }
+.term-chips { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px; }
+.term-chip {
+    padding:3px 10px;border-radius:20px;border:1px solid var(--gray-200);
+    background:#fff;font-size:11px;color:var(--gray-600);cursor:pointer;
+    transition:all .15s;white-space:nowrap;
+}
+.term-chip:hover { background:var(--primary);border-color:var(--primary);color:#fff; }
+.term-cb-wrap { position:relative; }
+.term-cb-input {
+    width:100%;padding:8px 32px 8px 11px;border:1px solid var(--gray-300);
+    border-radius:9px;font-size:13px;color:var(--gray-800);background:#fff;
+    transition:border-color .15s,box-shadow .15s;outline:none;box-sizing:border-box;
+}
+.term-cb-input:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(28,140,248,.12); }
+.term-cb-arrow { position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:11px;pointer-events:none; }
+.term-cb-dd {
+    display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;
+    background:#fff;border:1px solid var(--gray-200);border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.11);z-index:120;max-height:160px;overflow-y:auto;
+}
+.term-cb-dd.open { display:block; }
+.term-cb-opt {
+    padding:8px 12px;font-size:13px;color:var(--gray-700);cursor:pointer;
+    border-bottom:1px solid var(--gray-100);
+}
+.term-cb-opt:last-child { border-bottom:none; }
+.term-cb-opt:hover,.term-cb-opt.focused { background:var(--gray-50); }
+.term-footer {
+    padding:14px 22px;border-top:1px solid var(--gray-200);
+    display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-shrink:0;
+    background:var(--gray-50);
+}
+.term-btn-cancel {
+    padding:9px 18px;border-radius:9px;border:1px solid var(--gray-300);
+    background:#fff;color:var(--gray-700);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.term-btn-cancel:hover { background:var(--gray-100); }
+.term-btn-submit {
+    padding:9px 20px;border-radius:9px;border:none;
+    background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;
+    font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;
+    box-shadow:0 2px 8px rgba(239,68,68,.3);transition:all .15s;
+}
+.term-btn-submit:hover { box-shadow:0 4px 14px rgba(239,68,68,.45);transform:translateY(-1px); }
+</style>
+<div id="terminer-overlay" onclick="closeTerminerModal()" style="
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;backdrop-filter:blur(4px);
+"></div>
+<div id="terminer-modal">
+    <div class="term-hdr">
+        <div class="term-hdr-icon">✓</div>
+        <div class="term-hdr-text">
+            <h3>Terminer la consultation</h3>
+            <p>Clôturez et enregistrez le compte rendu.</p>
+        </div>
+        <button onclick="closeTerminerModal()" class="term-hdr-close" title="Fermer">✕</button>
+    </div>
+    <div class="term-body">
+        <div class="term-preview">
+            <div class="term-preview-title">Actions enregistrées</div>
+            <div id="terminer-actions-list" class="term-badges">
+                <span class="term-badge gray">Chargement...</span>
+            </div>
+        </div>
+        <form method="POST" action="/consultations/{{ active_consultation.id }}/terminate" class="term-form" id="term-form">
+            <input type="hidden" name="patient_id" value="{{ patient.id }}">
+            <p class="term-section-title" style="margin-top:16px;">Compte rendu clinique</p>
+
+            <div class="term-field">
+                <label class="term-label">Motif de consultation</label>
+                <div class="term-cb-wrap">
+                    <input type="text" name="reason" id="term-motif-inp" class="term-cb-input"
+                           placeholder="{% if is_dentist %}Douleur, détartrage, suivi...{% else %}Douleur, suivi, bilan...{% endif %}"
+                           autocomplete="off"
+                           onfocus="termCbOpen('motif')" oninput="termCbFilter('motif',this.value)" onblur="termCbClose('motif',300)">
+                    <span class="term-cb-arrow">▾</span>
+                    <div id="term-motif-dd" class="term-cb-dd"></div>
+                </div>
+            </div>
+
+            <div class="term-field">
+                <label class="term-label">Examen clinique</label>
+                <div class="term-chips" id="term-exam-chips"></div>
+                <textarea name="clinical_exam" id="term-exam-ta" rows="2" class="form-control"
+                          placeholder="{% if is_dentist %}Observations endo-buccales...{% else %}Observations cliniques...{% endif %}"
+                          style="resize:vertical;font-size:13px;"></textarea>
+            </div>
+
+            <div class="term-field">
+                <label class="term-label">Diagnostic</label>
+                <div class="term-chips" id="term-diag-chips"></div>
+                <textarea name="diagnosis" id="term-diag-ta" rows="2" class="form-control"
+                          placeholder="Diagnostic retenu..."
+                          style="resize:vertical;font-size:13px;"></textarea>
+            </div>
+
+            <div class="term-field">
+                <label class="term-label">Plan de traitement</label>
+                <div class="term-chips" id="term-plan-chips"></div>
+                <textarea name="treatment_plan" id="term-plan-ta" rows="2" class="form-control"
+                          placeholder="Suites envisagées..."
+                          style="resize:vertical;font-size:13px;"></textarea>
+            </div>
+
+            <p class="term-section-title" style="margin-top:16px;">Notes internes</p>
+            <div class="term-field" style="margin-bottom:8px;">
+                <textarea name="notes" rows="2" class="form-control"
+                          placeholder="Notes confidentielles (non incluses dans le PDF patient)..."
+                          style="resize:vertical;font-size:13px;border-style:dashed;color:var(--gray-600);"></textarea>
+            </div>
+        </form>
+    </div>
+    <div class="term-footer">
+        <button type="button" onclick="closeTerminerModal()" class="term-btn-cancel">Annuler</button>
+        <button type="submit" form="term-form" class="term-btn-submit">
+            Clôturer la consultation <span>→</span>
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{% if active_consultation %}
+<!-- ===== Modal Suivi (follow-up RDV) ===== -->
+<style>
+#followup-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;backdrop-filter:blur(4px); }
+#followup-modal {
+    display:none;flex-direction:column;position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);background:#fff;border-radius:20px;
+    width:560px;max-width:96vw;max-height:90vh;overflow:hidden;
+    z-index:2101;box-shadow:0 32px 80px rgba(0,0,0,.22);
+}
+.fu-hdr {
+    padding:18px 22px 16px;border-bottom:1px solid var(--gray-200);
+    display:flex;align-items:center;gap:14px;flex-shrink:0;
+    background:linear-gradient(135deg,#f0fdf4 0%,#fff 70%);
+}
+.fu-hdr-icon {
+    width:40px;height:40px;flex-shrink:0;border-radius:12px;
+    background:linear-gradient(135deg,#22c55e,#16a34a);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(34,197,94,.35);
+}
+.fu-hdr-text h3 { margin:0;font-size:16px;font-weight:700;color:var(--gray-900); }
+.fu-hdr-text p  { margin:3px 0 0;font-size:12px;color:var(--gray-500); }
+.fu-hdr-close { margin-left:auto;background:none;border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:17px;transition:background .15s; }
+.fu-hdr-close:hover { background:var(--gray-100);color:var(--gray-700); }
+.fu-body { overflow-y:auto;flex:1;padding:18px 22px 8px; }
+.fu-suggest {
+    background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;
+    border-radius:12px;padding:12px 14px;margin-bottom:16px;
+}
+.fu-suggest-label { font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px; }
+.fu-suggest-chips { display:flex;flex-wrap:wrap;gap:6px; }
+.fu-chip {
+    padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;background:#fff;
+    font-size:12px;font-weight:500;color:#1d4ed8;cursor:pointer;transition:all .15s;
+}
+.fu-chip:hover,.fu-chip.active { background:#2563eb;border-color:#2563eb;color:#fff; }
+.fu-row { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px; }
+.fu-field { margin-bottom:12px; }
+.fu-label { font-size:12px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:5px; }
+.fu-input {
+    width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:9px;
+    font-size:13px;color:var(--gray-800);outline:none;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;
+}
+.fu-input:focus { border-color:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.12); }
+.fu-footer {
+    padding:14px 22px;border-top:1px solid var(--gray-200);display:flex;justify-content:flex-end;
+    align-items:center;gap:10px;flex-shrink:0;background:var(--gray-50);
+}
+.fu-btn-skip { padding:9px 18px;border-radius:9px;border:1px solid var(--gray-300);background:#fff;color:var(--gray-600);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
+.fu-btn-skip:hover { background:var(--gray-100); }
+.fu-btn-create { padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(34,197,94,.3);transition:all .15s; }
+.fu-btn-create:hover { box-shadow:0 4px 14px rgba(34,197,94,.45);transform:translateY(-1px); }
+.fu-btn-create:disabled { opacity:.6;cursor:not-allowed;transform:none; }
+</style>
+<div id="followup-overlay"></div>
+<div id="followup-modal">
+    <div class="fu-hdr">
+        <div class="fu-hdr-icon">📅</div>
+        <div class="fu-hdr-text">
+            <h3>Consultation terminée !</h3>
+            <p>Souhaitez-vous planifier un rendez-vous de suivi ?</p>
+        </div>
+        <button class="fu-hdr-close" onclick="fuSkip()" title="Fermer">✕</button>
+    </div>
+    <div class="fu-body">
+        <div class="fu-suggest">
+            <div class="fu-suggest-label">💡 Suggestion rapide</div>
+            <div class="fu-suggest-chips" id="fu-suggest-chips"></div>
+        </div>
+        <div class="fu-field">
+            <label class="fu-label">Motif du rendez-vous</label>
+            <input type="text" id="fu-title" class="fu-input" placeholder="Ex: Suivi de consultation, contrôle..." value="Suivi de consultation">
+        </div>
+        <div class="fu-row">
+            <div>
+                <label class="fu-label">Date</label>
+                <input type="date" id="fu-date" class="fu-input">
+            </div>
+            <div>
+                <label class="fu-label">Heure</label>
+                <input type="time" id="fu-time" class="fu-input" value="09:00">
+            </div>
+        </div>
+        <div class="fu-row">
+            <div>
+                <label class="fu-label">Durée</label>
+                <select id="fu-duration" class="fu-input">
+                    <option value="15">15 min</option>
+                    <option value="30" selected>30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">1 heure</option>
+                    <option value="90">1h30</option>
+                </select>
+            </div>
+            <div>
+                <label class="fu-label">Type</label>
+                <select id="fu-type" class="fu-input">
+                    <option value="consultation">Consultation</option>
+                    <option value="suivi">Suivi</option>
+                    <option value="urgence">Urgence</option>
+                    <option value="controle">Contrôle</option>
+                    {% if is_dentist %}
+                    <option value="detartrage">Détartrage</option>
+                    <option value="soin">Soin dentaire</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+        <div class="fu-field" style="margin-bottom:4px;">
+            <label class="fu-label">Notes <span style="font-weight:400;color:var(--gray-400);">(optionnel)</span></label>
+            <textarea id="fu-notes" class="fu-input" rows="2" placeholder="Instructions post-consultation..." style="resize:vertical;"></textarea>
+        </div>
+        <div id="fu-error" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;"></div>
+    </div>
+    <div class="fu-footer">
+        <button class="fu-btn-skip" onclick="fuSkip()">Passer sans RDV</button>
+        <button class="fu-btn-create" id="fu-create-btn" onclick="fuCreate()">
+            📅 Créer le rendez-vous
+        </button>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -724,6 +1076,234 @@ function switchTab(tab) {
     if (tab === 'odontogram' && !reactOdoMounted)    { buildStats('stats-row-odo');    mountReactOdontogram('react-odo-root-odo', 'circle');  reactOdoMounted = true; }
     if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
 }
+
+// ===== Initialisation de l'onglet actif =====
+document.addEventListener('DOMContentLoaded', () => switchTab('{{ initial_tab | default("info") }}'));
+
+{% if active_consultation %}
+// ===== Modal Terminer la consultation =====
+const IS_DENTIST = {{ 'true' if is_dentist else 'false' }};
+const TERM_PRESETS = {
+    motif: IS_DENTIST
+        ? ['Douleur dentaire','Consultation de suivi','Détartrage','Carie','Extraction','Urgence','Contrôle orthodontique','Pose de prothèse','Blanchiment','Trauma dentaire']
+        : ['Douleur','Consultation de suivi','Bilan de santé','Urgence','Renouvellement d\'ordonnance','Résultats d\'examens','Certificat médical','Prévention'],
+    exam: IS_DENTIST
+        ? ['RAS','Douleur à la percussion','Mobilité dentaire','Inflammation gingivale','Lésion carieuse','Abcès','Fracture coronaire','Absence de vitalité']
+        : ['RAS','Douleur à la palpation','Auscultation normale','Tension élevée','Fièvre','Tachycardie','Dyspnée'],
+    diag: IS_DENTIST
+        ? ['Carie simple','Carie profonde','Pulpite aiguë','Nécrose pulpaire','Abcès apical','Parodontite','Gingivite','Fracture dentaire','Édentement']
+        : ['Infection virale','Infection bactérienne','HTA','Diabète déséquilibré','Anémie','Syndrome viral','RAS'],
+    plan: IS_DENTIST
+        ? ['Soins conservateurs','Traitement endodontique','Extraction','Détartrage','Pose de couronne','Suivi à 3 mois','Prescription antibiotique']
+        : ['Traitement symptomatique','Prescription antibiotique','Suivi à 1 mois','Bilan complémentaire','Référé spécialiste','Arrêt de travail'],
+};
+
+function termBuildUI() {
+    [['exam','term-exam-chips','term-exam-ta'],['diag','term-diag-chips','term-diag-ta'],['plan','term-plan-chips','term-plan-ta']].forEach(([key,cid,tid]) => {
+        const wrap = document.getElementById(cid);
+        if (!wrap) return;
+        wrap.innerHTML = TERM_PRESETS[key].map(p =>
+            `<button type="button" class="term-chip" onmousedown="termChipPick(event,'${tid}','${p.replace(/'/g,"\\'")}')">${p}</button>`
+        ).join('');
+    });
+    termCbRender('motif', TERM_PRESETS.motif);
+}
+
+function termChipPick(e, taId, val) {
+    e.preventDefault();
+    const ta = document.getElementById(taId);
+    if (!ta) return;
+    ta.value = ta.value ? ta.value.trimEnd() + '\n' + val : val;
+    ta.focus();
+}
+
+const _termCbTimer = {};
+function termCbOpen(key) {
+    clearTimeout(_termCbTimer[key]);
+    termCbRender(key, TERM_PRESETS[key]);
+}
+function termCbClose(key, delay) {
+    _termCbTimer[key] = setTimeout(() => {
+        const dd = document.getElementById('term-' + key + '-dd');
+        if (dd) dd.classList.remove('open');
+    }, delay);
+}
+function termCbFilter(key, q) {
+    const filtered = q ? TERM_PRESETS[key].filter(o => o.toLowerCase().includes(q.toLowerCase())) : TERM_PRESETS[key];
+    termCbRender(key, filtered);
+}
+function termCbRender(key, opts) {
+    const dd = document.getElementById('term-' + key + '-dd');
+    if (!dd) return;
+    if (!opts.length) { dd.classList.remove('open'); return; }
+    dd.innerHTML = opts.map(o =>
+        `<div class="term-cb-opt" onmousedown="termCbPick(event,'${key}','${o.replace(/'/g,"\\'")}')">${o}</div>`
+    ).join('');
+    dd.classList.add('open');
+}
+function termCbPick(e, key, val) {
+    e.preventDefault();
+    const inp = document.getElementById('term-' + key + '-inp');
+    if (inp) inp.value = val;
+    const dd = document.getElementById('term-' + key + '-dd');
+    if (dd) dd.classList.remove('open');
+}
+
+function openTerminerModal() {
+    document.getElementById('terminer-overlay').style.display = 'block';
+    document.getElementById('terminer-modal').style.display = 'flex';
+    termBuildUI();
+    fetch('/consultations/{{ active_consultation.id }}/summary-data')
+        .then(r => r.json())
+        .then(data => {
+            const badges = [];
+            const n = x => x && x.length ? x.length : 0;
+            if (n(data.prescriptions)) badges.push(`<span class="term-badge blue">💊 ${n(data.prescriptions)} ordonnance${n(data.prescriptions)>1?'s':''}</span>`);
+            if (n(data.antecedents))   badges.push(`<span class="term-badge purple">📋 ${n(data.antecedents)} antécédent${n(data.antecedents)>1?'s':''}</span>`);
+            if (n(data.dental))        badges.push(`<span class="term-badge green">🦷 ${n(data.dental)} acte${n(data.dental)>1?'s':''} dentaire${n(data.dental)>1?'s':''}</span>`);
+            if (n(data.endo))          badges.push(`<span class="term-badge amber">🔬 ${n(data.endo)} modif. endo</span>`);
+            if (n(data.conditions))    badges.push(`<span class="term-badge amber">🔄 ${n(data.conditions)} condition${n(data.conditions)>1?'s':''}</span>`);
+            if (n(data.feuilles))      badges.push(`<span class="term-badge pink">📄 ${n(data.feuilles)} feuille${n(data.feuilles)>1?'s':''} de soin</span>`);
+            if (n(data.documents))     badges.push(`<span class="term-badge blue">📎 ${n(data.documents)} document${n(data.documents)>1?'s':''}</span>`);
+            document.getElementById('terminer-actions-list').innerHTML =
+                badges.length ? badges.join('') : '<span class="term-badge gray">Aucune action enregistrée durant cette session.</span>';
+        }).catch(() => {
+            document.getElementById('terminer-actions-list').innerHTML = '<span class="term-badge gray">Impossible de charger.</span>';
+        });
+}
+function closeTerminerModal() {
+    document.getElementById('terminer-overlay').style.display = 'none';
+    document.getElementById('terminer-modal').style.display = 'none';
+}
+
+// ===== Interception form → AJAX → follow-up modal =====
+let _fuPatientId = null, _fuDoctorId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('term-form');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('fu-create-btn') || document.querySelector('.term-btn-submit');
+        const submitBtn = form.closest('#terminer-modal').querySelector('.term-btn-submit');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Clôture en cours...'; }
+        try {
+            const res = await fetch(form.action + '?ajax=1', {
+                method: 'POST',
+                body: new FormData(form),
+            });
+            const ct = res.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) {
+                throw new Error(`Réponse inattendue du serveur (${res.status}). Vérifiez que la session est active.`);
+            }
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Échec de la clôture');
+            _fuPatientId = data.patient_id;
+            _fuDoctorId  = data.doctor_id;
+            closeTerminerModal();
+            fuOpen();
+        } catch(err) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Clôturer la consultation <span>→</span>'; }
+            alert('Erreur lors de la clôture : ' + err.message);
+        }
+    });
+});
+
+// ===== Follow-up RDV modal =====
+const FU_SUGGESTIONS = IS_DENTIST
+    ? [{ label: '1 semaine', days: 7 }, { label: '2 semaines', days: 14 }, { label: '1 mois', days: 30 }, { label: '3 mois', days: 90 }]
+    : [{ label: '1 semaine', days: 7 }, { label: '1 mois', days: 30 }, { label: '3 mois', days: 90 }, { label: '6 mois', days: 182 }];
+
+function fuOpen() {
+    // Default date = 1 month from today
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('fu-date').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    document.getElementById('fu-error').style.display = 'none';
+    // Build suggestion chips
+    const chips = document.getElementById('fu-suggest-chips');
+    chips.innerHTML = FU_SUGGESTIONS.map(s =>
+        `<button type="button" class="fu-chip" onclick="fuSetDate(${s.days},this)">${s.label}</button>`
+    ).join('');
+    // Mark "1 mois" as active by default
+    const activeChip = chips.querySelectorAll('.fu-chip')[IS_DENTIST ? 2 : 1];
+    if (activeChip) activeChip.classList.add('active');
+    document.getElementById('followup-overlay').style.display = 'block';
+    document.getElementById('followup-modal').style.display = 'flex';
+}
+
+function fuSetDate(days, chipEl) {
+    document.querySelectorAll('.fu-chip').forEach(c => c.classList.remove('active'));
+    if (chipEl) chipEl.classList.add('active');
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('fu-date').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function fuSkip() {
+    document.getElementById('followup-overlay').style.display = 'none';
+    document.getElementById('followup-modal').style.display = 'none';
+    window.location.href = `/patients/{{ patient.id }}?tab=appts`;
+}
+
+async function fuCreate() {
+    const title    = document.getElementById('fu-title').value.trim();
+    const dateVal  = document.getElementById('fu-date').value;
+    const timeVal  = document.getElementById('fu-time').value || '09:00';
+    const duration = parseInt(document.getElementById('fu-duration').value) || 30;
+    const aptType  = document.getElementById('fu-type').value;
+    const notes    = document.getElementById('fu-notes').value.trim();
+    const errEl    = document.getElementById('fu-error');
+    errEl.style.display = 'none';
+
+    if (!title)   { errEl.textContent = 'Le motif est requis.'; errEl.style.display='block'; return; }
+    if (!dateVal) { errEl.textContent = 'La date est requise.'; errEl.style.display='block'; return; }
+
+    const start = `${dateVal}T${timeVal}`;
+    const endDate = new Date(`${dateVal}T${timeVal}`);
+    endDate.setMinutes(endDate.getMinutes() + duration);
+    const pad = n => String(n).padStart(2,'0');
+    const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+
+    const btn = document.getElementById('fu-create-btn');
+    btn.disabled = true;
+    btn.textContent = 'Création...';
+
+    try {
+        const res = await fetch('/appointments/api/new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                patient_id: _fuPatientId,
+                doctor_id:  _fuDoctorId,
+                title, appointment_type: aptType,
+                status: 'planifie',
+                start_datetime: start,
+                end_datetime: end,
+                notes: notes || null,
+            }),
+        });
+        if (res.status === 409) {
+            const data = await res.json();
+            const sugg = data.suggestions && data.suggestions.length
+                ? ' Suggestions : ' + data.suggestions.map(s => s.label).join(', ')
+                : '';
+            errEl.textContent = 'Créneau déjà occupé.' + sugg;
+            errEl.style.display = 'block';
+            btn.disabled = false; btn.innerHTML = '📅 Créer le rendez-vous';
+            return;
+        }
+        if (!res.ok) throw new Error('Erreur serveur');
+        window.location.href = `/patients/{{ patient.id }}?tab=appts`;
+    } catch(err) {
+        errEl.textContent = 'Erreur : ' + err.message;
+        errEl.style.display = 'block';
+        btn.disabled = false; btn.innerHTML = '📅 Créer le rendez-vous';
+    }
+}
+{% endif %}
 </script>
 {% if is_dentist %}
 <div id="overlay" onclick="closePanel()"></div>
@@ -1105,6 +1685,7 @@ async function saveCondition() {
     const notes     = document.getElementById('p-notes').value;
     const fd = new FormData();
     fd.append('condition', condition); fd.append('notes', notes);
+    {% if active_consultation %}fd.append('consultation_id', '{{ active_consultation.id }}');{% endif %}
     try {
         const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition`, {method:'POST', body:fd});
         if (r.ok) {
@@ -1134,7 +1715,7 @@ async function addBulkTreatment() {
         const r = await fetch(`/dental/${PATIENT_ID}/bulk-treatment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ treatment_type: treatmentType, description: desc, treatment_date: tdate, start_time: stime }),
+            body: JSON.stringify({ treatment_type: treatmentType, description: desc, treatment_date: tdate, start_time: stime{% if active_consultation %}, consultation_id: {{ active_consultation.id }}{% endif %} }),
         });
         if (r.ok) {
             showToast(`${treatmentType} appliqué à 32 dents ✓`);
@@ -1188,6 +1769,7 @@ async function addTreatment() {
     fd.append('description',    document.getElementById('new-t-desc').value);
     fd.append('treatment_date', document.getElementById('new-t-date').value);
     fd.append('start_time',     document.getElementById('new-t-time').value || '09:00');
+    {% if active_consultation %}fd.append('consultation_id', '{{ active_consultation.id }}');{% endif %}
     try {
         const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
         if (r.ok) {
@@ -1411,7 +1993,7 @@ async function saveEndoData() {
     });
     const generalNotes = document.getElementById('endo-general-notes').value;
     try {
-        const res = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({canals, general_notes: generalNotes})});
+        const res = await fetch(`/dental/${PATIENT_ID}/endo/${endoCurrentTooth}/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({canals, general_notes: generalNotes{% if active_consultation %}, consultation_id: {{ active_consultation.id }}{% endif %}})});
         if (!res.ok) { const err = await res.json(); showToast(err.error || 'Erreur'); return; }
         showToast('Données endodontiques enregistrées');
         updateEndoBtn(endoCurrentTooth, canals);

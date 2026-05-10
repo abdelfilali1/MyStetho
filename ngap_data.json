@@ -1,0 +1,1542 @@
+[
+  {
+    "categorie": "Consultation",
+    "code": "C",
+    "libelle": "Consultation chez un médecin généraliste ou médecin dentiste.",
+    "cotation": 1,
+    "cotation_bis": 0,
+    "lettre": "C",
+    "valeure_lettre": 150,
+    "remarques": "Une ordonnance avec le motif de consultation ou bien une préscription doit être jointe à la feuille de soins pour prétendre au remboursement."
+  },
+  {
+    "categorie": "Consultation",
+    "code": "V",
+    "libelle": "Visite à domicile d'un médecin généraliste, médecin dentiste, lors des jours fériés ou la nuit.",
+    "cotation": 1,
+    "cotation_bis": 0,
+    "lettre": "V",
+    "valeure_lettre": 190,
+    "remarques": "Une ordonnance avec le motif de la visite ou bien une préscription doit être jointe à la feuille de soins pour prétendre au remboursement."
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D626",
+    "libelle": "Examen de diagnostic d'ODF (hors examens complémentaires)",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D627",
+    "libelle": "Analyse céphalométrique",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D628",
+    "libelle": "Scéance de ré-éducation de la déglutition ou phonation (par série de douze séances)",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D629",
+    "libelle": "Traitement des dysmorphoses : Semestre",
+    "cotation": 90,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D630",
+    "libelle": "Traitement des dysmorphoses : Plafond ",
+    "cotation": 540,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D631",
+    "libelle": "Interruption du traitement de dysmorphoses : Séance de surveillance",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D632",
+    "libelle": "Interruption du traitement de dysmorphoses : Première année",
+    "cotation": 75,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D633",
+    "libelle": "Interruption du traitement de dysmorphoses : Deuxième année",
+    "cotation": 50,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D634",
+    "libelle": "Mise en occlusion d'une canine incluse (avant le 18e anniversaire)",
+    "cotation": 150,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D635",
+    "libelle": "Mise en occlusion de deux canines incluses  (avant le 18e anniversaire)",
+    "cotation": 200,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D636",
+    "libelle": "Contention après traitement orthodontique : Pemière année",
+    "cotation": 75,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D637",
+    "libelle": "Contention après traitement orthodontique : Deuxième année",
+    "cotation": 50,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D638",
+    "libelle": "Disjonction intrarmaxillaire rapide pour dysmorphose maxillaire en cas d'insuffisance respiratoire confirmée",
+    "cotation": 180,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D639",
+    "libelle": "Orthopédie des malformations consécutives au bec-de-lièvre total ou à la division palatine : forfait annuel, par année",
+    "cotation": 200,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D640",
+    "libelle": "Orthopédie des malformations consécutives au bec-de-lièvre total ou à la division palatine : en période d'attente",
+    "cotation": 60,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Orthopédie Dento-faciale",
+    "code": "D641",
+    "libelle": "Traitement d'orthopédie dento-faciale au delà du seizième anniversaire, préalable à une intervention chirurgicale portant sur les maxillaires, pour une période de six mois non renouvelable",
+    "cotation": 90,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D700",
+    "libelle": "Curetage et obturation coronaire de cavité simple",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D701",
+    "libelle": "Curetage et obturation coronaire de cavité composée de 2 faces",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D702",
+    "libelle": "Curetage et obturation coronaire de cavité composée de 3 faces et plus",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D703",
+    "libelle": "Pulpotomie ou pulpectomie coronaire avec obturation de la chambre pulpaire",
+    "cotation": 7,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D704",
+    "libelle": "Traitement endodontique du groupe inciso-canin",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire et une radiographie post-opératoire sont obligatoires\r\n"
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D705",
+    "libelle": "Traitement endodontique du groupe prémolaires",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire et une radiographie post-opératoire sont obligatoires\r\n"
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D706",
+    "libelle": "Traitement endodontique du groupe molaires",
+    "cotation": 25,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire et une radiographie post-opératoire sont obligatoires\r\n"
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D707",
+    "libelle": "Restauration par matériau inséré en phase plastique avec ancrage radiculaire",
+    "cotation": 33,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D708",
+    "libelle": "Séance de détartrage complet sus et sous-gingival",
+    "cotation": 12,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D709",
+    "libelle": "Ligature métallique dans les parodontopathies",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D710",
+    "libelle": "Attelle métallique dans les parodontopathies",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D711",
+    "libelle": "Prothèse attelle de contention quel que soit le nombre de dents ou de crochets",
+    "cotation": 70,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D712",
+    "libelle": "Scellement prophylactique des puits, sillons et fissures, par dent",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D713",
+    "libelle": "Extraction d'une dent permanente",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D714",
+    "libelle": "Extraction de chacune des suivantes au cours de la même séance",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D715",
+    "libelle": "Extraction d'une dent lactéale, quelle que soit la technique",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D716",
+    "libelle": "Extraction de chacune des dents suivantes au cours de la même séance",
+    "cotation": 4,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D717",
+    "libelle": "Extraction d'une dent par alvéolectomie",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D718",
+    "libelle": "Anesthésie générale pour une à douze extractions",
+    "cotation": 25,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D719",
+    "libelle": "Anesthésie générale pour treize extractions et plus",
+    "cotation": 30,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D720",
+    "libelle": "Extraction de la première dent de sagesse incluse",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D721",
+    "libelle": "Extraction des dents de sagesse incluses suivantes au cours de la même séance",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D722",
+    "libelle": "Anesthésie générale pour une dent incluse",
+    "cotation": 25,
+    "cotation_bis": 25,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D723",
+    "libelle": "Anesthésie générale pour deux dents incluses ou plus",
+    "cotation": 40,
+    "cotation_bis": 40,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D724",
+    "libelle": "Germectomie pour une autre dent que la dent de sagesse",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D725",
+    "libelle": "Extraction d'une dent incluse ou enclavée",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D726",
+    "libelle": "Extraction d'une canine incluse",
+    "cotation": 50,
+    "cotation_bis": 30,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D727",
+    "libelle": "Extraction d'une odontoïde ou d'une dent surnuméraire incluse ou enclavée",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D728",
+    "libelle": "Extraction d'une dent en désinclusion non enclavée, dont la couronne est sous-muqueuse",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D729",
+    "libelle": "Extraction d'une dent en désinclusion dont la couronne est sous muqueuse en position palatine ou linguale",
+    "cotation": 30,
+    "cotation_bis": 30,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D730",
+    "libelle": "Extraction d'une dent ectopique et incluse (coroné, gonion, branche montante, bord basilaire de la branche et du menton, sinus)",
+    "cotation": 30,
+    "cotation_bis": 30,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D731",
+    "libelle": "Extraction chirurgicale d'une dent permanente incluse, traitement radiculaire éventuel, réimplantation, contention : D'une dent",
+    "cotation": 100,
+    "cotation_bis": 30,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D732",
+    "libelle": "Extraction chirurgicale d'une dent permanente incluse, traitement radiculaire éventuel, réimplantation, contention : De deux dents",
+    "cotation": 150,
+    "cotation_bis": 40,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D733",
+    "libelle": "Trépanation du sinus maxillaire, par voie vestibulaire, pour recherche d'une racine dentaire",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D734",
+    "libelle": "Dégagement chirurgical de la couronne d'une dent permanente incluse",
+    "cotation": 30,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D735",
+    "libelle": "Régularisation d'une crête alvéolaire avec suture gingivale : Localisée, et dans une autre séance que celle de l'extraction",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D736",
+    "libelle": "Régularisation d'une crête alvéolaire avec suture gingivale : Etendue à la crête d'un hémimaxillaire ou de canine à canine",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D737",
+    "libelle": "Régularisation d'une crête alvéolaire avec suture gingivale : Etendue à la totalité de la crête",
+    "cotation": 30,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D738",
+    "libelle": "Curetage périapical avec ou sans résection apicale (radiographie obligatoire, traitement et obturation du canal non compris)",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D739",
+    "libelle": "Exérèse chirurgicale d'un kyste de petit volume par voie alvéolaire élargie",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D740",
+    "libelle": "Exérèse chirurgicale d'un kyste étendu aux apex de deux dents et nécessitant une trépanation osseuse",
+    "cotation": 30,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D741",
+    "libelle": "Exérèse chirurgicale d'un kyste étendu à un segment important du maxillaire",
+    "cotation": 50,
+    "cotation_bis": 30,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": "Une radiographie pré-opératoire est obligatoire\r\n"
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D742",
+    "libelle": "Gingivectomie partielle",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D743",
+    "libelle": "Gingivectomie étendue à un sextant : (de canine à canine, de prémolaire à dent de sagesse)",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D744",
+    "libelle": "Traitement d'une hémorragie post-opératoire dans une séance autre que celle de l'intervention",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D745",
+    "libelle": "Désinsertion musculaire d'un vestibule supérieur ou inférieur",
+    "cotation": 40,
+    "cotation_bis": 20,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D746",
+    "libelle": "Désinsertion musculaire du plancher de la bouche avec section des mylohyoïdiens",
+    "cotation": 60,
+    "cotation_bis": 20,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D747",
+    "libelle": "Approfondissement d'un vestibule par greffe cutanée",
+    "cotation": 40,
+    "cotation_bis": 20,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D748",
+    "libelle": "Couronnes en acier ou en nickel chromé.",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D749",
+    "libelle": "Couronnes en or jaune ou en métaux précieux",
+    "cotation": 60,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D750",
+    "libelle": "Couronnes coulées en acier ou en nickel chromé",
+    "cotation": 50,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D751",
+    "libelle": "Couronnes coulées en or jaune ou métaux précieux",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D752",
+    "libelle": "Couronnes à incrustation vestibulaire ou couronnes veneer en acier",
+    "cotation": 75,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D753",
+    "libelle": "Couronnes à incrustation vestibulaire en or jaune ou en métaux précieux",
+    "cotation": 120,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D754",
+    "libelle": "Couronnes céramo-métal",
+    "cotation": 180,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D755",
+    "libelle": "Couronnes jacket céramo-métal",
+    "cotation": 180,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D756",
+    "libelle": "Couronnes jacket cuite",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D757",
+    "libelle": "Chaque élément du bridge sera compté comme couronne unitaire de même nature",
+    "cotation": 0,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D758",
+    "libelle": "Les inlay-cores en or jaune ou métal précieux  sur dents uniradiculaires",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D759",
+    "libelle": "Les inlay-cores en or jaune ou métal précieux  sur dents pluriradiculaires",
+    "cotation": 100,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D760",
+    "libelle": "Les dents à pivots esthétiques en or jaune ou métaux précieux",
+    "cotation": 150,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D761",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement d'une à trois dents",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D762",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de quatre dents",
+    "cotation": 45,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D763",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de cinq dents",
+    "cotation": 50,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D764",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de six dents",
+    "cotation": 55,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D765",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de sept dents",
+    "cotation": 60,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D766",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de huit dents",
+    "cotation": 65,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D767",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de neuf dents",
+    "cotation": 70,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D768",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de dix dents",
+    "cotation": 75,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D769",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de onze dents",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D770",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de douze dents",
+    "cotation": 85,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D771",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de treize dents",
+    "cotation": 90,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D772",
+    "libelle": "Appareil sur plaque base en matière plastique d'un édentement de quatorze dents",
+    "cotation": 95,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D773",
+    "libelle": "Prothèse adjointe totale du maxillaire supérieur",
+    "cotation": 120,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D774",
+    "libelle": "Prothèse adjointe totale du maxillaire inférieur",
+    "cotation": 120,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D775",
+    "libelle": "Supplément pour plaque base métallique",
+    "cotation": 120,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D776",
+    "libelle": "Supplément pour dent prothétique contreplaquée sur plaque base en matière plastique",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D777",
+    "libelle": "Supplément pour dent prothétique contreplaquée ou massive sur plaque base métallique",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D778",
+    "libelle": "Réparation de fractures de la plaque base en matière plastique",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D779",
+    "libelle": "Réparation de fractures de la plaque base métallique, non compris, s'il y a lieu, le remontage des dents sur matière plastique",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D780",
+    "libelle": "Dents ou crochets ajoutés ou remplacés sur appareil en matière plastique, ou à chassis métallique ( premier élément )",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D781",
+    "libelle": "Dents ou crochets ajoutés ou remplacés sur appareil en matière plastique, ou à chassis métallique ( les suivants, sur le même appareil )",
+    "cotation": 5,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D782",
+    "libelle": "Dents contreplaquées ou massives et crochets, soudés, ajoutés ou remplacés sur appareil métallique ( par élément )",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D783",
+    "libelle": "Dents ou crochets remontés sur matière plastique, après réparation de la plaque base métallique (par élément )",
+    "cotation": 3,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D784",
+    "libelle": "Remplacement de facette",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D785",
+    "libelle": "Suplément d'attachement de PAP  la cotation de la plaque métallique",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D800",
+    "libelle": "Appareillage par obturateur pour perforation palatine de moins de 1 cm",
+    "cotation": 25,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D801",
+    "libelle": "Appareillage par obturateur pour perte de substance du maxillaire ou de la mandibule s'il s'agit d'une prothèse partielle",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D802",
+    "libelle": "Appareillage par obturateur pour perte de substance du maxillaire ou de la mandibule s'il s'agit d'une prothèse complète",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D803",
+    "libelle": "Appareillage par obturateur pour perte de substance vélopalatine",
+    "cotation": 100,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D804",
+    "libelle": "Prothèse à étages pour résection élargie du maxillaire supérieur (prothèse dentaire non comprise)",
+    "cotation": 150,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D805",
+    "libelle": "Chapes de recouvrement (support de prothèse vélopalatine), par élément",
+    "cotation": 25,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D806",
+    "libelle": "Prothèse de recouvrement pour correction de l'articulé",
+    "cotation": 60,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D807",
+    "libelle": "Appareillage de contention ou de réduction pré-opératoire et post- opératoire du maxillaire ou de la mandibule (résection chirurgicale ou greffe)",
+    "cotation": 130,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D808",
+    "libelle": "Appareillage par mobilisateur du maxillaire inférieur (quel que soit le modèle)",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D809",
+    "libelle": "Appareillage par appui péricrânien",
+    "cotation": 60,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D810",
+    "libelle": "Appareillage par appareil guide : sur une arcade",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D811",
+    "libelle": "Appareillage par appareil guide : sur deux arcades",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D812",
+    "libelle": "Appareillage de distension des cicatrices vicieuses",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D813",
+    "libelle": "Appareil porte-radium ou appareil de protection des maxillaires pour radiations ionisantes",
+    "cotation": 80,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D814",
+    "libelle": "Appareillage de redressement nasal avec point d'appui dento-maxillaire ou péricrânien",
+    "cotation": 140,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D815",
+    "libelle": "Moulage facial",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse restauratrice maxillo-faciale",
+    "code": "D816",
+    "libelle": "Prothèse plastique faciale (par exemple, du pavillon de l'oreille ou du nez); prise en charge, après accord préalable, suivant devis du praticien traitant.",
+    "cotation": 0,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 0,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D900 ",
+    "libelle": "Couronne céramo-céramique ",
+    "cotation": 200,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D901 ",
+    "libelle": "Inlay onlay céramique",
+    "cotation": 180,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D902 ",
+    "libelle": "Facette céramique ",
+    "cotation": 180,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse dentaire",
+    "code": "D903 ",
+    "libelle": "Dent à tenon céramo-métallique",
+    "cotation": 200,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D904 ",
+    "libelle": "Dent provisoire en résine (par élément)",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D905 ",
+    "libelle": "Dépose d’un ancrage radiculaire, coronaire, unitaire ou plural",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins chirurgicaux ",
+    "code": "D906",
+    "libelle": "Extraction d’une dent ankylosée",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D907 ",
+    "libelle": "Mainteneur d’espace fixe unilatéral",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D908 ",
+    "libelle": "Mainteneur d’espace fixe bilatéral ",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Prothèse Dentaire",
+    "code": "D909 ",
+    "libelle": "Prothèse dentaire amovible pédiatrique ",
+    "cotation": 40,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 12.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D910 ",
+    "libelle": "Eclaircissement d’une dent dépulpée",
+    "cotation": 25,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D911 ",
+    "libelle": "Reminéralisation une à deux dents",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D912",
+    "libelle": "Reminéralisation de 2 à 6 dents",
+    "cotation": 12,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D913 ",
+    "libelle": "Reminéralisation par arcade",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Soins conservateurs",
+    "code": "D914",
+    "libelle": "Etanchéification par dent",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "D",
+    "valeure_lettre": 17.5,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T142",
+    "libelle": "Incidences fondamentales : face, profil, projection sus-orbitaire des rochers, par incidence",
+    "cotation": 6,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T143",
+    "libelle": "Incidences spéciales : projections verticales de base, incidences obliques, opacification des sinus, par incidence",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T144",
+    "libelle": "Recherche d'un corps étranger oculaire par radiographie multiples, l'examen",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T145",
+    "libelle": "Maxillaire défilé, os propres du nez, articulation temporo-maxillaire",
+    "cotation": 8,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T146",
+    "libelle": "Examen radiologique du crâne, massif facial, sinus, une incidence",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T147",
+    "libelle": "Examen radiologique du crâne, massif facial, sinus, deux ou trois incidences",
+    "cotation": 18,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T148",
+    "libelle": "Examen radiologique du crâne, massif facial, sinus, quatre incidences et plus",
+    "cotation": 26,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T149",
+    "libelle": "Examen radiographique des os propres du nez, y compris la cloison, incluant l'ensemble des incidences nécessaires",
+    "cotation": 17,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T150",
+    "libelle": "Examen radiographique des articulations temporo-maxillaires",
+    "cotation": 19,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T151",
+    "libelle": "Examen radiographique panoramique de la totalité du système maxillaire et du système dentaire (technique tomographique)",
+    "cotation": 16,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T152",
+    "libelle": "Examen radiographique du crâne : incidences de Schuller (les deux côtés), non cumulable avec la radiographie du crâne",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T153",
+    "libelle": "Téléradiographie du crâne à trois mètres (diagnostique orthodontique), par incidence",
+    "cotation": 10,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T154",
+    "libelle": "Téléradiographie du crâne à 4 mètres (diagnostic orthodontique), une incidence",
+    "cotation": 15,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T155",
+    "libelle": "Téléradiographie du crâne à 4 mètres (diagnostic orthodontique), deux incidences et plus",
+    "cotation": 20,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T156",
+    "libelle": "Premier cliché d'un examen radiographique intra-buccal rétroalvéolaire, par dent ou groupe de deux ou trois dents contiguës, au cours d'une même séance de diagnostic ou de traitement",
+    "cotation": 4,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T157",
+    "libelle": "Deuxième cliché et suivants d'un examen radiographique intrabuccal rétroalvéolaire par dent ou groupe de deux ou trois dents contiguës, au cours d'une même séance de diagnostic ou de traitement",
+    "cotation": 1,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T158",
+    "libelle": "Bilan complet en téléradiographie intrabuccale (status), au cours d'une même séance, quel que soit le nombre de clichés rétroalvéolaires ou rétrocoronaires",
+    "cotation": 56,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": ""
+  },
+  {
+    "categorie": "Radiographie de la tête",
+    "code": "T159",
+    "libelle": "Examen radiographique intra-buccal à images numérisées par capteur, par dent ou groupe de deux ou trois dents contiguës, au cours d'une même séance de diagnostic ou de traitement",
+    "cotation": 6,
+    "cotation_bis": 0,
+    "lettre": "Z",
+    "valeure_lettre": 10,
+    "remarques": "Pour donner lieu à remboursement, l'examen ci-dessus, qui comporte la visualisation d'une ou plusieurs images numériques sur écran, doit être matérialisé par au moins un support papier de format égal ou supérieur à 70 x 90 mm indiquant la date de cet examen, l'identification du patient et celle de la dent ou des dents concernées. Le support papier doit comporter une ou plusieurs images d'un format au moins égal à 2,5 fois celui d'un cliché périapical standard\r\n"
+  }
+]

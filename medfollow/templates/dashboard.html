@@ -77,7 +77,11 @@
                         </td>
                         <td>
                             {% if apt.status != 'termine' %}
-                            <a href="/consultations/new?patient_id={{ apt.patient_id }}&appointment_id={{ apt.id }}" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px;">Consulter</a>
+                            <form method="POST" action="/consultations/start" style="display:inline;">
+                                <input type="hidden" name="patient_id" value="{{ apt.patient_id }}">
+                                <input type="hidden" name="appointment_id" value="{{ apt.id }}">
+                                <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px;">Consulter</button>
+                            </form>
                             {% endif %}
                         </td>
                     </tr>

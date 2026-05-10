@@ -187,7 +187,7 @@ async def list_consultations(
     base_query = """FROM consultations c
         JOIN patients p ON c.patient_id = p.id
         JOIN users u ON c.doctor_id = u.id
-        WHERE c.doctor_id = ?"""
+        WHERE c.doctor_id = ? AND (c.status IS NULL OR c.status = 'terminee')"""
     params: list = [uid]
 
     if q:
@@ -405,6 +405,58 @@ async def create_consultation(
     return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
 
 
+@router.post("/start")
+async def start_consultation(
+    request: Request,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    form = await request.form()
+    try:
+        patient_id = int(form.get("patient_id", 0))
+    except (ValueError, TypeError):
+        return RedirectResponse(url="/patients", status_code=302)
+    appointment_id_raw = form.get("appointment_id")
+    appointment_id = int(appointment_id_raw) if appointment_id_raw else None
+    uid = user["sub"]
+
+    # Guard: resume existing en_cours session
+    cursor = await db.execute(
+        """SELECT id FROM consultations
+           WHERE patient_id = ? AND doctor_id = ? AND status = 'en_cours'
+           ORDER BY created_at DESC LIMIT 1""",
+        (patient_id, uid),
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        return RedirectResponse(
+            url=f"/patients/{patient_id}?consultation_id={existing['id']}",
+            status_code=302,
+        )
+
+    if appointment_id:
+        await db.execute(
+            "UPDATE appointments SET status = 'en_cours', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (appointment_id,),
+        )
+
+    cursor = await db.execute(
+        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, status, consultation_date)
+           VALUES (?, ?, ?, 'en_cours', CURRENT_TIMESTAMP)""",
+        (patient_id, uid, appointment_id),
+    )
+    consultation_id = cursor.lastrowid
+    await db.commit()
+
+    return RedirectResponse(
+        url=f"/patients/{patient_id}?consultation_id={consultation_id}",
+        status_code=302,
+    )
+
+
 @router.get("/{consultation_id}", response_class=HTMLResponse)
 async def view_consultation(request: Request, consultation_id: int, db: aiosqlite.Connection = Depends(get_db)):
     user = get_current_user(request)
@@ -464,7 +516,7 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
 
     from services.pdf_service import generate_consultation_pdf
 
-    pdf_bytes = generate_consultation_pdf(consultation, vitals)
+    pdf_bytes = generate_consultation_pdf(consultation, vitals, consultation.get("summary"))
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -605,3 +657,270 @@ async def update_consultation(
 
     await db.commit()
     return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
+
+
+# ---------------------------------------------------------------------------
+# Consultation workflow: start / summary-data / terminate
+# ---------------------------------------------------------------------------
+
+async def _build_summary(
+    db: aiosqlite.Connection,
+    consultation_id: int,
+    reason: Optional[str],
+    diagnosis: Optional[str],
+    treatment_plan: Optional[str],
+) -> str:
+    parts = []
+
+    if reason:
+        parts.append(f"Motif : {reason}")
+    if diagnosis:
+        parts.append(f"Diagnostic : {diagnosis}")
+    if treatment_plan:
+        parts.append(f"Plan de traitement : {treatment_plan}")
+
+    # Constantes vitales
+    cursor = await db.execute("SELECT * FROM vitals WHERE consultation_id = ?", (consultation_id,))
+    vitals_row = await cursor.fetchone()
+    if vitals_row:
+        v = dict(vitals_row)
+        v_parts = []
+        if v.get("weight"): v_parts.append(f"Poids : {v['weight']} kg")
+        if v.get("height"): v_parts.append(f"Taille : {v['height']} cm")
+        if v.get("blood_pressure_sys") and v.get("blood_pressure_dia"):
+            v_parts.append(f"TA : {v['blood_pressure_sys']}/{v['blood_pressure_dia']} mmHg")
+        if v.get("heart_rate"): v_parts.append(f"FC : {v['heart_rate']} bpm")
+        if v.get("temperature"): v_parts.append(f"Température : {v['temperature']} °C")
+        if v.get("spo2"): v_parts.append(f"SpO₂ : {v['spo2']} %")
+        if v_parts:
+            parts.append("Constantes vitales : " + ", ".join(v_parts))
+
+    # Ordonnances
+    cursor = await db.execute(
+        """SELECT p.id, GROUP_CONCAT(pi.medication_name || ' ' || pi.dosage, ' | ') AS meds
+           FROM prescriptions p
+           LEFT JOIN prescription_items pi ON p.id = pi.prescription_id
+           WHERE p.consultation_id = ?
+           GROUP BY p.id""",
+        (consultation_id,),
+    )
+    rxs = await cursor.fetchall()
+    if rxs:
+        rx_lines = [f"  - Ordonnance #{r['id']}: {r['meds'] or 'vide'}" for r in rxs]
+        parts.append("Ordonnances :\n" + "\n".join(rx_lines))
+
+    # Antécédents / modifications médicales
+    cursor = await db.execute(
+        "SELECT type, description FROM medical_history WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    ants = await cursor.fetchall()
+    if ants:
+        ant_lines = [f"  - [{r['type']}] {r['description']}" for r in ants]
+        parts.append("Antécédents ajoutés :\n" + "\n".join(ant_lines))
+
+    # Actes dentaires (avec le RDV créé)
+    cursor = await db.execute(
+        """SELECT dt.tooth_number, dt.treatment_type, dt.description,
+                  a.start_datetime AS appt_date
+           FROM dental_treatments dt
+           LEFT JOIN appointments a ON dt.appointment_id = a.id
+           WHERE dt.consultation_id = ?
+           ORDER BY dt.tooth_number""",
+        (consultation_id,),
+    )
+    dental = await cursor.fetchall()
+    if dental:
+        d_lines = []
+        for r in dental:
+            appt_str = f" (RDV : {r['appt_date'][:10] if r['appt_date'] else '—'})" if r['appt_date'] else ""
+            d_lines.append(f"  - Dent {r['tooth_number']}: {r['treatment_type']} — {r['description'] or ''}{appt_str}")
+        parts.append("Actes dentaires :\n" + "\n".join(d_lines))
+
+    # Modifications endodontiques
+    cursor = await db.execute(
+        """SELECT tooth_number, canal_name, field, old_value, new_value
+           FROM endo_history
+           WHERE consultation_id = ?
+           ORDER BY tooth_number, canal_name, changed_at""",
+        (consultation_id,),
+    )
+    endo_changes = await cursor.fetchall()
+    if endo_changes:
+        e_lines = [
+            f"  - Dent {r['tooth_number']}, {r['canal_name']} — {r['field']} : {r['old_value'] or '—'} → {r['new_value'] or '—'}"
+            for r in endo_changes
+        ]
+        parts.append("Modifications endodontiques :\n" + "\n".join(e_lines))
+
+    # Changements de condition dentaire
+    cursor = await db.execute(
+        """SELECT tooth_number, condition, notes
+           FROM dental_condition_history
+           WHERE consultation_id = ?
+           ORDER BY tooth_number, changed_at""",
+        (consultation_id,),
+    )
+    cond_changes = await cursor.fetchall()
+    if cond_changes:
+        c_lines = [
+            f"  - Dent {r['tooth_number']}: {r['condition']}" + (f" ({r['notes']})" if r['notes'] else "")
+            for r in cond_changes
+        ]
+        parts.append("Changements de condition dentaire :\n" + "\n".join(c_lines))
+
+    # Feuilles de soin
+    cursor = await db.execute(
+        "SELECT mutuelle, type_feuille, total_montant FROM feuilles_soin WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    feuilles = await cursor.fetchall()
+    if feuilles:
+        f_lines = [f"  - {r['mutuelle']} ({r['type_feuille']}) — {r['total_montant'] or 0:.2f} Dh" for r in feuilles]
+        parts.append("Feuilles de soin :\n" + "\n".join(f_lines))
+
+    # Documents ajoutés
+    cursor = await db.execute(
+        "SELECT title, category FROM documents WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    docs = await cursor.fetchall()
+    if docs:
+        doc_lines = [f"  - {r['title']} [{r['category']}]" for r in docs]
+        parts.append("Documents ajoutés :\n" + "\n".join(doc_lines))
+
+    return "\n\n".join(parts) if parts else "Consultation sans résumé."
+
+
+@router.get("/{consultation_id}/summary-data")
+async def get_summary_data(
+    request: Request,
+    consultation_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    cursor = await db.execute(
+        """SELECT p.id, GROUP_CONCAT(pi.medication_name, ', ') AS meds
+           FROM prescriptions p
+           LEFT JOIN prescription_items pi ON p.id = pi.prescription_id
+           WHERE p.consultation_id = ?
+           GROUP BY p.id""",
+        (consultation_id,),
+    )
+    prescriptions = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT type, description FROM medical_history WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    antecedents = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT tooth_number, treatment_type, description FROM dental_treatments WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    dental = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT mutuelle, type_feuille, total_montant FROM feuilles_soin WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    feuilles = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT title, category FROM documents WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    documents = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT DISTINCT tooth_number, canal_name FROM endo_history WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    endo = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        "SELECT tooth_number, condition FROM dental_condition_history WHERE consultation_id = ?",
+        (consultation_id,),
+    )
+    conditions = [dict(r) for r in await cursor.fetchall()]
+
+    return JSONResponse(content={
+        "prescriptions": prescriptions,
+        "antecedents": antecedents,
+        "dental": dental,
+        "feuilles": feuilles,
+        "documents": documents,
+        "endo": endo,
+        "conditions": conditions,
+    })
+
+
+@router.post("/{consultation_id}/terminate")
+async def terminate_consultation(
+    request: Request,
+    consultation_id: int,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    is_ajax = request.query_params.get("ajax") == "1"
+
+    user = get_current_user(request)
+    if not user:
+        if is_ajax:
+            return JSONResponse(status_code=401, content={"ok": False, "error": "Non authentifié"})
+        return RedirectResponse(url="/login", status_code=302)
+
+    form = await request.form()
+    try:
+        patient_id = int(form.get("patient_id", 0))
+    except (ValueError, TypeError):
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"ok": False, "error": "Patient invalide"})
+        return RedirectResponse(url="/patients", status_code=302)
+
+    reason = form.get("reason", "") or None
+    clinical_exam = form.get("clinical_exam", "") or None
+    diagnosis = form.get("diagnosis", "") or None
+    treatment_plan = form.get("treatment_plan", "") or None
+    notes = form.get("notes", "") or None
+
+    cursor = await db.execute(
+        "SELECT * FROM consultations WHERE id = ? AND doctor_id = ? AND status = 'en_cours'",
+        (consultation_id, user["sub"]),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        if is_ajax:
+            return JSONResponse(status_code=404, content={"ok": False, "error": "Consultation introuvable ou déjà terminée"})
+        return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
+    consultation = dict(row)
+
+    summary = await _build_summary(db, consultation_id, reason, diagnosis, treatment_plan)
+
+    await db.execute(
+        """UPDATE consultations
+           SET status = 'terminee', reason = ?, clinical_exam = ?, diagnosis = ?,
+               treatment_plan = ?, notes = ?, summary = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (reason, clinical_exam, diagnosis, treatment_plan, notes, summary, consultation_id),
+    )
+
+    if consultation.get("appointment_id"):
+        await db.execute(
+            "UPDATE appointments SET status = 'termine', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (consultation["appointment_id"],),
+        )
+
+    await db.commit()
+
+    if is_ajax:
+        return JSONResponse(content={
+            "ok": True,
+            "consultation_id": consultation_id,
+            "patient_id": patient_id,
+            "doctor_id": user["sub"],
+        })
+    return RedirectResponse(url=f"/patients/{patient_id}?tab=appts", status_code=302)
