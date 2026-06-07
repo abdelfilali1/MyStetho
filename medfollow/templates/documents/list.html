@@ -29,6 +29,8 @@
             <select name="category" class="search-input" style="flex: 0 0 160px;">
                 <option value="">Toutes catégories</option>
                 <option value="radio" {{ 'selected' if selected_category == 'radio' }}>Radiologie</option>
+                <option value="photo_extra_orale" {{ 'selected' if selected_category == 'photo_extra_orale' }}>Photo Extra Orale</option>
+                <option value="photo_intra_orale" {{ 'selected' if selected_category == 'photo_intra_orale' }}>Photo Intra Orale</option>
                 <option value="labo" {{ 'selected' if selected_category == 'labo' }}>Laboratoire</option>
                 <option value="courrier" {{ 'selected' if selected_category == 'courrier' }}>Courrier</option>
                 <option value="compte_rendu" {{ 'selected' if selected_category == 'compte_rendu' }}>Compte-rendu</option>
@@ -67,13 +69,14 @@
                         </div>
                     </td>
                     <td><a href="/patients/{{ d.patient_id }}" class="patient-link">{{ d.patient_name }}</a></td>
-                    <td><span class="badge badge-{{ d.category }}">{{ d.category }}</span></td>
+                    {% set cat_labels = {'radio':'Radiologie','photo_extra_orale':'Photo Extra Orale','photo_intra_orale':'Photo Intra Orale','labo':'Laboratoire','courrier':'Courrier','compte_rendu':'Compte-rendu','ordonnance':'Ordonnance','autre':'Autre'} %}
+                    <td><span class="badge badge-{{ d.category }}">{{ cat_labels.get(d.category, d.category) }}</span></td>
                     <td>{{ '%.1f' | format(d.file_size / 1024) }} Ko</td>
                     <td>{{ d.created_at[:10] }}</td>
                     <td>
                         {% set is_previewable = d.file_name and (d.file_name.endswith('.pdf') or d.file_name.endswith('.png') or d.file_name.endswith('.jpg') or d.file_name.endswith('.jpeg') or d.file_name.endswith('.gif') or d.file_name.endswith('.webp')) %}
                         {% if is_previewable %}
-                        <button type="button" class="btn btn-outline btn-sm" onclick="previewDoc('/documents/{{ d.id }}/download', '{{ d.title }}', '{{ d.file_name }}')">Aperçu</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick='previewDoc("/documents/{{ d.id }}/download", {{ d.title|tojson }}, {{ d.file_name|tojson }})'>Aperçu</button>
                         {% endif %}
                         <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
                         <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer le document « {{ d.title }} » ?')">
@@ -107,32 +110,42 @@
 </div>
 
 <!-- Document preview overlay -->
-<div id="doc-preview-overlay" class="preview-overlay" style="display:none;" onclick="if(event.target===this)closeDocPreview()">
-    <div class="preview-box">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h3 id="doc-preview-title" style="margin:0;font-size:16px;"></h3>
-            <button onclick="closeDocPreview()" class="btn btn-outline btn-sm">✕ Fermer</button>
+<div id="doc-preview-overlay" class="preview-overlay" onclick="if(event.target===this)closeDocPreview()" style="--preview-w:96vw;">
+    <div class="preview-box" style="width:96vw;max-width:1400px;height:92vh;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
+            <h3 id="doc-preview-title" style="margin:0;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h3>
+            <a id="doc-preview-open" href="#" target="_blank" class="btn btn-outline btn-sm">Ouvrir</a>
+            <button type="button" onclick="closeDocPreview()" class="btn btn-outline btn-sm">✕ Fermer</button>
         </div>
-        <div id="doc-preview-content" style="flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;"></div>
+        <div id="doc-preview-content" style="flex:1;overflow:auto;display:flex;justify-content:center;align-items:center;background:#0f172a;border-radius:10px;"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+const IMG_EXT = ['png','jpg','jpeg','gif','webp','bmp','svg'];
 function previewDoc(url, title, filename) {
-    document.getElementById('doc-preview-title').textContent = title;
+    const overlay = document.getElementById('doc-preview-overlay');
+    document.getElementById('doc-preview-title').textContent = title || '';
+    document.getElementById('doc-preview-open').href = url;
     const content = document.getElementById('doc-preview-content');
-    const ext = filename.split('.').pop().toLowerCase();
+    const ext = (filename || '').split('.').pop().toLowerCase();
     if (ext === 'pdf') {
-        content.innerHTML = '<iframe src="' + url + '" style="width:100%;height:70vh;border:none;border-radius:8px;"></iframe>';
+        content.style.background = '#0f172a';
+        content.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;border-radius:8px;background:#fff;"></iframe>';
+    } else if (IMG_EXT.includes(ext)) {
+        content.style.background = '#0f172a';
+        content.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;" alt="">';
     } else {
-        content.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:70vh;border-radius:8px;" alt="' + title + '">';
+        content.style.background = '#fff';
+        content.innerHTML = '<div style="padding:24px;color:#475569;">Aperçu non disponible pour ce format. <a href="' + url + '" target="_blank">Ouvrir le fichier</a>.</div>';
     }
-    document.getElementById('doc-preview-overlay').style.display = 'flex';
+    overlay.classList.add('visible');
 }
 function closeDocPreview() {
-    document.getElementById('doc-preview-overlay').style.display = 'none';
+    const overlay = document.getElementById('doc-preview-overlay');
+    overlay.classList.remove('visible');
     document.getElementById('doc-preview-content').innerHTML = '';
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDocPreview(); });

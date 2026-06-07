@@ -93,6 +93,26 @@
         }
         .fc .fc-toolbar-title { text-align: center; }
     }
+
+    .rdv-count-badge {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 7px;
+        font-size: 11px;
+        background: #dbeafe;
+        color: #1e40af;
+        border-radius: 999px;
+        font-weight: 600;
+        vertical-align: middle;
+    }
+    .rdv-count-badge.cell {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        margin: 0;
+        z-index: 3;
+        pointer-events: none;
+    }
 </style>
 {% endblock %}
 
@@ -296,6 +316,38 @@ function toInputDateTime(date) {
     return `${y}-${m}-${d}T${h}:${min}`;
 }
 
+// ===== Helpers for "RDV count" badges =====
+function _localDateKey(d) {
+    if (!d) return '';
+    const dt = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(dt.getTime())) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+function _countEventsOnDate(dayKey) {
+    if (!_calendar) return 0;
+    let n = 0;
+    _calendar.getEvents().forEach(ev => {
+        if (ev.start && _localDateKey(ev.start) === dayKey) n++;
+    });
+    return n;
+}
+function _updateMonthCellBadges() {
+    document.querySelectorAll('.rdv-count-badge.cell').forEach(badge => {
+        const key = badge.dataset.dayKey;
+        if (!key) return;
+        const count = _countEventsOnDate(key);
+        if (count > 0) {
+            badge.textContent = count + ' RDV';
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    });
+}
+
 function seedNewAppointmentDate(baseDate) {
     const startInput = document.getElementById('apt_start');
     const endInput = document.getElementById('apt_end');
@@ -382,6 +434,27 @@ document.addEventListener('DOMContentLoaded', function() {
         allDaySlot: false,
         height: 'auto',
         dayMaxEventRows: isMobileView ? 2 : 4,
+        dayHeaderContent: function(arg) {
+            // arg.text is the default label (e.g. "lun. 13/05")
+            // For timeGrid views, arg.date is the column's date — show a count badge.
+            // For dayGridMonth, the header is a weekday name (no specific date) — return default text.
+            if (!arg.date || !_calendar || arg.view.type === 'dayGridMonth') {
+                return { html: '<span>' + arg.text + '</span>' };
+            }
+            const dayKey = _localDateKey(arg.date);
+            const count = _countEventsOnDate(dayKey);
+            const badge = count > 0
+                ? '<span class="rdv-count-badge">' + count + ' RDV</span>'
+                : '';
+            return { html: '<span>' + arg.text + '</span>' + badge };
+        },
+        eventsSet: function() {
+            // After events load, re-evaluate per-day counts in cell badges and re-render headers.
+            _updateMonthCellBadges();
+            if (_calendar && _calendar.view && _calendar.view.type !== 'dayGridMonth') {
+                _calendar.render();
+            }
+        },
         dayCellDidMount: function(info) {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -394,6 +467,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 openCreateModal(info.date);
             });
             info.el.appendChild(btn);
+
+            // Per-cell RDV count badge (used in dayGridMonth).
+            const badge = document.createElement('span');
+            badge.className = 'rdv-count-badge cell';
+            badge.dataset.dayKey = _localDateKey(info.date);
+            badge.style.display = 'none';
+            info.el.appendChild(badge);
         },
         dateClick: function(info) {
             openCreateModal(info.date);

@@ -118,6 +118,20 @@ async def quick_create_patient(
     return JSONResponse(content={"id": cursor.lastrowid, "name": f"{last_name.upper()} {first_name}"})
 
 
+def _parse_int(v):
+    try:
+        return int(v) if v not in (None, "", "None") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_float(v):
+    try:
+        return float(v) if v not in (None, "", "None") else None
+    except (TypeError, ValueError):
+        return None
+
+
 @router.post("/new", response_class=HTMLResponse)
 async def create_patient(
     request: Request,
@@ -126,6 +140,7 @@ async def create_patient(
     date_of_birth: str = Form(...),
     gender: str = Form(""),
     social_security_number: str = Form(""),
+    identity_document_type: str = Form("CIN"),
     email: str = Form(""),
     phone: str = Form(""),
     address: str = Form(""),
@@ -133,11 +148,23 @@ async def create_patient(
     postal_code: str = Form(""),
     blood_type: str = Form(""),
     referring_doctor: str = Form(""),
+    referring_doctor_phone: str = Form(""),
     insurance_name: str = Form(""),
     insurance_number: str = Form(""),
     insurance_serial: str = Form(""),
     emergency_contact_name: str = Form(""),
     emergency_contact_phone: str = Form(""),
+    emergency_contact_relation: str = Form(""),
+    profession: str = Form(""),
+    marital_status: str = Form(""),
+    height_cm: str = Form(""),
+    weight_kg: str = Form(""),
+    smoking: str = Form(""),
+    alcohol: str = Form(""),
+    pregnant: str = Form(""),
+    breastfeeding: str = Form(""),
+    current_medications: str = Form(""),
+    gdpr_consent: str = Form(""),
     notes: str = Form(""),
     next_url: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
@@ -146,18 +173,37 @@ async def create_patient(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    height_i = _parse_int(height_cm)
+    weight_f = _parse_float(weight_kg)
+    pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
+    breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
+    gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
+
     try:
         cur = await db.execute(
-            """INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth, gender, social_security_number, email, phone, address, city, postal_code, blood_type, referring_doctor, insurance_name, insurance_number, insurance_serial, emergency_contact_name, emergency_contact_phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO patients (
+                doctor_id, first_name, last_name, date_of_birth, gender, social_security_number,
+                identity_document_type,
+                email, phone, address, city, postal_code, blood_type,
+                referring_doctor, referring_doctor_phone,
+                insurance_name, insurance_number, insurance_serial,
+                emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+                profession, marital_status, height_cm, weight_kg, smoking, alcohol,
+                pregnant, breastfeeding, current_medications, gdpr_consent, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 user["sub"],
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
+                identity_document_type or None,
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
-                referring_doctor or None, insurance_name or None, insurance_number or None,
-                insurance_serial or None,
-                emergency_contact_name or None, emergency_contact_phone or None, notes or None,
+                referring_doctor or None, referring_doctor_phone or None,
+                insurance_name or None, insurance_number or None, insurance_serial or None,
+                emergency_contact_name or None, emergency_contact_phone or None, emergency_contact_relation or None,
+                profession or None, marital_status or None, height_i, weight_f,
+                smoking or None, alcohol or None,
+                pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None,
             ),
         )
         await db.commit()
@@ -171,12 +217,21 @@ async def create_patient(
         patient_data = {
             "first_name": first_name, "last_name": last_name, "date_of_birth": date_of_birth,
             "gender": gender, "social_security_number": social_security_number,
+            "identity_document_type": identity_document_type,
             "email": email, "phone": phone, "address": address, "city": city,
             "postal_code": postal_code, "blood_type": blood_type,
-            "referring_doctor": referring_doctor, "insurance_name": insurance_name,
+            "referring_doctor": referring_doctor, "referring_doctor_phone": referring_doctor_phone,
+            "insurance_name": insurance_name,
             "insurance_number": insurance_number, "insurance_serial": insurance_serial,
             "emergency_contact_name": emergency_contact_name,
-            "emergency_contact_phone": emergency_contact_phone, "notes": notes,
+            "emergency_contact_phone": emergency_contact_phone,
+            "emergency_contact_relation": emergency_contact_relation,
+            "profession": profession, "marital_status": marital_status,
+            "height_cm": height_i, "weight_kg": weight_f,
+            "smoking": smoking, "alcohol": alcohol,
+            "pregnant": pregnant_i, "breastfeeding": breastfeeding_i,
+            "current_medications": current_medications, "gdpr_consent": gdpr_i,
+            "notes": notes,
         }
         return templates.TemplateResponse(
             "patients/form.html",
@@ -254,6 +309,13 @@ async def view_patient(
         if row:
             active_consultation = dict(row)
 
+    # Décoder le questionnaire de début de consultation (QCM + texte libre)
+    if active_consultation and active_consultation.get("intake_json"):
+        try:
+            active_consultation["intake"] = json.loads(active_consultation["intake_json"])
+        except Exception:
+            active_consultation["intake"] = None
+
     from datetime import datetime
     now_year = datetime.now().year
     user_specialty = user.get("specialty", "") or ""
@@ -323,6 +385,7 @@ async def update_patient(
     date_of_birth: str = Form(...),
     gender: str = Form(""),
     social_security_number: str = Form(""),
+    identity_document_type: str = Form("CIN"),
     email: str = Form(""),
     phone: str = Form(""),
     address: str = Form(""),
@@ -330,11 +393,23 @@ async def update_patient(
     postal_code: str = Form(""),
     blood_type: str = Form(""),
     referring_doctor: str = Form(""),
+    referring_doctor_phone: str = Form(""),
     insurance_name: str = Form(""),
     insurance_number: str = Form(""),
     insurance_serial: str = Form(""),
     emergency_contact_name: str = Form(""),
     emergency_contact_phone: str = Form(""),
+    emergency_contact_relation: str = Form(""),
+    profession: str = Form(""),
+    marital_status: str = Form(""),
+    height_cm: str = Form(""),
+    weight_kg: str = Form(""),
+    smoking: str = Form(""),
+    alcohol: str = Form(""),
+    pregnant: str = Form(""),
+    breastfeeding: str = Form(""),
+    current_medications: str = Form(""),
+    gdpr_consent: str = Form(""),
     notes: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -342,17 +417,37 @@ async def update_patient(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    height_i = _parse_int(height_cm)
+    weight_f = _parse_float(weight_kg)
+    pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
+    breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
+    gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
+
     try:
         await db.execute(
-            """UPDATE patients SET first_name= ?, last_name= ?, date_of_birth= ?, gender= ?, social_security_number= ?, email= ?, phone= ?, address= ?, city= ?, postal_code= ?, blood_type= ?, referring_doctor= ?, insurance_name= ?, insurance_number= ?, insurance_serial= ?, emergency_contact_name= ?, emergency_contact_phone= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ?""",
+            """UPDATE patients SET
+                first_name=?, last_name=?, date_of_birth=?, gender=?, social_security_number=?,
+                identity_document_type=?,
+                email=?, phone=?, address=?, city=?, postal_code=?, blood_type=?,
+                referring_doctor=?, referring_doctor_phone=?,
+                insurance_name=?, insurance_number=?, insurance_serial=?,
+                emergency_contact_name=?, emergency_contact_phone=?, emergency_contact_relation=?,
+                profession=?, marital_status=?, height_cm=?, weight_kg=?, smoking=?, alcohol=?,
+                pregnant=?, breastfeeding=?, current_medications=?, gdpr_consent=?, notes=?,
+                updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND doctor_id=?""",
             (
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
+                identity_document_type or None,
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
-                referring_doctor or None, insurance_name or None, insurance_number or None,
-                insurance_serial or None,
-                emergency_contact_name or None, emergency_contact_phone or None, notes or None,
+                referring_doctor or None, referring_doctor_phone or None,
+                insurance_name or None, insurance_number or None, insurance_serial or None,
+                emergency_contact_name or None, emergency_contact_phone or None, emergency_contact_relation or None,
+                profession or None, marital_status or None, height_i, weight_f,
+                smoking or None, alcohol or None,
+                pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None,
                 patient_id, user["sub"],
             ),
         )
@@ -363,12 +458,22 @@ async def update_patient(
         patient_data = {"id": patient_id, "first_name": first_name, "last_name": last_name,
                         "date_of_birth": date_of_birth, "gender": gender,
                         "social_security_number": social_security_number,
+                        "identity_document_type": identity_document_type,
                         "email": email, "phone": phone, "address": address, "city": city,
                         "postal_code": postal_code, "blood_type": blood_type,
-                        "referring_doctor": referring_doctor, "insurance_name": insurance_name,
+                        "referring_doctor": referring_doctor,
+                        "referring_doctor_phone": referring_doctor_phone,
+                        "insurance_name": insurance_name,
                         "insurance_number": insurance_number, "insurance_serial": insurance_serial,
                         "emergency_contact_name": emergency_contact_name,
-                        "emergency_contact_phone": emergency_contact_phone, "notes": notes}
+                        "emergency_contact_phone": emergency_contact_phone,
+                        "emergency_contact_relation": emergency_contact_relation,
+                        "profession": profession, "marital_status": marital_status,
+                        "height_cm": height_i, "weight_kg": weight_f,
+                        "smoking": smoking, "alcohol": alcohol,
+                        "pregnant": pregnant_i, "breastfeeding": breastfeeding_i,
+                        "current_medications": current_medications, "gdpr_consent": gdpr_i,
+                        "notes": notes}
         return templates.TemplateResponse(
             "patients/form.html",
             {"request": request, "user": user, "active": "patients", "patient": patient_data, "error": error},

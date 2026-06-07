@@ -668,6 +668,7 @@
                                 <thead>
                                     <tr>
                                         <th>Canal</th>
+                                        <th>Point de réf.</th>
                                         <th>Estimée (mm)</th>
                                         <th>Travail (mm)</th>
                                         <th>Finale (mm)</th>
@@ -677,6 +678,15 @@
                                 </thead>
                                 <tbody id="endo-canal-tbody"></tbody>
                             </table>
+                            <datalist id="endo-pref-list">
+                                <option value="Bord incisif">
+                                <option value="Cuspide MV">
+                                <option value="Cuspide ML">
+                                <option value="Cuspide DV">
+                                <option value="Cuspide DL">
+                                <option value="Sommet de la cuspide">
+                                <option value="Pointe canine">
+                            </datalist>
                         </div>
                     </div>
                 </div>
@@ -809,7 +819,7 @@
 
 <div id="toast"></div>
 
-<script src="/static/js/odontogram-view.iife.js?v=20260316-12"></script>
+<script src="/static/js/odontogram-view.iife.js?v=20260510-1"></script>
 <script>
 // ===== DATA =====
 const PATIENT_ID = {{ patient.id }};
@@ -968,6 +978,7 @@ function mountReactOdontogram() {
             initialSelectedTooth: selectedTooth,
             onSelect: (fdiNum) => openPanel(fdiNum),
             layout: currentReactLayout,
+            showLabels: true,
         });
         _setReactConditions = (nextConditions) => {
             if (_odoBridge && _odoBridge.updateConditions) _odoBridge.updateConditions(nextConditions);
@@ -1054,9 +1065,10 @@ function drawTooth(svg, n, x, y) {
 
     const isUpper = UPPER.includes(n);
     const lbl = document.createElementNS(SVG_NS, 'text');
-    lbl.setAttribute('x', x + TW/2); lbl.setAttribute('y', isUpper ? y-6 : y+TH+14);
-    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '9');
-    lbl.setAttribute('fill', '#94a3b8'); lbl.setAttribute('font-family', 'monospace');
+    lbl.setAttribute('x', x + TW/2); lbl.setAttribute('y', isUpper ? y-8 : y+TH+18);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '13');
+    lbl.setAttribute('fill', '#1e293b'); lbl.setAttribute('font-family', 'monospace');
+    lbl.setAttribute('font-weight', 'bold');
     lbl.textContent = n;
     g.appendChild(lbl);
 
@@ -1527,9 +1539,11 @@ function renderEndoCanalTable() {
         const statusInfo = ENDO_STATUS[c.status] || ENDO_STATUS.non_localise;
         const updated = c.updated_at ? c.updated_at.substring(0, 16).replace('T', ' ') : '—';
 
+        const prefVal = (c.point_reference || '').replace(/"/g, '&quot;');
         if (endoEditMode) {
             tr.innerHTML = `
                 <td><strong>${c.canal_name}</strong></td>
+                <td><input type="text" list="endo-pref-list" value="${prefVal}" placeholder="Ex: Bord incisif" data-field="point_reference" data-idx="${i}" style="min-width:120px;"></td>
                 <td><input type="number" step="0.5" min="0" max="40" value="${c.estimated_length ?? ''}" data-field="estimated_length" data-idx="${i}"></td>
                 <td><input type="number" step="0.5" min="0" max="40" value="${c.working_length ?? ''}" data-field="working_length" data-idx="${i}"></td>
                 <td><input type="number" step="0.5" min="0" max="40" value="${c.final_length ?? ''}" data-field="final_length" data-idx="${i}"></td>
@@ -1546,6 +1560,7 @@ function renderEndoCanalTable() {
             const fmtLen = v => v != null ? `${v} mm` : '—';
             tr.innerHTML = `
                 <td><strong>${c.canal_name}</strong></td>
+                <td>${c.point_reference ? escapeHtml(c.point_reference) : '—'}</td>
                 <td>${fmtLen(c.estimated_length)}</td>
                 <td>${fmtLen(c.working_length)}</td>
                 <td>${fmtLen(c.final_length)}</td>

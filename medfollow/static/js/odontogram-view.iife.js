@@ -21852,7 +21852,8 @@ var OdontoNpm = (() => {
       initialSelectedTooth = null,
       onSelect = () => {
       },
-      layout = "circle"
+      layout = "circle",
+      showLabels = false
     } = options;
     const root = (0, import_client.createRoot)(rootElement);
     const bridge = {
@@ -21918,6 +21919,7 @@ var OdontoNpm = (() => {
           theme: "light",
           layout: currentLayout,
           singleSelect: true,
+          showLabels: showLabels,
           showTooltip: true,
           tooltip: {
             placement: "top",

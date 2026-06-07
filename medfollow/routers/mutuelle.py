@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
@@ -166,6 +167,25 @@ async def save_feuille(request: Request, db: aiosqlite.Connection = Depends(get_
     return JSONResponse({"ok": True, "id": feuille_id})
 
 
+async def _next_numero_note(db: aiosqlite.Connection, doctor_id: str) -> str:
+    """Generate the next sequential note number for the current year and doctor.
+
+    Format: YYYY-NNN (e.g. 2026-001). Sequence resets each calendar year per doctor.
+    """
+    year = datetime.now().year
+    prefix = f"{year}-"
+    cur = await db.execute(
+        """SELECT MAX(CAST(SUBSTR(numero_note, 6) AS INTEGER)) AS max_n
+           FROM feuilles_soin
+           WHERE doctor_id = ? AND type_feuille = 'honoraires'
+             AND numero_note LIKE ?""",
+        (doctor_id, prefix + "%"),
+    )
+    row = await cur.fetchone()
+    max_n = row[0] if row and row[0] is not None else 0
+    return f"{year}-{(max_n + 1):03d}"
+
+
 @router.post("/note/save")
 async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)):
     user = get_current_user(request)
@@ -177,10 +197,12 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
     if not patient_id:
         return JSONResponse({"error": "patient_id requis"}, status_code=400)
 
+    numero_note = await _next_numero_note(db, user["sub"])
+
     cursor = await db.execute(
         """INSERT INTO feuilles_soin
-           (patient_id, doctor_id, mutuelle, type_feuille, nom_beneficiaire, date_soin, total_montant, actes_json)
-           VALUES (?,?,?,?,?,?,?,?)""",
+           (patient_id, doctor_id, mutuelle, type_feuille, nom_beneficiaire, date_soin, total_montant, actes_json, numero_note)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
         (
             patient_id, user["sub"],
             "Note", "honoraires",
@@ -188,6 +210,7 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
             data.get("date_soin"),
             data.get("total_montant", 0),
             json.dumps(data.get("actes", []), ensure_ascii=False),
+            numero_note,
         ),
     )
     await db.commit()
@@ -202,7 +225,16 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
         await db.execute("UPDATE feuilles_soin SET html_path = ? WHERE id = ?", (html_path, note_id))
         await db.commit()
 
-    return JSONResponse({"ok": True, "id": note_id})
+    return JSONResponse({"ok": True, "id": note_id, "numero_note": numero_note})
+
+
+@router.get("/note/next-number")
+async def next_note_number(request: Request, db: aiosqlite.Connection = Depends(get_db)):
+    """Preview the next N° Note that will be assigned (for display in the form)."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return JSONResponse({"numero_note": await _next_numero_note(db, user["sub"])})
 
 
 @router.get("/api/acts")

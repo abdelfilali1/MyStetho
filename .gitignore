@@ -22,10 +22,11 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Application runtime data
+# Application runtime data (patient data — never commit)
 medfollow/data/*.db
-!medfollow/data/medfollow.db
+medfollow/data/*.db.backup-*
 medfollow/data/.secret_key
+medfollow/data/feuilles/
 medfollow/uploads/
 medfollow/server.out.log
 medfollow/server.err.log

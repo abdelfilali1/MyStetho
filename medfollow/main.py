@@ -39,23 +39,74 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MyStetho", lifespan=lifespan)
 
 
+# Inject the active (en_cours) consultation into every rendered page so a global
+# "Retour à la consultation" banner can be shown across all modules until the
+# consultation is closed. Exposed to templates via request.state.active_consultation.
+import aiosqlite as _aiosqlite
+from config import DATABASE_PATH as _DATABASE_PATH
+from routers.auth import get_current_user as _get_current_user
+
+
+@app.middleware("http")
+async def _inject_active_consultation(request, call_next):
+    request.state.active_consultation = None
+    try:
+        path = request.url.path
+        if request.method == "GET" and not path.startswith(("/static", "/health")):
+            user = _get_current_user(request)
+            if user:
+                conn = await _aiosqlite.connect(_DATABASE_PATH)
+                conn.row_factory = _aiosqlite.Row
+                try:
+                    cur = await conn.execute(
+                        """SELECT c.id, c.patient_id, c.consultation_date,
+                                  p.first_name, p.last_name
+                           FROM consultations c
+                           JOIN patients p ON c.patient_id = p.id
+                           WHERE c.doctor_id = ? AND c.status = 'en_cours'
+                           ORDER BY c.created_at DESC LIMIT 1""",
+                        (user["sub"],),
+                    )
+                    row = await cur.fetchone()
+                    if row:
+                        request.state.active_consultation = dict(row)
+                finally:
+                    await conn.close()
+    except Exception:
+        request.state.active_consultation = None
+    return await call_next(request)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 
 # Add global template variables
+import json as _json
 from fastapi.templating import Jinja2Templates
 from config import TEMPLATES_DIR
+
+
+def _from_json(value):
+    """Jinja filter: parse a JSON string into a dict/list (empty dict on failure)."""
+    try:
+        return _json.loads(value) if value else {}
+    except Exception:
+        return {}
+
+
 _global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _global_templates.env.globals["now_year"] = date.today().year
 
-# Patch all router template envs to include now_year and calc_age filter
+# Patch all router template envs to include now_year and calc_age/fromjson filters
 for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, learning]:
     if hasattr(mod, 'templates'):
         mod.templates.env.globals["now_year"] = date.today().year
         mod.templates.env.filters["calc_age"] = _calc_age
+        mod.templates.env.filters["fromjson"] = _from_json
 _global_templates.env.filters["calc_age"] = _calc_age
+_global_templates.env.filters["fromjson"] = _from_json
 
 # Static files
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")

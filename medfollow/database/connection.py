@@ -502,6 +502,20 @@ async def init_db():
     except Exception:
         pass
 
+    # Migration: questionnaire de début de consultation (QCM + texte libre) — JSON
+    try:
+        await db.execute("ALTER TABLE consultations ADD COLUMN intake_json TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: examen clinique dentaire structuré (douleur spontanée, sensibilité…) — JSON
+    try:
+        await db.execute("ALTER TABLE consultations ADD COLUMN dental_exam_json TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     # Migration: link antécédents to consultation session
     try:
         await db.execute(
@@ -572,5 +586,75 @@ async def init_db():
         )
     """)
     await db.commit()
+
+    # Migration: Note d'Honoraires auto-numbering
+    try:
+        await db.execute("ALTER TABLE feuilles_soin ADD COLUMN numero_note TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: Endodontie — point de référence de mesure par canal
+    try:
+        await db.execute("ALTER TABLE endo_canals ADD COLUMN point_reference TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: drop CHECK constraint on documents.category (to allow new categories
+    # like photo_extra_orale / photo_intra_orale without schema lock-in)
+    try:
+        cur = await db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'")
+        row = await cur.fetchone()
+        if row and row[0] and "CHECK(category IN" in row[0]:
+            await db.executescript("""
+                BEGIN;
+                CREATE TABLE documents_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_id INTEGER NOT NULL,
+                    consultation_id INTEGER,
+                    title TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_type TEXT,
+                    file_size INTEGER,
+                    description TEXT,
+                    uploaded_by INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (patient_id) REFERENCES patients(id),
+                    FOREIGN KEY (consultation_id) REFERENCES consultations(id),
+                    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+                );
+                INSERT INTO documents_new SELECT * FROM documents;
+                DROP TABLE documents;
+                ALTER TABLE documents_new RENAME TO documents;
+                COMMIT;
+            """)
+    except Exception:
+        pass
+
+    # Migration: patient health questionnaire fields
+    _patient_health_cols = [
+        ("profession", "TEXT"),
+        ("marital_status", "TEXT"),
+        ("height_cm", "INTEGER"),
+        ("weight_kg", "REAL"),
+        ("smoking", "TEXT"),
+        ("alcohol", "TEXT"),
+        ("pregnant", "INTEGER DEFAULT 0"),
+        ("breastfeeding", "INTEGER DEFAULT 0"),
+        ("current_medications", "TEXT"),
+        ("referring_doctor_phone", "TEXT"),
+        ("emergency_contact_relation", "TEXT"),
+        ("gdpr_consent", "INTEGER DEFAULT 0"),
+        # Type de pièce d'identité (CIN / Carte de séjour / Passeport / Permis de conduire)
+        ("identity_document_type", "TEXT DEFAULT 'CIN'"),
+    ]
+    for col, typ in _patient_health_cols:
+        try:
+            await db.execute(f"ALTER TABLE patients ADD COLUMN {col} {typ}")
+            await db.commit()
+        except Exception:
+            pass
 
     await db.close()

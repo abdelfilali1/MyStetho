@@ -92,13 +92,26 @@
             <h4 class="section-title">Identité & Assurance</h4>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="social_security_number">N° CIN</label>
-                    <input type="text" id="social_security_number" name="social_security_number" value="{{ patient.social_security_number if patient and patient.social_security_number else '' }}">
+                    <label for="identity_document_type">Type de pièce d'identité</label>
+                    {% set idt = patient.identity_document_type if patient and patient.identity_document_type else 'CIN' %}
+                    <select id="identity_document_type" name="identity_document_type">
+                        <option value="CIN" {{ 'selected' if idt == 'CIN' }}>CIN</option>
+                        <option value="Carte de séjour" {{ 'selected' if idt == 'Carte de séjour' }}>Carte de séjour</option>
+                        <option value="Passeport" {{ 'selected' if idt == 'Passeport' }}>Passeport</option>
+                        <option value="Permis de conduire" {{ 'selected' if idt == 'Permis de conduire' }}>Permis de conduire</option>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label for="social_security_number">N° de la pièce</label>
+                    <input type="text" id="social_security_number" name="social_security_number" value="{{ patient.social_security_number if patient and patient.social_security_number else '' }}" placeholder="N° du document">
+                </div>
+            </div>
+            <div class="form-row">
                 <div class="form-group">
                     <label for="referring_doctor">Médecin traitant</label>
                     <input type="text" id="referring_doctor" name="referring_doctor" value="{{ patient.referring_doctor if patient and patient.referring_doctor else '' }}">
                 </div>
+                <div class="form-group"></div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -111,11 +124,12 @@
                         <option value="AMO" {{ 'selected' if ins == 'AMO' }}>AMO</option>
                         <option value="MAMDA" {{ 'selected' if ins == 'MAMDA' }}>MAMDA</option>
                         <option value="MGPAP" {{ 'selected' if ins == 'MGPAP' }}>MGPAP</option>
+                        <option value="OCP" {{ 'selected' if ins == 'OCP' }}>OCP</option>
                         <option value="RMA" {{ 'selected' if ins == 'RMA' }}>RMA Assurance</option>
                         <option value="Saham" {{ 'selected' if ins == 'Saham' }}>Saham Assurance</option>
                         <option value="Allianz" {{ 'selected' if ins == 'Allianz' }}>Allianz</option>
                         <option value="AXA" {{ 'selected' if ins == 'AXA' }}>AXA</option>
-                        <option value="Autre" {{ 'selected' if ins and ins not in ['CNOPS','CNSS','AMO','MAMDA','MGPAP','RMA','Saham','Allianz','AXA'] and ins != '' }}>Autre</option>
+                        <option value="Autre" {{ 'selected' if ins and ins not in ['CNOPS','CNSS','AMO','MAMDA','MGPAP','OCP','RMA','Saham','Allianz','AXA'] and ins != '' }}>Autre</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -141,12 +155,103 @@
                     <label for="emergency_contact_phone">Téléphone du contact</label>
                     <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone" value="{{ patient.emergency_contact_phone if patient and patient.emergency_contact_phone else '' }}">
                 </div>
+                <div class="form-group">
+                    <label for="emergency_contact_relation">Lien</label>
+                    <input type="text" id="emergency_contact_relation" name="emergency_contact_relation" placeholder="Ex: épouse, fils, frère" value="{{ patient.emergency_contact_relation if patient and patient.emergency_contact_relation else '' }}">
+                </div>
             </div>
+
+            {% if patient and patient.id is defined %}
+            <h4 class="section-title">Données de santé</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="profession">Profession</label>
+                    <input type="text" id="profession" name="profession" value="{{ patient.profession if patient and patient.profession else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="marital_status">Situation matrimoniale</label>
+                    <select id="marital_status" name="marital_status">
+                        <option value="">—</option>
+                        {% set ms = patient.marital_status if patient and patient.marital_status else '' %}
+                        <option value="Célibataire" {{ 'selected' if ms == 'Célibataire' }}>Célibataire</option>
+                        <option value="Marié(e)" {{ 'selected' if ms == 'Marié(e)' }}>Marié(e)</option>
+                        <option value="Divorcé(e)" {{ 'selected' if ms == 'Divorcé(e)' }}>Divorcé(e)</option>
+                        <option value="Veuf(ve)" {{ 'selected' if ms == 'Veuf(ve)' }}>Veuf(ve)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="height_cm">Taille (cm)</label>
+                    <input type="number" min="30" max="250" id="height_cm" name="height_cm" value="{{ patient.height_cm if patient and patient.height_cm else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="weight_kg">Poids (kg)</label>
+                    <input type="number" step="0.1" min="1" max="400" id="weight_kg" name="weight_kg" value="{{ patient.weight_kg if patient and patient.weight_kg else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="smoking">Tabac</label>
+                    <select id="smoking" name="smoking">
+                        <option value="">—</option>
+                        {% set sm = patient.smoking if patient and patient.smoking else '' %}
+                        <option value="Non" {{ 'selected' if sm == 'Non' }}>Non</option>
+                        <option value="Ancien fumeur" {{ 'selected' if sm == 'Ancien fumeur' }}>Ancien fumeur</option>
+                        <option value="Occasionnel" {{ 'selected' if sm == 'Occasionnel' }}>Occasionnel</option>
+                        <option value="Régulier" {{ 'selected' if sm == 'Régulier' }}>Régulier</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="alcohol">Alcool</label>
+                    <select id="alcohol" name="alcohol">
+                        <option value="">—</option>
+                        {% set al = patient.alcohol if patient and patient.alcohol else '' %}
+                        <option value="Non" {{ 'selected' if al == 'Non' }}>Non</option>
+                        <option value="Occasionnel" {{ 'selected' if al == 'Occasionnel' }}>Occasionnel</option>
+                        <option value="Régulier" {{ 'selected' if al == 'Régulier' }}>Régulier</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" id="pregnancy-row" style="{{ '' if patient and patient.gender == 'F' else 'display:none;' }}">
+                <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="pregnant" name="pregnant" value="1" {{ 'checked' if patient and patient.pregnant }}>
+                    <label for="pregnant" style="font-weight: normal;">Grossesse en cours</label>
+                </div>
+                <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="breastfeeding" name="breastfeeding" value="1" {{ 'checked' if patient and patient.breastfeeding }}>
+                    <label for="breastfeeding" style="font-weight: normal;">Allaitement en cours</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="current_medications">Médicaments actuels</label>
+                <textarea id="current_medications" name="current_medications" rows="2" placeholder="Liste libre des médicaments pris au quotidien...">{{ patient.current_medications if patient and patient.current_medications else '' }}</textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="referring_doctor_phone">Téléphone du médecin traitant</label>
+                    <input type="tel" id="referring_doctor_phone" name="referring_doctor_phone" value="{{ patient.referring_doctor_phone if patient and patient.referring_doctor_phone else '' }}">
+                </div>
+                <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="gdpr_consent" name="gdpr_consent" value="1" {{ 'checked' if patient and patient.gdpr_consent }}>
+                    <label for="gdpr_consent" style="font-weight: normal;">Consentement au traitement des données médicales (RGPD)</label>
+                </div>
+            </div>
+            {% endif %}
 
             <h4 class="section-title">Notes</h4>
             <div class="form-group">
                 <textarea id="notes" name="notes" rows="3" placeholder="Notes libres...">{{ patient.notes if patient and patient.notes else '' }}</textarea>
             </div>
+
+            <script>
+            (function() {
+                const g = document.getElementById('gender');
+                const row = document.getElementById('pregnancy-row');
+                if (!g || !row) return;
+                g.addEventListener('change', () => {
+                    row.style.display = (g.value === 'F') ? '' : 'none';
+                });
+            })();
+            </script>
 
             <div class="form-actions">
                 <a href="/patients" class="btn btn-outline">Annuler</a>

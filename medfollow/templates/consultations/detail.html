@@ -38,8 +38,20 @@
                 <h4>Dent(s) concernée(s)</h4>
                 <p>{{ consultation.symptoms or 'Non renseigné' }}</p>
             </div>
+            {% set _de = (consultation.dental_exam_json | fromjson) if consultation.dental_exam_json else {} %}
+            {% if _de %}
             <div class="clinical-section">
-                <h4>Examen endo-buccal</h4>
+                <h4>Examen clinique</h4>
+                {% set _delabels = [('douleur_spontanee','Douleur spontanée'),('sensibilite','Test de sensibilité'),('percussion','Percussion'),('palpation','Palpation apicale'),('mobilite','Mobilité dentaire'),('tumefaction','Tuméfaction / œdème'),('saignement','Saignement gingival')] %}
+                <ul style="margin:0;padding-left:18px;">
+                {% for key, label in _delabels %}
+                  {% if _de[key] %}<li>{{ label }} : {{ 'Oui' if _de[key] is true else _de[key] }}</li>{% endif %}
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            <div class="clinical-section">
+                <h4>Examen endo-buccal{% if _de %} — observations libres{% endif %}</h4>
                 <p>{{ consultation.clinical_exam or 'Non renseigné' }}</p>
             </div>
             {% else %}

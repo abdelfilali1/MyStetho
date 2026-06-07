@@ -28,8 +28,8 @@ async def list_documents(
     per_page = 20
     offset = (page - 1) * per_page
 
-    base_where = "WHERE 1=1"
-    params: list = []
+    base_where = "WHERE p.doctor_id = ?"
+    params: list = [user["sub"]]
 
     if patient_id:
         base_where += " AND d.patient_id = ?"
@@ -39,7 +39,8 @@ async def list_documents(
         params.append(category)
 
     count_cursor = await db.execute(
-        f"SELECT COUNT(*) FROM documents d {base_where}", params
+        f"SELECT COUNT(*) FROM documents d JOIN patients p ON d.patient_id = p.id {base_where}",
+        params,
     )
     total_count = (await count_cursor.fetchone())[0]
     total_pages = max(1, (total_count + per_page - 1) // per_page)
@@ -56,7 +57,10 @@ async def list_documents(
         doc["file_name"] = os.path.basename(fp) if fp else ""
         documents.append(doc)
 
-    cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 AND doctor_id = ? ORDER BY last_name",
+        (user["sub"],),
+    )
     patients = [dict(r) for r in await cursor.fetchall()]
 
     return templates.TemplateResponse(
@@ -81,7 +85,10 @@ async def upload_form(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 AND doctor_id = ? ORDER BY last_name",
+        (user["sub"],),
+    )
     patients = [dict(r) for r in await cursor.fetchall()]
 
     return templates.TemplateResponse(
@@ -108,6 +115,14 @@ async def upload_document(
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+
+    # Verify patient belongs to current doctor
+    cur = await db.execute(
+        "SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?",
+        (patient_id, user["sub"]),
+    )
+    if not await cur.fetchone():
+        return RedirectResponse(url="/documents", status_code=302)
 
     # Create patient upload directory
     patient_dir = os.path.join(UPLOAD_DIR, f"patient_{patient_id}")
@@ -145,7 +160,11 @@ async def download_document(request: Request, document_id: int, db: aiosqlite.Co
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT * FROM documents WHERE id = ? ", (document_id,))
+    cursor = await db.execute(
+        """SELECT d.* FROM documents d JOIN patients p ON d.patient_id = p.id
+           WHERE d.id = ? AND p.doctor_id = ?""",
+        (document_id, user["sub"]),
+    )
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/documents", status_code=302)
@@ -163,7 +182,11 @@ async def delete_document(request: Request, document_id: int, db: aiosqlite.Conn
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT file_path FROM documents WHERE id = ? ", (document_id,))
+    cursor = await db.execute(
+        """SELECT d.file_path FROM documents d JOIN patients p ON d.patient_id = p.id
+           WHERE d.id = ? AND p.doctor_id = ?""",
+        (document_id, user["sub"]),
+    )
     row = await cursor.fetchone()
     if row:
         file_path = row[0]

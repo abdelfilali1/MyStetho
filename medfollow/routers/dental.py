@@ -311,7 +311,7 @@ async def get_endo_data(request: Request, patient_id: int, tooth_number: int, db
     # If no canals exist, return defaults
     if not canals:
         default_names = ENDO_CANALS.get(tooth_number, ["Canal unique"])
-        canals = [{"canal_name": n, "estimated_length": None, "working_length": None,
+        canals = [{"canal_name": n, "point_reference": None, "estimated_length": None, "working_length": None,
                     "final_length": None, "status": "non_localise", "notes": "", "updated_at": None}
                   for n in default_names]
 
@@ -360,6 +360,7 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
         fl = canal.get("final_length")
         status = canal.get("status", "non_localise")
         notes = canal.get("notes", "")
+        point_ref = canal.get("point_reference") or None
 
         # Validate lengths
         for val in [est, wl, fl]:
@@ -373,24 +374,26 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
 
         # Get old values for history
         cursor = await db.execute(
-            "SELECT estimated_length, working_length, final_length, status FROM endo_canals WHERE patient_id = ? AND tooth_number = ? AND canal_name = ?",
+            "SELECT estimated_length, working_length, final_length, status, point_reference FROM endo_canals WHERE patient_id = ? AND tooth_number = ? AND canal_name = ?",
             (patient_id, tooth_number, name)
         )
         old_row = await cursor.fetchone()
 
         # Upsert canal
         await db.execute(
-            """INSERT INTO endo_canals (patient_id, tooth_number, canal_name, estimated_length, working_length, final_length, status, notes, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """INSERT INTO endo_canals (patient_id, tooth_number, canal_name, point_reference, estimated_length, working_length, final_length, status, notes, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                ON CONFLICT(patient_id, tooth_number, canal_name) DO UPDATE SET
+               point_reference=excluded.point_reference,
                estimated_length=excluded.estimated_length, working_length=excluded.working_length,
                final_length=excluded.final_length, status=excluded.status, notes=excluded.notes,
                updated_at=excluded.updated_at""",
-            (patient_id, tooth_number, name, est, wl, fl, status, notes or None)
+            (patient_id, tooth_number, name, point_ref, est, wl, fl, status, notes or None)
         )
 
         # Record history: changes if existing, initial values if new
         field_map = {
+            "point_reference": ("Point de référence", point_ref),
             "estimated_length": ("Longueur estimée", est),
             "working_length": ("Longueur de travail", wl),
             "final_length": ("Longueur finale", fl),

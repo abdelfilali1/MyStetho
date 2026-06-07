@@ -131,7 +131,12 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Examen endo-buccal</label>
+                    <label>Examen clinique structuré</label>
+                    {% set dental_exam = (consultation.dental_exam_json | fromjson) if consultation and consultation.dental_exam_json else {} %}
+                    {% include '_dental_exam_fields.html' %}
+                </div>
+                <div class="form-group">
+                    <label>Examen endo-buccal — observations libres</label>
                     <textarea name="clinical_exam" rows="3">{{ consultation.clinical_exam if consultation and consultation.clinical_exam else '' }}</textarea>
                 </div>
                 <div class="form-group">

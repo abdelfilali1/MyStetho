@@ -245,16 +245,108 @@
   50%      { box-shadow:0 0 0 7px rgba(34,197,94,.08); }
 }
 </style>
+
+{# Récapitulatif du questionnaire de début de consultation #}
+{% if active_consultation.intake %}
+{% set _ik = active_consultation.intake %}
+<div class="card no-print" style="margin-bottom:16px;border-left:3px solid var(--primary);">
+    <div class="card-header"><h3 style="font-size:14px;">Questionnaire de début de consultation</h3></div>
+    <div class="card-body">
+        <div class="info-grid">
+            {% if _ik.motif %}<div class="info-item"><span class="info-label">Motif</span><span class="info-value">{{ _ik.motif }}</span></div>{% endif %}
+            {% if _ik.douleur %}<div class="info-item"><span class="info-label">Niveau de douleur</span><span class="info-value">{{ _ik.douleur }}</span></div>{% endif %}
+            {% if _ik.caractere %}<div class="info-item"><span class="info-label">Caractéristiques</span><span class="info-value">{{ _ik.caractere | join(', ') }}</span></div>{% endif %}
+            {% if _ik.depuis %}<div class="info-item"><span class="info-label">Depuis</span><span class="info-value">{{ _ik.depuis }}</span></div>{% endif %}
+        </div>
+        {% if _ik.notes %}<div class="info-notes"><span class="info-label">Précisions</span><p>{{ _ik.notes }}</p></div>{% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% else %}
 <div class="no-print" style="margin-bottom:16px;">
-    <form method="POST" action="/consultations/start" style="display:inline;">
-        <input type="hidden" name="patient_id" value="{{ patient.id }}">
-        <button type="submit" style="
-            background:var(--primary);border:none;border-radius:9px;color:white;
-            font-size:13px;font-weight:600;padding:9px 20px;cursor:pointer;
-        ">Démarrer la consultation</button>
-    </form>
+    <button type="button" onclick="openStartModal()" style="
+        background:var(--primary);border:none;border-radius:9px;color:white;
+        font-size:13px;font-weight:600;padding:9px 20px;cursor:pointer;
+    ">Démarrer la consultation</button>
 </div>
+
+<!-- ===== Modal : questionnaire de début de consultation (QCM + texte libre) ===== -->
+<div id="start-overlay" class="no-print" onclick="closeStartModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;backdrop-filter:blur(4px);"></div>
+<div id="start-modal" class="no-print" style="display:none;flex-direction:column;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;width:600px;max-width:96vw;max-height:90vh;overflow:hidden;z-index:2001;box-shadow:0 30px 80px rgba(0,0,0,.25);">
+  <form method="POST" action="/consultations/start" id="start-form" style="display:flex;flex-direction:column;min-height:0;">
+    <input type="hidden" name="patient_id" value="{{ patient.id }}">
+    <div style="padding:18px 22px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--primary),#1e3a5f);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">🦷</div>
+      <div>
+        <h3 style="margin:0;font-size:16px;">Début de consultation</h3>
+        <p style="margin:2px 0 0;font-size:12px;color:var(--gray-500);">Quelques questions avant de commencer</p>
+      </div>
+      <button type="button" onclick="closeStartModal()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);line-height:1;">✕</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;">
+      <div class="start-q">
+        <label class="start-q-label">Motif de consultation</label>
+        <div class="start-chips">
+          {% if is_dentist %}{% set motifs = ['Douleur dentaire','Contrôle / Détartrage','Suivi de traitement','Urgence','Esthétique','Prothèse','Orthodontie','Autre'] %}
+          {% else %}{% set motifs = ['Douleur','Suivi','Bilan de santé','Urgence','Renouvellement d\'ordonnance','Résultats d\'examens','Certificat médical','Autre'] %}{% endif %}
+          {% for m in motifs %}
+          <label class="start-chip"><input type="radio" name="intake_motif" value="{{ m }}"><span>{{ m }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      {% if is_dentist %}
+      <div class="start-q">
+        <label class="start-q-label">Niveau de douleur</label>
+        <div class="start-chips">
+          {% for d in ['Aucune','Légère','Modérée','Intense'] %}
+          <label class="start-chip"><input type="radio" name="intake_douleur" value="{{ d }}"><span>{{ d }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="start-q">
+        <label class="start-q-label">Caractéristiques de la douleur</label>
+        <div class="start-chips">
+          {% for c in ['Spontanée','Provoquée (froid)','Provoquée (chaud)','À la mastication','Nocturne','Irradiante'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_caractere" value="{{ c }}"><span>{{ c }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="start-q">
+        <label class="start-q-label">Depuis quand ?</label>
+        <div class="start-chips">
+          {% for p in ['Moins de 24h','Quelques jours','Quelques semaines','Plus d\'un mois'] %}
+          <label class="start-chip"><input type="radio" name="intake_depuis" value="{{ p }}"><span>{{ p }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="start-q">
+        <label class="start-q-label">Précisions (texte libre)</label>
+        <textarea name="intake_notes" rows="3" class="form-control" style="resize:vertical;width:100%;" placeholder="Décrivez la demande / le motif en détail..."></textarea>
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--gray-200);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">
+      <button type="button" onclick="closeStartModal()" class="btn btn-outline">Annuler</button>
+      <button type="submit" class="btn btn-primary">Commencer la consultation →</button>
+    </div>
+  </form>
+</div>
+<style>
+.start-q{margin-bottom:18px;}
+.start-q-label{display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:9px;}
+.start-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.start-chip{position:relative;cursor:pointer;}
+.start-chip input{position:absolute;opacity:0;pointer-events:none;}
+.start-chip span{display:inline-block;padding:7px 14px;border:1px solid var(--gray-300);border-radius:20px;font-size:13px;color:var(--gray-600);transition:all .15s;background:#fff;}
+.start-chip span:hover{border-color:var(--primary);}
+.start-chip input:checked + span{background:var(--primary);border-color:var(--primary);color:#fff;}
+</style>
+<script>
+function openStartModal(){document.getElementById('start-overlay').style.display='block';document.getElementById('start-modal').style.display='flex';}
+function closeStartModal(){document.getElementById('start-overlay').style.display='none';document.getElementById('start-modal').style.display='none';}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartModal();});
+</script>
 {% endif %}
 
 <!-- Barre d'onglets -->
@@ -277,10 +369,6 @@
         </button>
         {% if is_dentist %}
         <div class="view-btn-sep"></div>
-        <button class="view-btn" id="btn-layout" onclick="switchTab('layout')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            Disposition
-        </button>
         <button class="view-btn" id="btn-odontogram" onclick="switchTab('odontogram')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
             Odontogramme
@@ -324,7 +412,7 @@
                     <span class="info-value">{{ [patient.address, patient.postal_code, patient.city] | select | join(', ') or '—' }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">N° CIN</span>
+                    <span class="info-label">N° {{ patient.identity_document_type or 'CIN' }}</span>
                     <span class="info-value">{{ patient.social_security_number or '—' }}</span>
                 </div>
                 <div class="info-item">
@@ -373,7 +461,7 @@
                 <h4 style="margin: 16px 0 8px; font-size: 14px; color: var(--gray-600);">Ajouter un antécédent</h4>
                 <div class="form-row">
                     <div class="form-group">
-                        <select name="type" required>
+                        <select name="type" id="hist-type-select" required onchange="histTypeChanged()">
                             <option value="medical">Médical</option>
                             <option value="surgical">Chirurgical</option>
                             <option value="family">Familial</option>
@@ -591,10 +679,11 @@
                         </td>
                         <td><strong>{{ '%.2f'|format(f.total_montant or 0) }} Dh</strong></td>
                         <td style="display:flex;gap:6px;align-items:center;">
-                            <a href="/mutuelle/feuille/{{ f.id }}/view" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
+                            {% set f_title = 'Note d’honoraires' if f.mutuelle == 'Note' else 'Feuille de soins' %}
+                            <button type="button" onclick="previewFeuille({{ f.id }}, '{{ f_title }}')" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 Aperçu
-                            </a>
+                            </button>
                             <a href="/mutuelle/feuille/{{ f.id }}/download" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Télécharger
@@ -614,35 +703,25 @@
 </div>
 
 {% if is_dentist %}
-<!-- ===== ONGLET : DISPOSITION (React Square) ===== -->
-<div id="view-layout" style="display:none;">
-    <div class="odo-stats" id="stats-row-layout"></div>
-    <div class="odo-react-wrap">
-        <div id="react-odo-root-layout" class="react-odo-root"></div>
-    </div>
-    <div class="odo-legend">
-        <div class="odo-legend-title">Légende des conditions</div>
-        <div class="odo-legend-grid">
-            <span class="legend-pill"><span class="legend-dot" style="background:#e2e8f0;"></span>Sain</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#ef4444;"></span>Carie</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#3b82f6;"></span>Obturation composite</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#64748b;"></span>Amalgame</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#f59e0b;"></span>Couronne</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#fbbf24;"></span>Couronne provisoire</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#374151;"></span>Absent / Extrait</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Implant</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#92400e;"></span>Dévitalisé (RCT)</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#ea580c;"></span>Bridge</span>
-            <span class="legend-pill"><span class="legend-dot" style="background:#dc2626;"></span>Fracture</span>
+<!-- ===== ONGLET : ODONTOGRAMME (vues Odontogramme + Disposition via slider) ===== -->
+<div id="view-odontogram" style="display:none;">
+    <style>
+        .odo-view-slider{position:relative;display:inline-flex;background:var(--gray-100);border-radius:999px;padding:4px;width:300px;max-width:100%;}
+        .odo-slider-btn{position:relative;z-index:2;flex:1;border:none;background:none;cursor:pointer;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--gray-500);transition:color .2s;white-space:nowrap;}
+        .odo-slider-btn.active{color:var(--primary);}
+        .odo-slider-thumb{position:absolute;z-index:1;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:#fff;border-radius:999px;box-shadow:0 2px 8px rgba(15,23,42,.12);transition:transform .22s ease;}
+    </style>
+    <div style="display:flex;justify-content:center;margin-bottom:16px;" class="no-print">
+        <div class="odo-view-slider" id="odo-view-slider" role="tablist" aria-label="Vue dentaire">
+            <span class="odo-slider-thumb" id="odo-slider-thumb"></span>
+            <button type="button" class="odo-slider-btn active" data-mode="circle" role="tab" onclick="toggleOdontoLayout('circle')">Odontogramme</button>
+            <button type="button" class="odo-slider-btn" data-mode="square" role="tab" onclick="toggleOdontoLayout('square')">Disposition</button>
         </div>
     </div>
-</div>
-
-<!-- ===== ONGLET : ODONTOGRAMME (React Circle) ===== -->
-<div id="view-odontogram" style="display:none;">
     <div class="odo-stats" id="stats-row-odo"></div>
     <div class="odo-react-wrap">
-        <div id="react-odo-root-odo" class="react-odo-root"></div>
+        <div id="react-odo-root-odo" class="react-odo-root" data-mode="circle"></div>
+        <div id="react-odo-root-layout" class="react-odo-root" data-mode="square" style="display:none;"></div>
     </div>
     <div class="odo-legend">
         <div class="odo-legend-title">Légende des conditions</div>
@@ -698,11 +777,20 @@
                     <div style="overflow-x:auto;">
                         <table class="endo-table" id="endo-canal-table">
                             <thead>
-                                <tr><th>Canal</th><th>Estimée (mm)</th><th>Travail (mm)</th><th>Finale (mm)</th><th>Statut</th><th>Mis à jour</th></tr>
+                                <tr><th>Canal</th><th>Point de réf.</th><th>Estimée (mm)</th><th>Travail (mm)</th><th>Finale (mm)</th><th>Statut</th><th>Mis à jour</th></tr>
                             </thead>
                             <tbody id="endo-canal-tbody"></tbody>
                         </table>
                     </div>
+                    <datalist id="endo-pref-list">
+                        <option value="Bord incisif">
+                        <option value="Cuspide MV">
+                        <option value="Cuspide ML">
+                        <option value="Cuspide DV">
+                        <option value="Cuspide DL">
+                        <option value="Sommet de la cuspide">
+                        <option value="Pointe canine">
+                    </datalist>
                 </div>
             </div>
             <div class="endo-notes-section">
@@ -859,6 +947,7 @@
                 <label class="term-label">Motif de consultation</label>
                 <div class="term-cb-wrap">
                     <input type="text" name="reason" id="term-motif-inp" class="term-cb-input"
+                           value="{{ active_consultation.reason if active_consultation and active_consultation.reason else '' }}"
                            placeholder="{% if is_dentist %}Douleur, détartrage, suivi...{% else %}Douleur, suivi, bilan...{% endif %}"
                            autocomplete="off"
                            onfocus="termCbOpen('motif')" oninput="termCbFilter('motif',this.value)" onblur="termCbClose('motif',300)">
@@ -867,8 +956,16 @@
                 </div>
             </div>
 
+            {% if is_dentist %}
+            {% set dental_exam = (active_consultation.dental_exam_json | fromjson) if active_consultation and active_consultation.dental_exam_json else {} %}
             <div class="term-field">
-                <label class="term-label">Examen clinique</label>
+                <label class="term-label">Examen clinique structuré</label>
+                {% include '_dental_exam_fields.html' %}
+            </div>
+            {% endif %}
+
+            <div class="term-field">
+                <label class="term-label">Examen clinique{% if is_dentist %} — observations libres{% endif %}</label>
                 <div class="term-chips" id="term-exam-chips"></div>
                 <textarea name="clinical_exam" id="term-exam-ta" rows="2" class="form-control"
                           placeholder="{% if is_dentist %}Observations endo-buccales...{% else %}Observations cliniques...{% endif %}"
@@ -1032,13 +1129,65 @@
 </div>
 {% endif %}
 
+<!-- Feuille / Note d'honoraires preview modal -->
+<div id="feuille-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.65);z-index:5000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closeFeuillePreview()">
+    <div style="background:#fff;width:100%;max-width:900px;height:90vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.4);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e2e8f0;">
+            <h3 id="feuille-preview-title" style="margin:0;font-size:16px;">Aperçu</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <a id="feuille-preview-open" href="#" target="_blank" class="btn btn-outline btn-sm">Ouvrir dans un onglet</a>
+                <button onclick="closeFeuillePreview()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+            </div>
+        </div>
+        <iframe id="feuille-preview-frame" src="about:blank" style="flex:1;width:100%;border:0;background:#f8fafc;"></iframe>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ===== Combobox antécédents =====
-const HIST_PRESETS = ["Diabète","HTA","Cardiopathie","Trouble de coagulation","Allergie médicamenteuse","Allergie au latex","Hépatite","VIH","Grossesse","Traitement anticoagulant","Bisphosphonates","Radiothérapie cervico-faciale","Prothèse valvulaire","Endocardite","Autre"];
+// ===== Combobox antécédents (listes spécifiques par type) =====
+const HIST_PRESETS_BY_TYPE = {
+    medical: [
+        "Diabète type 1","Diabète type 2","HTA","Cardiopathie ischémique","Insuffisance cardiaque",
+        "Trouble du rythme cardiaque","Endocardite","Asthme","BPCO","Apnée du sommeil",
+        "Hépatite B","Hépatite C","VIH","Tuberculose","Insuffisance rénale","Insuffisance hépatique",
+        "Hypothyroïdie","Hyperthyroïdie","Trouble de coagulation","Anémie","Drépanocytose",
+        "Épilepsie","AVC","Cancer (en cours)","Cancer (rémission)","Radiothérapie cervico-faciale",
+        "Chimiothérapie","Bisphosphonates","Anticoagulants","Corticothérapie au long cours",
+        "Maladie auto-immune","Polyarthrite rhumatoïde","Lupus","Grossesse","Allaitement","Autre"
+    ],
+    surgical: [
+        "Extraction dentaire compliquée","Implant dentaire","Greffe osseuse",
+        "Chirurgie maxillo-faciale","Amygdalectomie","Adénoïdectomie","Chirurgie ORL",
+        "Chirurgie ophtalmologique","Chirurgie cardiaque (pontage)","Pose de stent",
+        "Pose de pacemaker","Prothèse valvulaire","Chirurgie orthopédique",
+        "Prothèse de hanche","Prothèse de genou","Césarienne","Hystérectomie",
+        "Appendicectomie","Cholécystectomie","Hernie","Chirurgie bariatrique",
+        "Greffe d'organe","Autre"
+    ],
+    family: [
+        "Diabète familial","HTA familiale","Cardiopathie familiale","AVC familial",
+        "Cancer du sein","Cancer du côlon","Cancer de la prostate","Cancer (autre)",
+        "Maladie d'Alzheimer","Maladie de Parkinson","Hémophilie","Drépanocytose",
+        "Mucoviscidose","Trouble psychiatrique","Décès cardiaque précoce","Autre"
+    ],
+    allergy: [
+        "Pénicilline","Amoxicilline","Céphalosporines","AINS (Ibuprofène/Aspirine)",
+        "Paracétamol","Codéine / Opioïdes","Lidocaïne (anesthésique local)","Articaïne",
+        "Latex","Iode","Produits de contraste","Sulfamides",
+        "Métaux (nickel, chrome)","Acrylates dentaires","Pollen","Acariens","Animaux",
+        "Arachides","Fruits à coque","Œufs","Lait / Lactose","Fruits de mer",
+        "Gluten","Piqûres d'insectes","Autre"
+    ]
+};
 
+function histCurrentList() {
+    const sel = document.getElementById('hist-type-select');
+    const t = sel ? sel.value : 'medical';
+    return HIST_PRESETS_BY_TYPE[t] || HIST_PRESETS_BY_TYPE.medical;
+}
 function histRender(opts) {
     const dd = document.getElementById('hist-dropdown');
     if (!dd) return;
@@ -1047,10 +1196,11 @@ function histRender(opts) {
     dd.style.display = '';
 }
 function histFilter(q) {
-    const filtered = HIST_PRESETS.filter(o => o.toLowerCase().includes(q.toLowerCase()));
+    const list = histCurrentList();
+    const filtered = list.filter(o => o.toLowerCase().includes(q.toLowerCase()));
     histRender(filtered);
 }
-function histShow() { histRender(HIST_PRESETS); }
+function histShow() { histRender(histCurrentList()); }
 function histHide() { const dd = document.getElementById('hist-dropdown'); if (dd) dd.style.display='none'; }
 function histPick(e, val) {
     e.preventDefault();
@@ -1058,24 +1208,74 @@ function histPick(e, val) {
     if (inp) inp.value = val;
     histHide();
 }
+function histTypeChanged() {
+    // Refresh dropdown if it's open / focused; keep current text intact
+    const inp = document.getElementById('hist-desc-input');
+    if (inp && document.activeElement === inp) {
+        histFilter(inp.value || '');
+    }
+}
+
+// ===== Feuille / Note d'honoraires preview modal =====
+function previewFeuille(id, title) {
+    const url = '/mutuelle/feuille/' + id + '/view';
+    const ov = document.getElementById('feuille-preview-overlay');
+    document.getElementById('feuille-preview-title').textContent = title || 'Aperçu';
+    document.getElementById('feuille-preview-frame').src = url;
+    document.getElementById('feuille-preview-open').href = url;
+    ov.style.display = 'flex';
+}
+function closeFeuillePreview() {
+    const ov = document.getElementById('feuille-preview-overlay');
+    if (!ov) return;
+    document.getElementById('feuille-preview-frame').src = 'about:blank';
+    ov.style.display = 'none';
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const ov = document.getElementById('feuille-preview-overlay');
+        if (ov && ov.style.display !== 'none') closeFeuillePreview();
+    }
+});
 
 // ===== Tab switching — available for all users =====
 const PATIENT_TABS = ['info','appts','ordonnance','documents','mutuelle'];
-const DENTAL_TABS  = ['layout','odontogram','endo'];
+const DENTAL_TABS  = ['odontogram','endo'];
 const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
-let reactLayoutMounted = false, reactOdoMounted = false, endoGridBuilt = false;
+let reactOdoMounted = false, endoGridBuilt = false;
+let currentOdontoLayout = 'circle';   // 'circle' = Odontogramme (défaut), 'square' = Disposition
 
 function switchTab(tab) {
+    if (tab === 'layout') tab = 'odontogram';   // ancien onglet fusionné
     ALL_TABS.forEach(t => {
         const el  = document.getElementById('view-' + t);
         const btn = document.getElementById('btn-' + t);
         if (el)  el.style.display  = (t === tab) ? '' : 'none';
         if (btn) btn.classList.toggle('active', t === tab);
     });
-    if (tab === 'layout'     && !reactLayoutMounted) { buildStats('stats-row-layout'); mountReactOdontogram('react-odo-root-layout', 'square'); reactLayoutMounted = true; }
-    if (tab === 'odontogram' && !reactOdoMounted)    { buildStats('stats-row-odo');    mountReactOdontogram('react-odo-root-odo', 'circle');  reactOdoMounted = true; }
+    if (tab === 'odontogram' && !reactOdoMounted) {
+        buildStats('stats-row-odo');
+        mountReactOdontogram('react-odo-root-odo', 'circle');
+        mountReactOdontogram('react-odo-root-layout', 'square');
+        reactOdoMounted = true;
+        toggleOdontoLayout(currentOdontoLayout);
+    }
     if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
 }
+
+// Bascule entre la vue Odontogramme (circle) et Disposition (square)
+function toggleOdontoLayout(mode) {
+    currentOdontoLayout = (mode === 'square') ? 'square' : 'circle';
+    const odo = document.getElementById('react-odo-root-odo');
+    const lay = document.getElementById('react-odo-root-layout');
+    if (odo) odo.style.display = (currentOdontoLayout === 'circle') ? '' : 'none';
+    if (lay) lay.style.display = (currentOdontoLayout === 'square') ? '' : 'none';
+    document.querySelectorAll('#odo-view-slider .odo-slider-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === currentOdontoLayout));
+    const thumb = document.getElementById('odo-slider-thumb');
+    if (thumb) thumb.style.transform = (currentOdontoLayout === 'square') ? 'translateX(100%)' : 'translateX(0)';
+}
+window.toggleOdontoLayout = toggleOdontoLayout;
 
 // ===== Initialisation de l'onglet actif =====
 document.addEventListener('DOMContentLoaded', () => switchTab('{{ initial_tab | default("info") }}'));
@@ -1377,7 +1577,7 @@ async function fuCreate() {
 </div>
 <div id="toast"></div>
 
-<script src="/static/js/odontogram-view.iife.js?v=20260316-12"></script>
+<script src="/static/js/odontogram-view.iife.js?v=20260510-1"></script>
 <script>
 // ===== DONNÉES DENTAIRES =====
 const PATIENT_ID = {{ patient.id }};
@@ -1480,6 +1680,7 @@ function mountReactOdontogram(rootId, layout) {
             initialSelectedTooth: selectedTooth,
             onSelect: (fdiNum) => openPanel(fdiNum),
             layout,
+            showLabels: true,
         });
         _odoBridges[rootId] = bridge;
         _setReactConditions = (nextConditions) => {
@@ -1576,7 +1777,7 @@ function buildStats(targetId) {
         else if (c === 'carie' || c === 'fracture') stats.carie++;
         else stats.traite++;
     });
-    const row = document.getElementById(targetId || 'stats-row-layout');
+    const row = document.getElementById(targetId || 'stats-row-odo');
     if (!row) return;
     row.innerHTML = `
         <div class="stat-kpi"><div class="stat-kpi-icon" style="background:rgba(34,197,94,0.12);color:#16a34a;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8.5 2 6 4.5 6 7c0 1.5.5 3 1 4l1 8c.2 1 1 2 2 2h4c1 0 1.8-1 2-2l1-8c.5-1 1-2.5 1-4 0-2.5-2.5-5-6-5z"/></svg></div><div><div class="stat-kpi-num" style="color:#16a34a;">${stats.sain}</div><div class="stat-kpi-label">Saines</div></div></div>
@@ -1886,7 +2087,7 @@ async function openEndoModal(toothNum) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         endoData = await res.json();
     } catch (e) {
-        endoData = { canals: (ENDO_CANALS_MAP[toothNum] || ['Canal unique']).map(n => ({canal_name: n, estimated_length: null, working_length: null, final_length: null, status: 'non_localise', notes: '', updated_at: null})), history: [], general_notes: '' };
+        endoData = { canals: (ENDO_CANALS_MAP[toothNum] || ['Canal unique']).map(n => ({canal_name: n, point_reference: null, estimated_length: null, working_length: null, final_length: null, status: 'non_localise', notes: '', updated_at: null})), history: [], general_notes: '' };
     }
     renderEndoModal();
     drawEndoToothSVG(toothNum, endoData.canals);
@@ -1919,11 +2120,13 @@ function renderEndoCanalTable() {
         tr.addEventListener('mouseleave', () => highlightSVGCanal(i, false));
         const statusInfo = ENDO_STATUS[c.status] || ENDO_STATUS.non_localise;
         const updated = c.updated_at ? c.updated_at.substring(0, 16).replace('T', ' ') : '—';
+        const prefVal = (c.point_reference || '').replace(/"/g, '&quot;');
+        const escPref = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         if (endoEditMode) {
-            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td><input type="number" step="0.5" min="0" max="40" value="${c.estimated_length ?? ''}" data-field="estimated_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.working_length ?? ''}" data-field="working_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.final_length ?? ''}" data-field="final_length" data-idx="${i}"></td><td><select data-field="status" data-idx="${i}">${Object.entries(ENDO_STATUS).map(([k,v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
+            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td><input type="text" list="endo-pref-list" value="${prefVal}" placeholder="Ex: Bord incisif" data-field="point_reference" data-idx="${i}" style="min-width:120px;"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.estimated_length ?? ''}" data-field="estimated_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.working_length ?? ''}" data-field="working_length" data-idx="${i}"></td><td><input type="number" step="0.5" min="0" max="40" value="${c.final_length ?? ''}" data-field="final_length" data-idx="${i}"></td><td><select data-field="status" data-idx="${i}">${Object.entries(ENDO_STATUS).map(([k,v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
         } else {
             const fmtLen = v => v != null ? `${v} mm` : '—';
-            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td>${fmtLen(c.estimated_length)}</td><td>${fmtLen(c.working_length)}</td><td>${fmtLen(c.final_length)}</td><td><span class="endo-status-badge st-${c.status || 'non_localise'}">${statusInfo.label}</span></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
+            tr.innerHTML = `<td><strong>${c.canal_name}</strong></td><td>${c.point_reference ? escPref(c.point_reference) : '—'}</td><td>${fmtLen(c.estimated_length)}</td><td>${fmtLen(c.working_length)}</td><td>${fmtLen(c.final_length)}</td><td><span class="endo-status-badge st-${c.status || 'non_localise'}">${statusInfo.label}</span></td><td style="font-size:11px;color:var(--gray-400);">${updated}</td>`;
         }
         tbody.appendChild(tr);
     });

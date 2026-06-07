@@ -38,6 +38,49 @@ def _clean_text(value: Optional[str]) -> str:
     return str(value).strip()
 
 
+# --- Examen clinique dentaire structuré (douleur spontanée, sensibilité, etc.) ---
+DENTAL_EXAM_FIELDS = [
+    ("douleur_spontanee", "de_douleur_spontanee", "Douleur spontanée"),
+    ("sensibilite", "de_sensibilite", "Test de sensibilité"),
+    ("percussion", "de_percussion", "Percussion"),
+    ("palpation", "de_palpation", "Palpation apicale"),
+    ("mobilite", "de_mobilite", "Mobilité dentaire"),
+]
+DENTAL_EXAM_FLAGS = [
+    ("tumefaction", "de_tumefaction", "Tuméfaction / œdème"),
+    ("saignement", "de_saignement", "Saignement gingival"),
+]
+
+
+def _build_dental_exam_json(form) -> Optional[str]:
+    """Sérialise les champs structurés de l'examen clinique dentaire en JSON."""
+    de: dict = {}
+    for key, field, _label in DENTAL_EXAM_FIELDS:
+        v = _clean_text(form.get(field))
+        if v:
+            de[key] = v
+    for key, field, _label in DENTAL_EXAM_FLAGS:
+        if _clean_text(form.get(field)):
+            de[key] = True
+    return json.dumps(de, ensure_ascii=False) if de else None
+
+
+def _format_dental_exam(exam_json: Optional[str]) -> list[str]:
+    """Transforme l'examen structuré en lignes lisibles pour le résumé/affichage."""
+    try:
+        de = json.loads(exam_json) if exam_json else {}
+    except Exception:
+        de = {}
+    if not isinstance(de, dict):
+        return []
+    lines: list[str] = []
+    for key, _field, label in DENTAL_EXAM_FIELDS + DENTAL_EXAM_FLAGS:
+        if key in de and de[key]:
+            val = "Oui" if de[key] is True else de[key]
+            lines.append(f"{label} : {val}")
+    return lines
+
+
 def _decode_vitals_notes(raw_notes: Optional[str]) -> dict:
     if not raw_notes:
         return {}
@@ -356,6 +399,7 @@ async def create_consultation(
     reason = form.get("reason", "") or None
     symptoms = form.get("symptoms", "") or None
     clinical_exam = form.get("clinical_exam", "") or None
+    dental_exam_json = _build_dental_exam_json(form)
     diagnosis = form.get("diagnosis", "") or None
     treatment_plan = form.get("treatment_plan", "") or None
     notes = form.get("notes", "") or None
@@ -375,8 +419,8 @@ async def create_consultation(
     vitals_notes = json.dumps(vitals_notes_payload, ensure_ascii=False) if vitals_notes_payload else None
 
     cursor = await db.execute(
-        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes),
+        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json),
     )
     consultation_id = cursor.lastrowid
 
@@ -423,7 +467,26 @@ async def start_consultation(
     appointment_id = int(appointment_id_raw) if appointment_id_raw else None
     uid = user["sub"]
 
-    # Guard: resume existing en_cours session
+    # Questionnaire de début de consultation (QCM + texte libre)
+    intake: dict = {}
+    motif = _clean_text(form.get("intake_motif"))
+    douleur = _clean_text(form.get("intake_douleur"))
+    caractere = [_clean_text(c) for c in form.getlist("intake_caractere") if _clean_text(c)]
+    depuis = _clean_text(form.get("intake_depuis"))
+    intake_notes = _clean_text(form.get("intake_notes"))
+    if motif:
+        intake["motif"] = motif
+    if douleur:
+        intake["douleur"] = douleur
+    if caractere:
+        intake["caractere"] = caractere
+    if depuis:
+        intake["depuis"] = depuis
+    if intake_notes:
+        intake["notes"] = intake_notes
+    intake_json = json.dumps(intake, ensure_ascii=False) if intake else None
+
+    # Guard: resume existing en_cours session (ne pas écraser le questionnaire existant)
     cursor = await db.execute(
         """SELECT id FROM consultations
            WHERE patient_id = ? AND doctor_id = ? AND status = 'en_cours'
@@ -444,9 +507,9 @@ async def start_consultation(
         )
 
     cursor = await db.execute(
-        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, status, consultation_date)
-           VALUES (?, ?, ?, 'en_cours', CURRENT_TIMESTAMP)""",
-        (patient_id, uid, appointment_id),
+        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, status, consultation_date, reason, intake_json)
+           VALUES (?, ?, ?, 'en_cours', CURRENT_TIMESTAMP, ?, ?)""",
+        (patient_id, uid, appointment_id, motif or None, intake_json),
     )
     consultation_id = cursor.lastrowid
     await db.commit()
@@ -613,6 +676,7 @@ async def update_consultation(
     reason = form.get("reason", "") or None
     symptoms = form.get("symptoms", "") or None
     clinical_exam = form.get("clinical_exam", "") or None
+    dental_exam_json = _build_dental_exam_json(form)
     diagnosis = form.get("diagnosis", "") or None
     treatment_plan = form.get("treatment_plan", "") or None
     notes = form.get("notes", "") or None
@@ -634,8 +698,8 @@ async def update_consultation(
     vitals_notes = json.dumps(vitals_notes_payload, ensure_ascii=False) if vitals_notes_payload else None
 
     await db.execute(
-        """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? """,
-        (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, consultation_id),
+        """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? """,
+        (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id),
     )
 
     cursor = await db.execute("SELECT id FROM vitals WHERE consultation_id = ? ", (consultation_id,))
@@ -669,11 +733,24 @@ async def _build_summary(
     reason: Optional[str],
     diagnosis: Optional[str],
     treatment_plan: Optional[str],
+    clinical_exam: Optional[str] = None,
+    dental_exam_json: Optional[str] = None,
 ) -> str:
     parts = []
 
     if reason:
         parts.append(f"Motif : {reason}")
+
+    exam_lines = _format_dental_exam(dental_exam_json)
+    ce = _clean_text(clinical_exam)
+    if exam_lines or ce:
+        block = "Examen clinique :"
+        if exam_lines:
+            block += "\n  - " + "\n  - ".join(exam_lines)
+        if ce:
+            block += ("\n  " + ce) if exam_lines else (" " + ce)
+        parts.append(block)
+
     if diagnosis:
         parts.append(f"Diagnostic : {diagnosis}")
     if treatment_plan:
@@ -886,6 +963,7 @@ async def terminate_consultation(
     diagnosis = form.get("diagnosis", "") or None
     treatment_plan = form.get("treatment_plan", "") or None
     notes = form.get("notes", "") or None
+    dental_exam_json = _build_dental_exam_json(form)
 
     cursor = await db.execute(
         "SELECT * FROM consultations WHERE id = ? AND doctor_id = ? AND status = 'en_cours'",
@@ -898,14 +976,17 @@ async def terminate_consultation(
         return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
     consultation = dict(row)
 
-    summary = await _build_summary(db, consultation_id, reason, diagnosis, treatment_plan)
+    summary = await _build_summary(
+        db, consultation_id, reason, diagnosis, treatment_plan, clinical_exam, dental_exam_json
+    )
 
     await db.execute(
         """UPDATE consultations
            SET status = 'terminee', reason = ?, clinical_exam = ?, diagnosis = ?,
-               treatment_plan = ?, notes = ?, summary = ?, updated_at = CURRENT_TIMESTAMP
+               treatment_plan = ?, notes = ?, summary = ?, dental_exam_json = ?,
+               updated_at = CURRENT_TIMESTAMP
            WHERE id = ?""",
-        (reason, clinical_exam, diagnosis, treatment_plan, notes, summary, consultation_id),
+        (reason, clinical_exam, diagnosis, treatment_plan, notes, summary, dental_exam_json, consultation_id),
     )
 
     if consultation.get("appointment_id"):

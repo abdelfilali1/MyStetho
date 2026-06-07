@@ -1,0 +1,62 @@
+{# Examen clinique dentaire structuré — réutilisé (formulaire consultation + modal "Terminer").
+   Attend une variable `dental_exam` (dict, éventuellement vide) dans le contexte. #}
+{% set _de = dental_exam or {} %}
+<div class="dental-exam-grid">
+  <div class="de-field">
+    <span class="de-label">Douleur spontanée</span>
+    <div class="de-opts">
+      {% for o in ['Oui','Non'] %}
+      <label class="de-opt"><input type="radio" name="de_douleur_spontanee" value="{{ o }}" {{ 'checked' if _de.douleur_spontanee == o }}><span>{{ o }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="de-field">
+    <span class="de-label">Test de sensibilité (vitalité froid/chaud)</span>
+    <div class="de-opts">
+      {% for o in ['Normale','Augmentée','Diminuée','Absente'] %}
+      <label class="de-opt"><input type="radio" name="de_sensibilite" value="{{ o }}" {{ 'checked' if _de.sensibilite == o }}><span>{{ o }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="de-field">
+    <span class="de-label">Percussion</span>
+    <div class="de-opts">
+      {% for o in ['Négative','Positive verticale','Positive horizontale'] %}
+      <label class="de-opt"><input type="radio" name="de_percussion" value="{{ o }}" {{ 'checked' if _de.percussion == o }}><span>{{ o }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="de-field">
+    <span class="de-label">Palpation apicale</span>
+    <div class="de-opts">
+      {% for o in ['Normale','Douloureuse','Tuméfaction'] %}
+      <label class="de-opt"><input type="radio" name="de_palpation" value="{{ o }}" {{ 'checked' if _de.palpation == o }}><span>{{ o }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="de-field">
+    <span class="de-label">Mobilité dentaire</span>
+    <div class="de-opts">
+      {% for o in ['0','1','2','3'] %}
+      <label class="de-opt"><input type="radio" name="de_mobilite" value="{{ o }}" {{ 'checked' if _de.mobilite == o }}><span>{{ o }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="de-field">
+    <span class="de-label">Autres signes</span>
+    <div class="de-opts">
+      <label class="de-opt"><input type="checkbox" name="de_tumefaction" value="1" {{ 'checked' if _de.tumefaction }}><span>Tuméfaction / œdème</span></label>
+      <label class="de-opt"><input type="checkbox" name="de_saignement" value="1" {{ 'checked' if _de.saignement }}><span>Saignement gingival</span></label>
+    </div>
+  </div>
+</div>
+<style>
+.dental-exam-grid{display:grid;grid-template-columns:1fr;gap:11px;margin:4px 0 6px;}
+.de-label{display:block;font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:6px;}
+.de-opts{display:flex;flex-wrap:wrap;gap:6px;}
+.de-opt{position:relative;cursor:pointer;}
+.de-opt input{position:absolute;opacity:0;pointer-events:none;}
+.de-opt span{display:inline-block;padding:5px 11px;border:1px solid var(--gray-300);border-radius:16px;font-size:12px;color:var(--gray-600);background:#fff;transition:all .15s;}
+.de-opt span:hover{border-color:var(--primary);}
+.de-opt input:checked + span{background:var(--primary);border-color:var(--primary);color:#fff;}
+</style>

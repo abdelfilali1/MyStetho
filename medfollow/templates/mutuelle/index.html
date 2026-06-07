@@ -372,9 +372,10 @@
         <h4>Médecin traitant</h4>
         <div class="fg-row">
           <div class="fg">
-            <label>INPE <span class="req">*</span></label>
-            <input type="text" id="f-inpe" placeholder="N° INPE" oninput="feuilleChanged()">
+            <label>INPE</label>
+            <input type="text" id="f-inpe" placeholder="N° INPE (optionnel)" oninput="feuilleChanged()">
             <div class="err-msg" id="f-inpe-err" style="display:none">Requis</div>
+            <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="f-hide-inpe" onchange="feuilleChanged()"> Masquer l'INPE sur la feuille</label>
           </div>
           <div class="fg">
             <label>Type de déclaration <span class="req">*</span></label>
@@ -448,8 +449,9 @@
         </div>
         <div class="fg-row">
           <div class="fg">
-            <label>N° Note <span class="req">*</span></label>
-            <input type="text" id="n-num" placeholder="Ex: 2026-001">
+            <label>N° Note</label>
+            <input type="text" id="n-num" placeholder="Auto-généré" readonly
+                   style="background:#f1f5f9;color:#1e293b;font-weight:600;cursor:not-allowed;">
             <div class="err-msg" id="n-num-err" style="display:none">Requis</div>
           </div>
           <div class="fg">
@@ -500,9 +502,12 @@
             </div>
           </div>
           <div class="fg-row3">
-            <div class="fg"><label>INPE</label><input type="text" id="n-inpe"></div>
-            <div class="fg"><label>ICE</label><input type="text" id="n-ice"></div>
-            <div class="fg"><label>IF</label><input type="text" id="n-if"></div>
+            <div class="fg"><label>INPE</label><input type="text" id="n-inpe">
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-inpe" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
+            <div class="fg"><label>ICE</label><input type="text" id="n-ice">
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-ice" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
+            <div class="fg"><label>IF</label><input type="text" id="n-if">
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-if" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
           </div>
           <div class="fg-row">
             <div class="fg"><label>CNSS praticien</label><input type="text" id="n-cnss"></div>
@@ -551,7 +556,13 @@ const MA_NO = new Set(["C","V","D626","D627","D628","D629","D630","D631","D632",
     "D735","D736","D737","D741","D744","D745","D746","D747","D773","D774","D775",
     "D778","D779","D785","D913","T142","T143","T144","T145","T146","T147","T148",
     "T149","T150","T151","T152","T153","T154","T155","T158"]);
-const NA_YES = new Set(["D634","D635","D805","T156","T157","T159"]);
+const NA_YES = new Set(["D634","D635","D805","T156","T157","T159",
+    // Soins conservateurs / chirurgicaux portant sur une dent précise mais dont le
+    // libellé ne contient pas de mot-clé "dent" (sinon ignorés → aucune dent rattachée) :
+    "D700","D701","D702",   // Curetage + obturation coronaire (cavité simple / composée)
+    "D703",                 // Pulpotomie / pulpectomie coronaire
+    "D724",                 // Germectomie
+    "D738"]);               // Curetage périapical
 const SA_NO_CAT = new Set(["Consultation","Orthopédie Dento-faciale",
     "Prothèse restauratrice maxillo-faciale","Radiographie de la tête"]);
 const OVERRIDES = new Map([
@@ -579,7 +590,11 @@ const EA = [
     /\bbridge\b/,/\binlay\b/,/\bonlay\b/,/\bfacette\b/,/dent [aà] tenon/,
     /[eé]dentement/,/mainteneur d'espace/,/remin[eé]ralisation une [aà] deux dents/,
     /remin[eé]ralisation de 2 [aà] 6 dents/,/[eé]tanch[eé]ification par dent/,
-    /retroalv[eé]olaire.*par dent/,/par [eé]l[eé]ment/
+    /retroalv[eé]olaire.*par dent/,/par [eé]l[eé]ment/,
+    // Soins conservateurs / chirurgicaux par dent (filet de sécurité pour les libellés
+    // sans mot-clé "dent" : curetage de carie, pulpo/pulpectomie, germectomie…)
+    /curetage et obturation/,/obturation coronaire/,/pulpotomie/,/pulpectomie/,
+    /chambre pulpaire/,/curetage p[eé]riapical/,/germectomie/
 ];
 const LA = [
     /anesth[eé]sie g[eé]n[eé]rale/,/par arcade/,/proth[eè]se adjointe totale/,
@@ -917,6 +932,7 @@ window.patKeydown = function(e) {
 };
 
 let _selectedPatientId = null;
+let _contextPatientIdx = -1;   // patient passé dans l'URL (?patient_id=) — pré-remplissage
 
 window.selectPatient = function(idx) {
     const p = ALL_PATIENTS[idx];
@@ -952,13 +968,14 @@ document.addEventListener('click', function(e) {
 // ==============================
 // FEUILLE DE SOINS MODAL
 // ==============================
-const FEUILLE_REQUIRED = ['f-nom','f-ddn','f-cin','f-inpe','f-ville','f-date'];
+const FEUILLE_REQUIRED = ['f-nom','f-ddn','f-cin','f-ville','f-date'];
 function loadFeuilleDoctor() {
     try {
         const d = JSON.parse(localStorage.getItem('ngap_feuille_doctor') || 'null');
         if (!d) return;
         if (d.inpe) document.getElementById('f-inpe').value = d.inpe;
         if (d.ville) document.getElementById('f-ville').value = d.ville;
+        document.getElementById('f-hide-inpe').checked = !!d.hide_inpe;
         document.getElementById('f-save-inpe').checked = true;
     } catch{}
 }
@@ -967,6 +984,7 @@ window.saveFeuilleDoctor = function() {
     localStorage.setItem('ngap_feuille_doctor', JSON.stringify({
         inpe: document.getElementById('f-inpe').value,
         ville: document.getElementById('f-ville').value,
+        hide_inpe: document.getElementById('f-hide-inpe').checked,
     }));
 };
 window.feuilleChanged = function() {
@@ -988,7 +1006,9 @@ function updateFeuilleStatus() {
 window.openFeuille = function() {
     if (!treatments.length) return;
     document.getElementById('f-date').value = TODAY;
-    clearPatient();
+    // Pré-remplir le patient si on arrive depuis une consultation (?patient_id=)
+    if (_contextPatientIdx >= 0) { selectPatient(_contextPatientIdx); }
+    else { clearPatient(); }
     loadFeuilleDoctor();
     updateFeuilleStatus();
     document.getElementById('modal-feuille').style.display = 'flex';
@@ -1006,6 +1026,9 @@ function loadNoteDoctor() {
             const el = document.getElementById('n-'+k);
             if (el && d[k]) el.value = d[k];
         });
+        document.getElementById('n-hide-inpe').checked = !!d.hide_inpe;
+        document.getElementById('n-hide-ice').checked = !!d.hide_ice;
+        document.getElementById('n-hide-if').checked = !!d.hide_if;
         document.getElementById('n-save').checked = true;
     } catch{}
 }
@@ -1015,6 +1038,9 @@ window.saveNoteDoctor = function() {
     ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
         d[k] = (document.getElementById('n-'+k)||{value:''}).value;
     });
+    d.hide_inpe = document.getElementById('n-hide-inpe').checked;
+    d.hide_ice = document.getElementById('n-hide-ice').checked;
+    d.hide_if = document.getElementById('n-hide-if').checked;
     localStorage.setItem('ngap_note_doctor', JSON.stringify(d));
 };
 window.toggleNoteDoc = function() {
@@ -1053,13 +1079,21 @@ window.noteSelectPatient = function(idx) {
 window.openNote = function() {
     if (!treatments.length) return;
     document.getElementById('n-date').value = TODAY;
+    document.getElementById('n-num').value = '…';
     _selectedPatientIdNote = null;
     const sel = document.getElementById('n-pat-select');
     sel.innerHTML = '<option value="">— Sélectionner un patient —</option>' +
         ALL_PATIENTS.map((p, i) => `<option value="${i}">${esc(p.nom)}</option>`).join('');
+    // Pré-remplir le patient si on arrive depuis une consultation (?patient_id=)
+    if (_contextPatientIdx >= 0) { sel.value = String(_contextPatientIdx); noteSelectPatient(String(_contextPatientIdx)); }
     loadNoteDoctor();
     renderNoteActes();
     document.getElementById('modal-note').style.display = 'flex';
+    // Fetch the next auto-generated note number for display
+    fetch('/mutuelle/note/next-number')
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => { if (d.numero_note) document.getElementById('n-num').value = d.numero_note; })
+        .catch(() => { document.getElementById('n-num').value = ''; });
 };
 window.closeNote = function() { document.getElementById('modal-note').style.display='none'; };
 
@@ -1164,7 +1198,7 @@ window.saveFeuille = async function() {
         cin:              document.getElementById('f-cin').value,
         parente:          (['conjoint','enfant'].includes(lien)) ? lien : 'assure',
         sexe:             (['feminin','femelle','female'].includes(sexeVal)) ? 'femelle' : 'male',
-        inpe:             document.getElementById('f-inpe').value,
+        inpe:             document.getElementById('f-hide-inpe').checked ? '' : document.getElementById('f-inpe').value,
         numero_entente:   document.getElementById('f-entente').value,
         type_soin:        (['prothese','odf','autres'].includes(typeSoin)) ? typeSoin : 'soins',
         ville:            document.getElementById('f-ville').value,
@@ -1270,7 +1304,7 @@ window.printFeuille = async function() {
         cin: ficheRaw.cin,
         parente: (['conjoint','enfant'].includes(ficheRaw.lienAssure)) ? ficheRaw.lienAssure : 'assure',
         sexe: (['feminin','femelle','female'].includes(ficheRaw.sexe)) ? 'femelle' : 'male',
-        inpe: ficheRaw.inpe,
+        inpe: document.getElementById('f-hide-inpe').checked ? '' : ficheRaw.inpe,
         numero_entente: ficheRaw.numeroEntente,
         type_soin: (['prothese','odf','autres'].includes(ficheRaw.typeDeclaration)) ? ficheRaw.typeDeclaration : 'soins',
         ville: ficheRaw.ville,
@@ -1308,10 +1342,9 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 // ==============================
 function validateNote() {
     const patient = document.getElementById('n-patient').value.trim();
-    const num = document.getElementById('n-num').value.trim();
     const date = document.getElementById('n-date').value;
-    if (!patient || !num || !date) {
-        ['n-patient','n-num','n-date'].forEach(id => {
+    if (!patient || !date) {
+        ['n-patient','n-date'].forEach(id => {
             if (!document.getElementById(id).value.trim()) {
                 document.getElementById(id).classList.add('err');
                 const e = document.getElementById(id+'-err'); if (e) e.style.display = '';
@@ -1319,6 +1352,8 @@ function validateNote() {
         });
         return null;
     }
+    // N° Note is auto-generated server-side; pre-fill shown in the readonly field.
+    const num = document.getElementById('n-num').value.trim() || '—';
     return { patient, num, date, paiement: document.getElementById('n-paiement').value };
 }
 
@@ -1333,10 +1368,13 @@ function buildNoteHtml(fields) {
     const ice = document.getElementById('n-ice').value.trim();
     const ifVal = document.getElementById('n-if').value.trim();
     const cnss = document.getElementById('n-cnss').value.trim();
+    const hideInpe = document.getElementById('n-hide-inpe').checked;
+    const hideIce = document.getElementById('n-hide-ice').checked;
+    const hideIf = document.getElementById('n-hide-if').checked;
     const hasDoc = !!(praticien || adresse);
     const total = treatments.reduce((s, t) => s + t.montant, 0);
     const dateStr = new Date(date+'T00:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
-    const footerParts = [adresse, ville, tel?`Tél: ${tel}`:'', inpe?`INPE: ${inpe}`:'', ice?`ICE: ${ice}`:'', ifVal?`IF: ${ifVal}`:'', cnss?`CNSS: ${cnss}`:''].filter(Boolean);
+    const footerParts = [adresse, ville, tel?`Tél: ${tel}`:'', (inpe && !hideInpe)?`INPE: ${inpe}`:'', (ice && !hideIce)?`ICE: ${ice}`:'', (ifVal && !hideIf)?`IF: ${ifVal}`:'', cnss?`CNSS: ${cnss}`:''].filter(Boolean);
     return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
 <title>Note d'Honoraires</title>
 <style>
@@ -1427,6 +1465,7 @@ window.saveNote = async function() {
         });
         const result = await resp.json();
         if (result.ok) {
+            if (result.numero_note) document.getElementById('n-num').value = result.numero_note;
             closeNote();
             window.open('/mutuelle/feuille/' + result.id + '/view', '_blank');
         } else {
@@ -1470,7 +1509,7 @@ renderAll();
     const pid = params.get('patient_id');
     if (pid) {
         const idx = ALL_PATIENTS.findIndex(p => String(p.id) === pid);
-        if (idx >= 0) window.selectPatient(idx);
+        if (idx >= 0) { _contextPatientIdx = idx; window.selectPatient(idx); }
     }
 })();
 
