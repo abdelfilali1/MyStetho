@@ -290,93 +290,117 @@ def _sig_block(doctor_name):
 # ORDONNANCE
 # ═════════════════════════════════════════════════════════════
 
-def generate_prescription_pdf(prescription: dict, items: list, template_path: Optional[str] = None) -> bytes:
+_FR_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+              "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+def _fr_long_date(s) -> str:
+    """'2026-03-09' -> 'Le 09 mars 2026'. Forme lisible en cas de doute."""
+    try:
+        y, m, d = str(s)[:10].split("-")
+        return f"Le {int(d):02d} {_FR_MONTHS[int(m) - 1]} {y}"
+    except Exception:
+        return f"Le {s}" if s else ""
+
+
+def _fr_short_date(s) -> str:
+    """'1999-02-28' -> '28/02/1999'."""
+    try:
+        y, m, d = str(s)[:10].split("-")
+        return f"{int(d):02d}/{int(m):02d}/{y}"
+    except Exception:
+        return str(s) if s else ""
+
+
+def generate_prescription_pdf(prescription: dict, items: list,
+                              template_path: Optional[str] = None,
+                              allergies: Optional[str] = None) -> bytes:
+    """Ordonnance épurée, facile à lire (style « ordonnance médicale ») :
+    date en haut à droite, patient (nom / naissance / allergies) aligné à droite,
+    médicaments à gauche (nom en gras + posologie en clair), signature en bas.
+    Aucun encadré gris ; le papier à en-tête du médecin reste tel quel."""
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
     doc = _doc_for(buf, template_path)
-    S = _styles()
 
-    doctor_hdr = f"Dr. {prescription['d_first']} {prescription['d_last']}"
+    base = getSampleStyleSheet()["Normal"]
+    name_st = ParagraphStyle("_oName", parent=base, fontName="Helvetica-Bold",
+                             fontSize=11.5, textColor=DARK, alignment=TA_RIGHT, leading=15)
+    sub_st  = ParagraphStyle("_oSub", parent=base, fontName="Helvetica",
+                             fontSize=9.5, textColor=GRAY, alignment=TA_RIGHT, leading=13)
+    alg_st  = ParagraphStyle("_oAlg", parent=base, fontName="Helvetica-Oblique",
+                             fontSize=9.5, textColor=DARK, alignment=TA_RIGHT, leading=13)
+    date_st = ParagraphStyle("_oDate", parent=base, fontName="Helvetica",
+                             fontSize=10, textColor=DARK, alignment=TA_RIGHT, leading=13)
+    drug_st = ParagraphStyle("_oDrug", parent=base, fontName="Helvetica-Bold",
+                             fontSize=10.5, textColor=DARK, leading=14, spaceBefore=12, spaceAfter=1)
+    poso_st = ParagraphStyle("_oPoso", parent=base, fontName="Helvetica",
+                             fontSize=10, textColor=DARK, leading=14)
+    note_st = ParagraphStyle("_oNote", parent=base, fontName="Helvetica-Oblique",
+                             fontSize=9.5, textColor=GRAY, leading=13)
+    sign_st = ParagraphStyle("_oSign", parent=base, fontName="Helvetica-Bold",
+                             fontSize=10.5, textColor=DARK, alignment=TA_RIGHT, leading=14)
+    sigl_st = ParagraphStyle("_oSigl", parent=base, fontName="Helvetica",
+                             fontSize=8.5, textColor=GRAY, alignment=TA_RIGHT, leading=12)
+
+    doctor_name = f"{prescription['d_first']} {prescription['d_last']}"
+    doctor_hdr = f"Dr. {doctor_name}"
     if prescription.get("specialty"):
         doctor_hdr += f"  •  {prescription['specialty']}"
 
     def _page(canv, d):
         if use_tpl:
             return  # le papier à en-tête fournit l'en-tête / pied de page
-        _draw_page(canv, d, "ORDONNANCE MÉDICALE", doctor_hdr)
+        _draw_page(canv, d, "ORDONNANCE", doctor_hdr)
 
     els = []
 
-    # Patient box — nom et prénom uniquement (pas de date de naissance / CIN)
-    pname = f"{prescription['p_last'].upper()} {prescription['p_first']}"
-    els.append(_patient_box(S, pname))
-    els.append(Spacer(1, 8))
+    # ── Date (en haut à droite) ──
+    els.append(Paragraph(_fr_long_date(prescription.get("prescription_date")), date_st))
+    els.append(Spacer(1, 16))
 
-    # Date + doctor line
-    meta = Table(
-        [[f"Date : {prescription['prescription_date']}", doctor_hdr]],
-        colWidths=[90 * mm, 81 * mm],
-    )
-    meta.setStyle(TableStyle([
-        ("FONTNAME",   (0, 0), (-1, -1), "Helvetica"),
-        ("FONTSIZE",   (0, 0), (-1, -1), 9.5),
-        ("TEXTCOLOR",  (0, 0), (-1, -1), GRAY),
-        ("ALIGN",      (1, 0), (1, 0),   "RIGHT"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING",    (0, 0), (-1, -1), 0),
-    ]))
-    els.append(meta)
-    els.append(Spacer(1, 10))
+    # ── Patient (à droite : nom, naissance, allergies) ──
+    els.append(Paragraph(f"{prescription['p_last'].upper()} {prescription['p_first']}", name_st))
+    if prescription.get("date_of_birth"):
+        els.append(Paragraph(f"Né(e) le {_fr_short_date(prescription['date_of_birth'])}", sub_st))
+    alg_txt = (allergies or "").strip()
+    els.append(Paragraph(f"Allergies : {alg_txt}" if alg_txt else "Allergies : aucune connue", alg_st))
+    els.append(Spacer(1, 22))
 
-    # Section: Prescription
-    els.extend(_section("Prescription", S))
-    els.append(Paragraph("<i>Rp/</i>", S["_Italic"]))
-    els.append(Spacer(1, 6))
-
-    for i, item in enumerate(items, 1):
-        parts = [
-            f"Posologie : <b>{item['dosage']}</b>",
-            f"Fréquence : <b>{item['frequency']}</b>",
-        ]
+    # ── Médicaments (à gauche : nom en gras + posologie) ──
+    for item in items:
+        block = [Paragraph(item.get("medication_name", ""), drug_st)]
+        seg = []
+        if item.get("dosage"):
+            seg.append(str(item["dosage"]))
+        if item.get("frequency"):
+            seg.append(str(item["frequency"]))
+        detail = ", ".join(seg)
         if item.get("duration"):
-            parts.append(f"Durée : <b>{item['duration']}</b>")
-        if item.get("quantity"):
-            parts.append(f"Qté : <b>{item['quantity']}</b>")
-
-        block = [
-            Paragraph(f"{i}.  {item['medication_name']}", S["_MedName"]),
-            Paragraph("  •  ".join(parts), S["_MedDetail"]),
-        ]
+            detail += (", " if detail else "") + f"pendant {item['duration']}"
+        if detail and not detail.endswith("."):
+            detail += "."
         if item.get("instructions"):
-            block.append(Paragraph(f"→  {item['instructions']}", S["_MedDetail"]))
-        block.append(Spacer(1, 6))
+            instr = str(item["instructions"]).strip()
+            detail += (" " if detail else "") + instr + ("" if instr.endswith(".") else ".")
+        if item.get("quantity"):
+            detail += f" Quantité : {item['quantity']}."
+        if detail:
+            block.append(Paragraph(detail, poso_st))
         els.append(KeepTogether(block))
 
-    # Notes
+    # ── Notes / renouvelable (texte simple, sans encadré) ──
     if prescription.get("notes"):
-        els.append(Spacer(1, 4))
-        els.extend(_section("Notes", S))
-        els.append(Paragraph(prescription["notes"], S["_Italic"]))
-
-    # Renewable badge
-    if prescription.get("is_renewable"):
         els.append(Spacer(1, 10))
-        badge = Table([["✓   Ordonnance renouvelable"]], colWidths=[171 * mm])
-        badge.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, -1), SUCCESS_BG),
-            ("TEXTCOLOR",     (0, 0), (-1, -1), SUCCESS),
-            ("FONTNAME",      (0, 0), (-1, -1), "Helvetica-Bold"),
-            ("FONTSIZE",      (0, 0), (-1, -1), 10),
-            ("TOPPADDING",    (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
-            ("BOX",           (0, 0), (-1, -1), 1, SUCCESS_BDR),
-        ]))
-        els.append(badge)
+        els.append(Paragraph(prescription["notes"], note_st))
+    if prescription.get("is_renewable"):
+        els.append(Spacer(1, 8))
+        els.append(Paragraph("Ordonnance renouvelable.", note_st))
 
-    # Signature
-    els.append(Spacer(1, 36))
-    els.append(_sig_block(f"{prescription['d_first']} {prescription['d_last']}"))
+    # ── Signature (en bas à droite, sans encadré) ──
+    els.append(Spacer(1, 34))
+    els.append(Paragraph(f"Dr. {doctor_name}", sign_st))
+    els.append(Paragraph("Signature et cachet", sigl_st))
 
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
     out = buf.getvalue()

@@ -206,9 +206,27 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
     cursor = await db.execute("SELECT * FROM prescription_items WHERE prescription_id = ? ", (prescription_id,))
     items = [dict(r) for r in await cursor.fetchall()]
 
+    # Allergies du patient (sécurité) — affichées sur l'ordonnance.
+    cursor = await db.execute(
+        "SELECT description FROM medical_history WHERE patient_id = ? AND type = 'allergy' ORDER BY date_recorded DESC, created_at DESC",
+        (prescription["patient_id"],),
+    )
+    seen, allergy_list = set(), []
+    for r in await cursor.fetchall():
+        desc = (r["description"] or "").strip()
+        low = desc.lower()
+        for pref in ("allergie:", "allergie :", "allergy:", "allergy :"):
+            if low.startswith(pref):
+                desc = desc[len(pref):].strip()
+                break
+        if desc and desc.lower() not in seen:
+            seen.add(desc.lower())
+            allergy_list.append(desc)
+    allergies = ", ".join(allergy_list)
+
     from fastapi.responses import StreamingResponse
     import io
-    pdf_bytes = generate_prescription_pdf(prescription, items, prescription.get("pdf_template_path"))
+    pdf_bytes = generate_prescription_pdf(prescription, items, prescription.get("pdf_template_path"), allergies)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
