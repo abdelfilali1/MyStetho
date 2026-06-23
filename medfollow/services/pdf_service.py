@@ -42,20 +42,28 @@ def _stamp_on_template(content_pdf: bytes, template_path: str) -> bytes:
     except Exception:
         return content_pdf
 
-# ── Palette (matches the web app) ────────────────────────────
-PRIMARY      = HexColor("#1c8cf8")
-PRIMARY_DARK = HexColor("#0f61cf")
-PRIMARY_BG   = HexColor("#eff6ff")
-DARK         = HexColor("#1e293b")
-GRAY         = HexColor("#64748b")
-LIGHT        = HexColor("#f8fafc")
-BORDER       = HexColor("#e2e8f0")
-SUCCESS      = HexColor("#16a34a")
-SUCCESS_BG   = HexColor("#dcfce7")
-SUCCESS_BDR  = HexColor("#86efac")
+# ── Palette — noir & blanc, sobre et professionnel ───────────
+# Tout le CONTENU généré est en niveaux de gris. Le papier à en-tête
+# (template PDF du médecin) n'est jamais recoloré : il reste tel quel.
+PRIMARY      = HexColor("#111111")   # titres, filets, en-têtes de tableau (noir)
+PRIMARY_DARK = HexColor("#000000")   # accents (noir pur)
+PRIMARY_BG   = HexColor("#f0f0f0")   # fonds d'encadrés (gris très clair)
+DARK         = HexColor("#1a1a1a")   # texte principal (quasi noir)
+GRAY         = HexColor("#555555")   # texte secondaire (gris neutre)
+LIGHT        = HexColor("#f5f5f5")   # lignes alternées des tableaux
+BORDER       = HexColor("#cccccc")   # bordures (gris clair)
+SUCCESS      = HexColor("#1a1a1a")   # badge "renouvelable" : texte noir
+SUCCESS_BG   = HexColor("#f0f0f0")   # badge : fond gris clair
+SUCCESS_BDR  = HexColor("#bdbdbd")   # badge : bordure grise
 WHITE        = white
 
 _PW, _PH = A4  # 595.27 × 841.89 pts
+
+# Marges quand un papier à en-tête est fourni : on laisse une zone
+# « en-tête » suffisante en haut (et un pied) pour ne JAMAIS écrire
+# par-dessus le logo / l'adresse du template, quel que soit le médecin.
+TPL_TOP_MM    = 55   # ~5,5 cm réservés en haut pour l'en-tête du template
+TPL_BOTTOM_MM = 30   # ~3 cm réservés en bas pour un éventuel pied de page
 
 
 # ─────────────────────────────────────────────────────────────
@@ -63,25 +71,24 @@ _PW, _PH = A4  # 595.27 × 841.89 pts
 # ─────────────────────────────────────────────────────────────
 
 def _draw_page(canvas, doc, title, subtitle):
+    """En-tête sobre N&B (utilisé uniquement SANS papier à en-tête).
+    Pas de bande de couleur : titre noir + filet fin, style document officiel."""
     canvas.saveState()
 
-    # Blue top band
-    band = 24 * mm
+    # Title (black bold, left)
     canvas.setFillColor(PRIMARY)
-    canvas.rect(0, _PH - band, _PW, band, fill=1, stroke=0)
+    canvas.setFont("Helvetica-Bold", 15)
+    canvas.drawString(22 * mm, _PH - 16 * mm, title)
 
-    # Thin accent strip at bottom of band
-    canvas.setFillColor(PRIMARY_DARK)
-    canvas.rect(0, _PH - band - 2, _PW, 2, fill=1, stroke=0)
-
-    # Title (white bold, left)
-    canvas.setFillColor(WHITE)
-    canvas.setFont("Helvetica-Bold", 14)
-    canvas.drawString(22 * mm, _PH - 15 * mm, title)
-
-    # Subtitle (white, right)
+    # Subtitle (gray, right)
+    canvas.setFillColor(GRAY)
     canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(_PW - 22 * mm, _PH - 15 * mm, subtitle)
+    canvas.drawRightString(_PW - 22 * mm, _PH - 16 * mm, subtitle)
+
+    # Thin rule under the header
+    canvas.setStrokeColor(PRIMARY)
+    canvas.setLineWidth(1)
+    canvas.line(22 * mm, _PH - 20 * mm, _PW - 22 * mm, _PH - 20 * mm)
 
     # Footer separator
     canvas.setStrokeColor(BORDER)
@@ -101,12 +108,22 @@ def _draw_page(canvas, doc, title, subtitle):
 # Shared helpers
 # ─────────────────────────────────────────────────────────────
 
-def _make_doc(buf, top=32):
+def _make_doc(buf, top=32, bottom=24):
     return SimpleDocTemplate(
         buf, pagesize=A4,
         leftMargin=22 * mm, rightMargin=22 * mm,
-        topMargin=top * mm, bottomMargin=24 * mm,
+        topMargin=top * mm, bottomMargin=bottom * mm,
     )
+
+
+def _doc_for(buf, use_tpl, top=32):
+    """Build the document with margins adapted to the letterhead.
+    With a template: réserve une zone d'en-tête (et de pied) suffisante
+    pour ne jamais écrire par-dessus le fond. Sans template : marges
+    normales (l'app dessine elle-même son en-tête)."""
+    if use_tpl:
+        return _make_doc(buf, top=TPL_TOP_MM, bottom=TPL_BOTTOM_MM)
+    return _make_doc(buf, top=top)
 
 
 def _styles():
@@ -208,7 +225,7 @@ def _sig_block(doctor_name):
 def generate_prescription_pdf(prescription: dict, items: list, template_path: Optional[str] = None) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _make_doc(buf, top=32)
+    doc = _doc_for(buf, use_tpl)
     S = _styles()
 
     doctor_hdr = f"Dr. {prescription['d_first']} {prescription['d_last']}"
@@ -313,7 +330,7 @@ def generate_patient_brochure_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _make_doc(buf, top=32)
+    doc = _doc_for(buf, use_tpl)
     S = _styles()
 
     full_name = f"{patient.get('last_name', '').upper()} {patient.get('first_name', '')}"
@@ -456,7 +473,7 @@ def generate_consultation_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _make_doc(buf, top=32)
+    doc = _doc_for(buf, use_tpl)
     S = _styles()
 
     doc_date    = consultation.get("consultation_date", "")[:10]
@@ -599,7 +616,7 @@ def generate_note_honoraires_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _make_doc(buf, top=32)
+    doc = _doc_for(buf, use_tpl)
     S = _styles()
 
     def _page(canv, d):
