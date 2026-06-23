@@ -307,14 +307,9 @@ def generate_prescription_pdf(prescription: dict, items: list, template_path: Op
 
     els = []
 
-    # Patient box
+    # Patient box — nom et prénom uniquement (pas de date de naissance / CIN)
     pname = f"{prescription['p_last'].upper()} {prescription['p_first']}"
-    pdetails = []
-    if prescription.get("date_of_birth"):
-        pdetails.append(f"Né(e) le {prescription['date_of_birth']}")
-    if prescription.get("social_security_number"):
-        pdetails.append(f"N° CIN : {prescription['social_security_number']}")
-    els.append(_patient_box(S, pname, "  •  ".join(pdetails) if pdetails else None))
+    els.append(_patient_box(S, pname))
     els.append(Spacer(1, 8))
 
     # Date + doctor line
