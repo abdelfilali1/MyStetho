@@ -252,11 +252,17 @@
 <div class="card no-print" style="margin-bottom:16px;border-left:3px solid var(--primary);">
     <div class="card-header"><h3 style="font-size:14px;">Questionnaire de début de consultation</h3></div>
     <div class="card-body">
+        {% macro _ikval(v) %}{{ v | join(', ') if v is iterable and v is not string else v }}{% endmacro %}
         <div class="info-grid">
-            {% if _ik.motif %}<div class="info-item"><span class="info-label">Motif</span><span class="info-value">{{ _ik.motif }}</span></div>{% endif %}
+            {% if _ik.motif %}<div class="info-item"><span class="info-label">Motif</span><span class="info-value">{{ _ikval(_ik.motif) }}</span></div>{% endif %}
+            {% if _ik.arcade or _ik.cote %}<div class="info-item"><span class="info-label">Localisation</span><span class="info-value">{{ [_ikval(_ik.arcade), _ikval(_ik.cote)] | select | join(' · ') }}</span></div>{% endif %}
             {% if _ik.douleur %}<div class="info-item"><span class="info-label">Niveau de douleur</span><span class="info-value">{{ _ik.douleur }}</span></div>{% endif %}
-            {% if _ik.caractere %}<div class="info-item"><span class="info-label">Caractéristiques</span><span class="info-value">{{ _ik.caractere | join(', ') }}</span></div>{% endif %}
+            {% if _ik.caractere %}<div class="info-item"><span class="info-label">Caractéristiques</span><span class="info-value">{{ _ikval(_ik.caractere) }}</span></div>{% endif %}
             {% if _ik.depuis %}<div class="info-item"><span class="info-label">Depuis</span><span class="info-value">{{ _ik.depuis }}</span></div>{% endif %}
+            {% if _ik.antecedents %}<div class="info-item"><span class="info-label">Antécédents / pathologies</span><span class="info-value">{{ _ikval(_ik.antecedents) }}</span></div>{% endif %}
+            {% if _ik.allergies %}<div class="info-item"><span class="info-label">Allergies</span><span class="info-value">{{ _ikval(_ik.allergies) }}</span></div>{% endif %}
+            {% if _ik.tabac %}<div class="info-item"><span class="info-label">Tabac</span><span class="info-value">{{ _ik.tabac.statut }}{% if _ik.tabac.paquets_jour %} — {{ _ik.tabac.paquets_jour }} paquet(s)/jour{% endif %}</span></div>{% endif %}
+            {% if _ik.habitudes %}<div class="info-item"><span class="info-label">Habitudes / parafonctions</span><span class="info-value">{{ _ikval(_ik.habitudes) }}</span></div>{% endif %}
         </div>
         {% if _ik.notes %}<div class="info-notes"><span class="info-label">Précisions</span><p>{{ _ik.notes }}</p></div>{% endif %}
     </div>
@@ -286,16 +292,28 @@
     </div>
     <div style="padding:18px 22px;overflow-y:auto;">
       <div class="start-q">
-        <label class="start-q-label">Motif de consultation</label>
+        <label class="start-q-label">Motif de consultation <span class="start-hint">(plusieurs choix possibles)</span></label>
         <div class="start-chips">
           {% if is_dentist %}{% set motifs = ['Douleur dentaire','Contrôle / Détartrage','Suivi de traitement','Urgence','Esthétique','Prothèse','Orthodontie','Autre'] %}
           {% else %}{% set motifs = ['Douleur','Suivi','Bilan de santé','Urgence','Renouvellement d\'ordonnance','Résultats d\'examens','Certificat médical','Autre'] %}{% endif %}
           {% for m in motifs %}
-          <label class="start-chip"><input type="radio" name="intake_motif" value="{{ m }}"><span>{{ m }}</span></label>
+          <label class="start-chip"><input type="checkbox" name="intake_motif" value="{{ m }}"><span>{{ m }}</span></label>
           {% endfor %}
         </div>
       </div>
       {% if is_dentist %}
+      <div class="start-q">
+        <label class="start-q-label">Localisation</label>
+        <div class="start-chips">
+          {% for a in ['Maxillaire','Mandibulaire'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_arcade" value="{{ a }}"><span>{{ a }}</span></label>
+          {% endfor %}
+          <span class="start-chip-sep"></span>
+          {% for c in ['Droite','Gauche'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_cote" value="{{ c }}"><span>{{ c }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
       <div class="start-q">
         <label class="start-q-label">Niveau de douleur</label>
         <div class="start-chips">
@@ -322,6 +340,43 @@
       </div>
       {% endif %}
       <div class="start-q">
+        <label class="start-q-label">Antécédents / pathologies <span class="start-hint">(enregistrés sur la fiche patient)</span></label>
+        <div class="start-chips">
+          {% for p in ['Diabète','HTA','Cardiopathie','Asthme','Trouble de coagulation','Anticoagulants','Bisphosphonates','Grossesse','Insuffisance rénale'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_pathologies" value="{{ p }}"><span>{{ p }}</span></label>
+          {% endfor %}
+        </div>
+        <input type="text" name="intake_pathologies_autres" class="form-control start-extra-input" placeholder="Autres pathologies (séparées par des virgules)...">
+      </div>
+      <div class="start-q">
+        <label class="start-q-label">Allergies <span class="start-hint">(enregistrées sur la fiche patient)</span></label>
+        <div class="start-chips">
+          {% for a in ['Pénicilline','AINS (Ibuprofène/Aspirine)','Latex','Anesthésiques locaux','Iode','Sulfamides','Métaux'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_allergies" value="{{ a }}"><span>{{ a }}</span></label>
+          {% endfor %}
+        </div>
+        <input type="text" name="intake_allergies_autres" class="form-control start-extra-input" placeholder="Autres allergies (séparées par des virgules)...">
+      </div>
+      <div class="start-q">
+        <label class="start-q-label">Tabac <span class="start-hint">(enregistré sur la fiche patient)</span></label>
+        <div class="start-chips">
+          {% for t in ['Non','Occasionnel','Régulier','Ancien fumeur'] %}
+          <label class="start-chip"><input type="radio" name="intake_tabac" value="{{ t }}"><span>{{ t }}</span></label>
+          {% endfor %}
+        </div>
+        <input type="number" name="intake_tabac_paquets" min="0" step="0.5" class="form-control start-extra-input" style="max-width:240px;" placeholder="Nombre de paquets / jour">
+      </div>
+      {% if is_dentist %}
+      <div class="start-q">
+        <label class="start-q-label">Habitudes / parafonctions</label>
+        <div class="start-chips">
+          {% for h in ['Bruxisme','Serrement (crispation)','Onychophagie','Respiration buccale','Succion du pouce','Mordillement joues/lèvres','Mastication unilatérale'] %}
+          <label class="start-chip"><input type="checkbox" name="intake_habitudes" value="{{ h }}"><span>{{ h }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="start-q">
         <label class="start-q-label">Précisions (texte libre)</label>
         <textarea name="intake_notes" rows="3" class="form-control" style="resize:vertical;width:100%;" placeholder="Décrivez la demande / le motif en détail..."></textarea>
       </div>
@@ -335,12 +390,15 @@
 <style>
 .start-q{margin-bottom:18px;}
 .start-q-label{display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:9px;}
-.start-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.start-hint{font-weight:500;font-size:11px;color:var(--gray-400);}
+.start-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .start-chip{position:relative;cursor:pointer;}
 .start-chip input{position:absolute;opacity:0;pointer-events:none;}
 .start-chip span{display:inline-block;padding:7px 14px;border:1px solid var(--gray-300);border-radius:20px;font-size:13px;color:var(--gray-600);transition:all .15s;background:#fff;}
 .start-chip span:hover{border-color:var(--primary);}
 .start-chip input:checked + span{background:var(--primary);border-color:var(--primary);color:#fff;}
+.start-chip-sep{width:1px;align-self:stretch;min-height:24px;background:var(--gray-200);margin:0 4px;}
+.start-extra-input{margin-top:8px;width:100%;font-size:13px;}
 </style>
 <script>
 function openStartModal(){document.getElementById('start-overlay').style.display='block';document.getElementById('start-modal').style.display='flex';}
@@ -441,6 +499,12 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
     <div class="card" style="margin-top: 16px; overflow: visible;">
         <div class="card-header"><h3>Antécédents médicaux</h3></div>
         <div class="card-body">
+            {% if patient.smoking or patient.alcohol %}
+            <div class="info-grid" style="margin-bottom: 14px;">
+                {% if patient.smoking %}<div class="info-item"><span class="info-label">Tabac</span><span class="info-value">{{ patient.smoking }}</span></div>{% endif %}
+                {% if patient.alcohol %}<div class="info-item"><span class="info-label">Alcool</span><span class="info-value">{{ patient.alcohol }}</span></div>{% endif %}
+            </div>
+            {% endif %}
             {% if history %}
             <ul class="list">
                 {% for h in history %}
@@ -684,6 +748,12 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 Aperçu
                             </button>
+                            {% if f.mutuelle == 'Note' %}
+                            <a href="/mutuelle/note/{{ f.id }}/pdf" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;" title="PDF sur papier à en-tête">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                PDF
+                            </a>
+                            {% endif %}
                             <a href="/mutuelle/feuille/{{ f.id }}/download" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:5px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Télécharger
@@ -710,6 +780,10 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         .odo-slider-btn{position:relative;z-index:2;flex:1;border:none;background:none;cursor:pointer;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;color:var(--gray-500);transition:color .2s;white-space:nowrap;}
         .odo-slider-btn.active{color:var(--primary);}
         .odo-slider-thumb{position:absolute;z-index:1;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:#fff;border-radius:999px;box-shadow:0 2px 8px rgba(15,23,42,.12);transition:transform .22s ease;}
+        .odo-num-wrap{position:relative;}
+        .odo-num-overlay{position:absolute;inset:0;pointer-events:none;z-index:6;}
+        .odo-num{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:700;color:#0f172a;background:rgba(255,255,255,.72);border:1px solid rgba(15,23,42,.08);border-radius:6px;padding:0 3px;line-height:1.35;pointer-events:none;white-space:nowrap;}
+        @media(max-width:640px){.odo-num{font-size:8px;padding:0 2px;}}
     </style>
     <div style="display:flex;justify-content:center;margin-bottom:16px;" class="no-print">
         <div class="odo-view-slider" id="odo-view-slider" role="tablist" aria-label="Vue dentaire">
@@ -720,8 +794,14 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
     </div>
     <div class="odo-stats" id="stats-row-odo"></div>
     <div class="odo-react-wrap">
-        <div id="react-odo-root-odo" class="react-odo-root" data-mode="circle"></div>
-        <div id="react-odo-root-layout" class="react-odo-root" data-mode="square" style="display:none;"></div>
+        <div class="odo-num-wrap" id="odo-num-wrap-odo">
+            <div id="react-odo-root-odo" class="react-odo-root" data-mode="circle"></div>
+            <div id="odo-num-overlay-odo" class="odo-num-overlay"></div>
+        </div>
+        <div class="odo-num-wrap" id="odo-num-wrap-layout" style="display:none;">
+            <div id="react-odo-root-layout" class="react-odo-root" data-mode="square"></div>
+            <div id="odo-num-overlay-layout" class="odo-num-overlay"></div>
+        </div>
     </div>
     <div class="odo-legend">
         <div class="odo-legend-title">Légende des conditions</div>
@@ -1253,27 +1333,80 @@ function switchTab(tab) {
         if (el)  el.style.display  = (t === tab) ? '' : 'none';
         if (btn) btn.classList.toggle('active', t === tab);
     });
-    if (tab === 'odontogram' && !reactOdoMounted) {
-        buildStats('stats-row-odo');
-        mountReactOdontogram('react-odo-root-odo', 'circle');
-        mountReactOdontogram('react-odo-root-layout', 'square');
-        reactOdoMounted = true;
-        toggleOdontoLayout(currentOdontoLayout);
+    if (tab === 'odontogram') {
+        if (!reactOdoMounted) {
+            buildStats('stats-row-odo');
+            mountReactOdontogram('react-odo-root-odo', 'circle');
+            mountReactOdontogram('react-odo-root-layout', 'square');
+            reactOdoMounted = true;
+            toggleOdontoLayout(currentOdontoLayout);
+            setupToothNumberObservers('react-odo-root-odo', 'odo-num-overlay-odo');
+            setupToothNumberObservers('react-odo-root-layout', 'odo-num-overlay-layout');
+        } else {
+            // Recalcule les numéros pour la vue visible au retour sur l'onglet
+            renderVisibleToothNumbers();
+        }
     }
     if (tab === 'endo'       && !endoGridBuilt)      { buildEndoGrid(); }
 }
 
+// ===== Numéros de dents (overlay au-dessus de l'odontogramme React) =====
+const _odoNumRAF = {};
+function renderToothNumbers(rootId, overlayId) {
+    const root = document.getElementById(rootId);
+    const overlay = document.getElementById(overlayId);
+    if (!root || !overlay) return;
+    const wrap = overlay.parentElement;
+    if (!wrap || wrap.offsetParent === null) { overlay.innerHTML = ''; return; }  // masqué
+    const wrapRect = wrap.getBoundingClientRect();
+    if (!wrapRect.width) return;
+    const teeth = root.querySelectorAll('g[class*="teeth-"]');
+    if (!teeth.length) return;
+    let html = '';
+    teeth.forEach(g => {
+        const m = (g.getAttribute('class') || '').match(/teeth-(\d{2})\b/);
+        if (!m) return;
+        const r = g.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const cx = (r.left + r.width / 2 - wrapRect.left).toFixed(1);
+        const cy = (r.top + r.height / 2 - wrapRect.top).toFixed(1);
+        html += `<span class="odo-num" style="left:${cx}px;top:${cy}px;">${m[1]}</span>`;
+    });
+    overlay.innerHTML = html;
+}
+function scheduleToothNumbers(rootId, overlayId) {
+    if (_odoNumRAF[rootId]) cancelAnimationFrame(_odoNumRAF[rootId]);
+    _odoNumRAF[rootId] = requestAnimationFrame(() => renderToothNumbers(rootId, overlayId));
+}
+function renderVisibleToothNumbers() {
+    if (currentOdontoLayout === 'square') scheduleToothNumbers('react-odo-root-layout', 'odo-num-overlay-layout');
+    else scheduleToothNumbers('react-odo-root-odo', 'odo-num-overlay-odo');
+}
+function setupToothNumberObservers(rootId, overlayId) {
+    const root = document.getElementById(rootId);
+    if (!root || root._odoNumObserved) return;
+    root._odoNumObserved = true;
+    // React remonte le SVG (changement de sélection) → recalcule les numéros
+    new MutationObserver(() => scheduleToothNumbers(rootId, overlayId)).observe(root, { childList: true, subtree: true });
+    if (window.ResizeObserver) {
+        new ResizeObserver(() => scheduleToothNumbers(rootId, overlayId)).observe(root);
+    }
+    scheduleToothNumbers(rootId, overlayId);
+}
+window.addEventListener('resize', () => { if (reactOdoMounted) renderVisibleToothNumbers(); });
+
 // Bascule entre la vue Odontogramme (circle) et Disposition (square)
 function toggleOdontoLayout(mode) {
     currentOdontoLayout = (mode === 'square') ? 'square' : 'circle';
-    const odo = document.getElementById('react-odo-root-odo');
-    const lay = document.getElementById('react-odo-root-layout');
+    const odo = document.getElementById('odo-num-wrap-odo');
+    const lay = document.getElementById('odo-num-wrap-layout');
     if (odo) odo.style.display = (currentOdontoLayout === 'circle') ? '' : 'none';
     if (lay) lay.style.display = (currentOdontoLayout === 'square') ? '' : 'none';
     document.querySelectorAll('#odo-view-slider .odo-slider-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.mode === currentOdontoLayout));
     const thumb = document.getElementById('odo-slider-thumb');
     if (thumb) thumb.style.transform = (currentOdontoLayout === 'square') ? 'translateX(100%)' : 'translateX(0)';
+    renderVisibleToothNumbers();
 }
 window.toggleOdontoLayout = toggleOdontoLayout;
 

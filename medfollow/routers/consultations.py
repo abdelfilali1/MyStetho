@@ -39,29 +39,56 @@ def _clean_text(value: Optional[str]) -> str:
 
 
 # --- Examen clinique dentaire structuré (douleur spontanée, sensibilité, etc.) ---
-DENTAL_EXAM_FIELDS = [
+# Champs à choix unique (radio)
+DENTAL_EXAM_SINGLE = [
     ("douleur_spontanee", "de_douleur_spontanee", "Douleur spontanée"),
     ("sensibilite", "de_sensibilite", "Test de sensibilité"),
+    ("mobilite", "de_mobilite", "Mobilité dentaire"),
+    ("oedeme_godet", "de_oedeme_godet", "Signe du godet (extra-oral)"),
+]
+# Champs à choix multiple (cases à cocher) — stockés en liste
+DENTAL_EXAM_MULTI = [
     ("percussion", "de_percussion", "Percussion"),
     ("palpation", "de_palpation", "Palpation apicale"),
-    ("mobilite", "de_mobilite", "Mobilité dentaire"),
 ]
+# Drapeaux (présence Oui/Non) avec description multiple optionnelle (consistance, etc.)
+# (clé json, champ, libellé, clé description, champ description)
 DENTAL_EXAM_FLAGS = [
-    ("tumefaction", "de_tumefaction", "Tuméfaction / œdème"),
-    ("saignement", "de_saignement", "Saignement gingival"),
+    ("tumefaction", "de_tumefaction", "Tuméfaction / œdème intra-oral", "tumefaction_desc", "de_tumefaction_desc"),
+    ("oedeme_extra", "de_oedeme_extra", "Œdème / tuméfaction extra-orale", "oedeme_extra_desc", "de_oedeme_extra_desc"),
+    ("saignement", "de_saignement", "Saignement gingival", None, None),
+]
+# Ordre + libellés pour le résumé lisible
+DENTAL_EXAM_LABELS = {key: label for key, _f, label in DENTAL_EXAM_SINGLE + DENTAL_EXAM_MULTI}
+DENTAL_EXAM_LABELS.update({key: label for key, _f, label, _dk, _df in DENTAL_EXAM_FLAGS})
+DENTAL_EXAM_DISPLAY_ORDER = [
+    "douleur_spontanee", "sensibilite", "percussion", "palpation", "mobilite",
+    "tumefaction", "oedeme_extra", "oedeme_godet", "saignement",
 ]
 
 
 def _build_dental_exam_json(form) -> Optional[str]:
     """Sérialise les champs structurés de l'examen clinique dentaire en JSON."""
     de: dict = {}
-    for key, field, _label in DENTAL_EXAM_FIELDS:
+    for key, field, _label in DENTAL_EXAM_SINGLE:
         v = _clean_text(form.get(field))
         if v:
             de[key] = v
-    for key, field, _label in DENTAL_EXAM_FLAGS:
+    for key, field, _label in DENTAL_EXAM_MULTI:
+        vals = [_clean_text(v) for v in form.getlist(field) if _clean_text(v)]
+        if vals:
+            de[key] = vals
+    for key, field, _label, desc_key, desc_field in DENTAL_EXAM_FLAGS:
         if _clean_text(form.get(field)):
             de[key] = True
+            if desc_field:
+                descs = [_clean_text(v) for v in form.getlist(desc_field) if _clean_text(v)]
+                if descs:
+                    de[desc_key] = descs
+    # Le signe du godet ne décrit l'œdème extra-oral que si celui-ci est coché
+    # (le radio reste sélectionné même si la case est décochée puis masquée en CSS).
+    if not de.get("oedeme_extra"):
+        de.pop("oedeme_godet", None)
     return json.dumps(de, ensure_ascii=False) if de else None
 
 
@@ -74,10 +101,23 @@ def _format_dental_exam(exam_json: Optional[str]) -> list[str]:
     if not isinstance(de, dict):
         return []
     lines: list[str] = []
-    for key, _field, label in DENTAL_EXAM_FIELDS + DENTAL_EXAM_FLAGS:
-        if key in de and de[key]:
-            val = "Oui" if de[key] is True else de[key]
-            lines.append(f"{label} : {val}")
+    for key in DENTAL_EXAM_DISPLAY_ORDER:
+        if key not in de or not de[key]:
+            continue
+        label = DENTAL_EXAM_LABELS.get(key, key)
+        val = de[key]
+        if val is True:
+            text = "Oui"
+            desc = de.get(f"{key}_desc")
+            if isinstance(desc, list) and desc:
+                text += " (" + ", ".join(str(d) for d in desc) + ")"
+            elif desc:
+                text += f" ({desc})"
+        elif isinstance(val, list):
+            text = ", ".join(str(v) for v in val)
+        else:
+            text = str(val)
+        lines.append(f"{label} : {text}")
     return lines
 
 
@@ -178,22 +218,26 @@ async def _save_history_item_if_new(
     if not patient_id or not value:
         return
 
+    # Le préfixe "Type: …" n'est interprété que s'il correspond à un type connu
+    # (ex. les wrappers internes "Allergie: X"). Sinon, le texte libre est conservé
+    # tel quel (un ':' saisi par l'utilisateur ne doit pas tronquer l'antécédent).
+    type_by_prefix = {
+        "médical": "medical",
+        "medical": "medical",
+        "chirurgical": "surgical",
+        "familial": "family",
+        "allergie": "allergy",
+        "allergy": "allergy",
+    }
+    history_type = "medical"
+    description = value
     if ":" in value:
         prefix, desc = value.split(":", 1)
-        desc = _clean_text(desc)
         prefix_key = _clean_text(prefix).casefold()
-        history_type = {
-            "médical": "medical",
-            "medical": "medical",
-            "chirurgical": "surgical",
-            "familial": "family",
-            "allergie": "allergy",
-            "allergy": "allergy",
-        }.get(prefix_key, "medical")
-        description = desc or value
-    else:
-        history_type = "medical"
-        description = value
+        desc = _clean_text(desc)
+        if prefix_key in type_by_prefix and desc:
+            history_type = type_by_prefix[prefix_key]
+            description = desc
 
     cursor = await db.execute(
         """SELECT 1 FROM medical_history
@@ -208,6 +252,34 @@ async def _save_history_item_if_new(
         "INSERT INTO medical_history (patient_id, type, description, date_recorded) VALUES (?, ?, ?, DATE('now'))",
         (patient_id, history_type, description),
     )
+
+
+async def _persist_intake_patient_data(
+    db: aiosqlite.Connection,
+    patient_id: int,
+    doctor_id,
+    pathologies: list[str],
+    allergies: list[str],
+    tabac_statut: str,
+    tabac_paquets: str,
+) -> None:
+    """Enregistre sur la fiche patient les antécédents/allergies/tabac saisis dans le
+    questionnaire de début de consultation (indépendant de la consultation active)."""
+    for pathologie in pathologies:
+        await _save_history_item_if_new(db, patient_id, pathologie)
+    for allergie in allergies:
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {allergie}")
+    if tabac_statut:
+        if tabac_statut == "Non":
+            smoking_val = "Non"
+        elif tabac_paquets:
+            smoking_val = f"{tabac_statut} — {tabac_paquets} paquet(s)/jour"
+        else:
+            smoking_val = tabac_statut
+        await db.execute(
+            "UPDATE patients SET smoking = ? WHERE id = ? AND doctor_id = ?",
+            (smoking_val, patient_id, doctor_id),
+        )
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -469,22 +541,56 @@ async def start_consultation(
 
     # Questionnaire de début de consultation (QCM + texte libre)
     intake: dict = {}
-    motif = _clean_text(form.get("intake_motif"))
+
+    def _list(field: str) -> list[str]:
+        return [_clean_text(v) for v in form.getlist(field) if _clean_text(v)]
+
+    def _split_extra(value: str) -> list[str]:
+        return [p.strip() for p in _clean_text(value).replace(";", ",").split(",") if p.strip()]
+
+    motifs = _list("intake_motif")
+    arcade = _list("intake_arcade")
+    cote = _list("intake_cote")
     douleur = _clean_text(form.get("intake_douleur"))
-    caractere = [_clean_text(c) for c in form.getlist("intake_caractere") if _clean_text(c)]
+    caractere = _list("intake_caractere")
     depuis = _clean_text(form.get("intake_depuis"))
+    pathologies = _list("intake_pathologies") + _split_extra(form.get("intake_pathologies_autres"))
+    allergies = _list("intake_allergies") + _split_extra(form.get("intake_allergies_autres"))
+    tabac_statut = _clean_text(form.get("intake_tabac"))
+    tabac_paquets = _clean_text(form.get("intake_tabac_paquets"))
+    habitudes = _list("intake_habitudes")
     intake_notes = _clean_text(form.get("intake_notes"))
-    if motif:
-        intake["motif"] = motif
+
+    if motifs:
+        intake["motif"] = motifs
+    if arcade:
+        intake["arcade"] = arcade
+    if cote:
+        intake["cote"] = cote
     if douleur:
         intake["douleur"] = douleur
     if caractere:
         intake["caractere"] = caractere
     if depuis:
         intake["depuis"] = depuis
+    if pathologies:
+        intake["antecedents"] = pathologies
+    if allergies:
+        intake["allergies"] = allergies
+    # Le nombre de paquets n'a de sens qu'avec un statut tabagique → on n'enregistre
+    # le tabac (intake + colonne patients.smoking) que si un statut est sélectionné.
+    if tabac_statut:
+        tabac: dict = {"statut": tabac_statut}
+        if tabac_paquets:
+            tabac["paquets_jour"] = tabac_paquets
+        intake["tabac"] = tabac
+    if habitudes:
+        intake["habitudes"] = habitudes
     if intake_notes:
         intake["notes"] = intake_notes
     intake_json = json.dumps(intake, ensure_ascii=False) if intake else None
+
+    motif = ", ".join(motifs) if motifs else ""
 
     # Guard: resume existing en_cours session (ne pas écraser le questionnaire existant)
     cursor = await db.execute(
@@ -495,6 +601,19 @@ async def start_consultation(
     )
     existing = await cursor.fetchone()
     if existing:
+        # On ne réécrit pas le questionnaire d'une session déjà en cours, mais les
+        # données patient (antécédents/allergies/tabac) saisies doivent être conservées.
+        await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets)
+        # Compléter le questionnaire de la session existante seulement s'il est vide.
+        if intake_json:
+            cur2 = await db.execute("SELECT intake_json, reason FROM consultations WHERE id = ?", (existing["id"],))
+            row2 = await cur2.fetchone()
+            if row2 and not _clean_text(row2["intake_json"]):
+                await db.execute(
+                    "UPDATE consultations SET intake_json = ?, reason = COALESCE(NULLIF(TRIM(reason), ''), ?) WHERE id = ?",
+                    (intake_json, motif or None, existing["id"]),
+                )
+        await db.commit()
         return RedirectResponse(
             url=f"/patients/{patient_id}?consultation_id={existing['id']}",
             status_code=302,
@@ -512,6 +631,10 @@ async def start_consultation(
         (patient_id, uid, appointment_id, motif or None, intake_json),
     )
     consultation_id = cursor.lastrowid
+
+    # Persister antécédents / allergies / tabac sur la fiche patient
+    await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets)
+
     await db.commit()
 
     return RedirectResponse(
@@ -565,7 +688,7 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? """,
+        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? """,
         (consultation_id,),
     )
     row = await cursor.fetchone()
@@ -579,7 +702,7 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
 
     from services.pdf_service import generate_consultation_pdf
 
-    pdf_bytes = generate_consultation_pdf(consultation, vitals, consultation.get("summary"))
+    pdf_bytes = generate_consultation_pdf(consultation, vitals, consultation.get("summary"), consultation.get("pdf_template_path"))
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",

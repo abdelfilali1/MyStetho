@@ -657,4 +657,11 @@ async def init_db():
         except Exception:
             pass
 
+    # Migration: per-user PDF letterhead/template (fond des PDF générés)
+    try:
+        await db.execute("ALTER TABLE users ADD COLUMN pdf_template_path TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     await db.close()

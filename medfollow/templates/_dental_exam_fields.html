@@ -1,6 +1,11 @@
 {# Examen clinique dentaire structuré — réutilisé (formulaire consultation + modal "Terminer").
    Attend une variable `dental_exam` (dict, éventuellement vide) dans le contexte. #}
 {% set _de = dental_exam or {} %}
+{# Normalise les champs multi-choix (compatibilité ancien format texte) #}
+{% set _perc = ([_de.percussion] if _de.percussion is string else (_de.percussion or [])) %}
+{% set _palp = ([_de.palpation] if _de.palpation is string else (_de.palpation or [])) %}
+{% set _tum_desc = ([_de.tumefaction_desc] if _de.tumefaction_desc is string else (_de.tumefaction_desc or [])) %}
+{% set _oed_desc = ([_de.oedeme_extra_desc] if _de.oedeme_extra_desc is string else (_de.oedeme_extra_desc or [])) %}
 <div class="dental-exam-grid">
   <div class="de-field">
     <span class="de-label">Douleur spontanée</span>
@@ -19,18 +24,18 @@
     </div>
   </div>
   <div class="de-field">
-    <span class="de-label">Percussion</span>
+    <span class="de-label">Percussion <span class="de-hint">(choix multiple)</span></span>
     <div class="de-opts">
-      {% for o in ['Négative','Positive verticale','Positive horizontale'] %}
-      <label class="de-opt"><input type="radio" name="de_percussion" value="{{ o }}" {{ 'checked' if _de.percussion == o }}><span>{{ o }}</span></label>
+      {% for o in ['Négative','Positive verticale','Positive horizontale','Positive latérale'] %}
+      <label class="de-opt"><input type="checkbox" name="de_percussion" value="{{ o }}" {{ 'checked' if o in _perc }}><span>{{ o }}</span></label>
       {% endfor %}
     </div>
   </div>
   <div class="de-field">
-    <span class="de-label">Palpation apicale</span>
+    <span class="de-label">Palpation apicale <span class="de-hint">(choix multiple)</span></span>
     <div class="de-opts">
-      {% for o in ['Normale','Douloureuse','Tuméfaction'] %}
-      <label class="de-opt"><input type="radio" name="de_palpation" value="{{ o }}" {{ 'checked' if _de.palpation == o }}><span>{{ o }}</span></label>
+      {% for o in ['Normale','Douloureuse','Tuméfaction','Adénopathie'] %}
+      <label class="de-opt"><input type="checkbox" name="de_palpation" value="{{ o }}" {{ 'checked' if o in _palp }}><span>{{ o }}</span></label>
       {% endfor %}
     </div>
   </div>
@@ -45,18 +50,63 @@
   <div class="de-field">
     <span class="de-label">Autres signes</span>
     <div class="de-opts">
-      <label class="de-opt"><input type="checkbox" name="de_tumefaction" value="1" {{ 'checked' if _de.tumefaction }}><span>Tuméfaction / œdème</span></label>
+      <label class="de-opt"><input type="checkbox" name="de_tumefaction" value="1" data-de-toggle {{ 'checked' if _de.tumefaction }}><span>Tuméfaction / œdème intra-oral</span></label>
+      <label class="de-opt"><input type="checkbox" name="de_oedeme_extra" value="1" data-de-toggle {{ 'checked' if _de.oedeme_extra }}><span>Œdème / tuméfaction extra-orale</span></label>
       <label class="de-opt"><input type="checkbox" name="de_saignement" value="1" {{ 'checked' if _de.saignement }}><span>Saignement gingival</span></label>
+    </div>
+    {# Description tuméfaction intra-orale (consistance) #}
+    <div class="de-desc" style="{{ '' if _de.tumefaction else 'display:none;' }}">
+      <span class="de-sublabel">Tuméfaction intra-orale — consistance</span>
+      <div class="de-opts">
+        {% for o in ['Molle','Indurée','Fluctuante','Douloureuse'] %}
+        <label class="de-opt"><input type="checkbox" name="de_tumefaction_desc" value="{{ o }}" {{ 'checked' if o in _tum_desc }}><span>{{ o }}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+    {# Description œdème extra-oral (consistance + signe du godet) #}
+    <div class="de-desc" style="{{ '' if _de.oedeme_extra else 'display:none;' }}">
+      <span class="de-sublabel">Œdème extra-oral (visage, joue…) — consistance</span>
+      <div class="de-opts">
+        {% for o in ['Molle','Indurée','Fluctuante','Douloureuse','Chaude'] %}
+        <label class="de-opt"><input type="checkbox" name="de_oedeme_extra_desc" value="{{ o }}" {{ 'checked' if o in _oed_desc }}><span>{{ o }}</span></label>
+        {% endfor %}
+      </div>
+      <span class="de-sublabel" style="margin-top:8px;">Signe du godet</span>
+      <div class="de-opts">
+        {% for o in ['Positif','Négatif'] %}
+        <label class="de-opt"><input type="radio" name="de_oedeme_godet" value="{{ o }}" {{ 'checked' if _de.oedeme_godet == o }}><span>{{ o }}</span></label>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </div>
 <style>
 .dental-exam-grid{display:grid;grid-template-columns:1fr;gap:11px;margin:4px 0 6px;}
 .de-label{display:block;font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:6px;}
+.de-hint{font-weight:500;font-size:11px;color:var(--gray-400);}
+.de-sublabel{display:block;font-size:11px;font-weight:600;color:var(--gray-500);margin-bottom:5px;}
 .de-opts{display:flex;flex-wrap:wrap;gap:6px;}
+.de-desc{margin-top:9px;padding:9px 11px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;}
 .de-opt{position:relative;cursor:pointer;}
 .de-opt input{position:absolute;opacity:0;pointer-events:none;}
 .de-opt span{display:inline-block;padding:5px 11px;border:1px solid var(--gray-300);border-radius:16px;font-size:12px;color:var(--gray-600);background:#fff;transition:all .15s;}
 .de-opt span:hover{border-color:var(--primary);}
 .de-opt input:checked + span{background:var(--primary);border-color:var(--primary);color:#fff;}
 </style>
+<script>
+(function(){
+  function deToggle(cb){
+    var field = cb.closest('.de-field');
+    if(!field) return;
+    // Map each "Autres signes" toggle to its description block by index
+    var toggles = field.querySelectorAll('input[data-de-toggle]');
+    var descs = field.querySelectorAll('.de-desc');
+    toggles.forEach(function(t, i){
+      if(descs[i]) descs[i].style.display = t.checked ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.dental-exam-grid input[data-de-toggle]').forEach(function(cb){
+    cb.addEventListener('change', function(){ deToggle(cb); });
+  });
+})();
+</script>

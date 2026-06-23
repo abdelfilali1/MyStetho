@@ -190,7 +190,7 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
     from services.pdf_service import generate_prescription_pdf
 
     cursor = await db.execute(
-        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? """,
+        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty, u.pdf_template_path FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? """,
         (prescription_id,),
     )
     row = await cursor.fetchone()
@@ -203,7 +203,7 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
 
     from fastapi.responses import StreamingResponse
     import io
-    pdf_bytes = generate_prescription_pdf(prescription, items)
+    pdf_bytes = generate_prescription_pdf(prescription, items, prescription.get("pdf_template_path"))
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",

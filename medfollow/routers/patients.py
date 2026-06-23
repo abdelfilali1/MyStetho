@@ -551,8 +551,12 @@ async def patient_brochure_pdf(request: Request, patient_id: int, db: aiosqlite.
         )
         rx["items"] = [dict(i) for i in await cursor2.fetchall()]
 
+    cursor = await db.execute("SELECT pdf_template_path FROM users WHERE id = ?", (patient.get("doctor_id"),))
+    trow = await cursor.fetchone()
+    template_path = trow["pdf_template_path"] if trow else None
+
     from services.pdf_service import generate_patient_brochure_pdf
-    pdf_bytes = generate_patient_brochure_pdf(patient, history, appointments, rx_rows)
+    pdf_bytes = generate_patient_brochure_pdf(patient, history, appointments, rx_rows, template_path)
     filename = f"fiche_{patient['last_name'].lower()}_{patient['first_name'].lower()}.pdf"
     return Response(
         content=pdf_bytes,

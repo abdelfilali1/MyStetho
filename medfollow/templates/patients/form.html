@@ -198,6 +198,9 @@
                         <option value="Ancien fumeur" {{ 'selected' if sm == 'Ancien fumeur' }}>Ancien fumeur</option>
                         <option value="Occasionnel" {{ 'selected' if sm == 'Occasionnel' }}>Occasionnel</option>
                         <option value="Régulier" {{ 'selected' if sm == 'Régulier' }}>Régulier</option>
+                        {% if sm and sm not in ['Non','Ancien fumeur','Occasionnel','Régulier'] %}
+                        <option value="{{ sm }}" selected>{{ sm }}</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div class="form-group">

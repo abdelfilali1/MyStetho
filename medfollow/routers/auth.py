@@ -1,17 +1,21 @@
+import os
 import secrets
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 import aiosqlite
 
 from database.connection import get_db
-from config import TEMPLATES_DIR
+from config import TEMPLATES_DIR, UPLOAD_DIR
 from services.auth_service import hash_password, verify_password, create_token, decode_token
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+LETTERHEAD_DIR = os.path.join(UPLOAD_DIR, "letterheads")
 
 
 def get_current_user(request: Request) -> dict | None:
@@ -20,6 +24,49 @@ def get_current_user(request: Request) -> dict | None:
     if not token:
         return None
     return decode_token(token)
+
+
+def require_admin(request: Request) -> dict:
+    """Dependency enforcing that the request comes from an authenticated admin.
+
+    Authorization must NOT rely on the nav link being hidden in the templates —
+    every /admin/* route (and the reset-link / toggle-active / invite endpoints)
+    is reachable by direct URL, so each one depends on this guard.
+
+    - Not authenticated  -> redirect to /login (matches the rest of the app).
+    - Authenticated, not admin -> 403 Forbidden.
+    """
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=302, headers={"Location": "/login"})
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès réservé à l'administrateur")
+    return user
+
+
+async def _save_letterhead(upload: Optional[UploadFile], user_id: int) -> Optional[str]:
+    """Validate + persist a per-user PDF letterhead. Returns the stored path, or
+    None if no (valid) file was provided."""
+    if not upload or not upload.filename:
+        return None
+    if not upload.filename.lower().endswith(".pdf"):
+        return None
+    content = await upload.read()
+    if not content or not content[:5].startswith(b"%PDF"):
+        return None
+    os.makedirs(LETTERHEAD_DIR, exist_ok=True)
+    path = os.path.join(LETTERHEAD_DIR, f"user_{user_id}.pdf")
+    with open(path, "wb") as f:
+        f.write(content)
+    return path
+
+
+def _delete_letterhead_file(path: Optional[str]) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -78,27 +125,22 @@ async def logout():
 
 
 @router.get("/admin/users", response_class=HTMLResponse)
-async def list_users(request: Request, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active FROM users ORDER BY created_at")
+async def list_users(request: Request, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
+    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active, pdf_template_path FROM users ORDER BY created_at")
     rows = await cursor.fetchall()
-    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6]} for r in rows]
+    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6], "has_template": bool(r[7])} for r in rows]
     return templates.TemplateResponse("admin/users.html", {"request": request, "user": user, "users": users, "active": "admin_users"})
 
 
 @router.get("/admin/users/new", response_class=HTMLResponse)
-async def new_user_page(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
+async def new_user_page(request: Request, user: dict = Depends(require_admin)):
     return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None})
 
 
 @router.post("/admin/users/new", response_class=HTMLResponse)
 async def create_user(
     request: Request,
+    current_user: dict = Depends(require_admin),
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
@@ -107,12 +149,9 @@ async def create_user(
     role: str = Form(...),
     specialty: str = Form(""),
     phone: str = Form(""),
+    pdf_template: UploadFile = File(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    current_user = get_current_user(request)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
     def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg,
@@ -127,16 +166,24 @@ async def create_user(
         return error("Les mots de passe ne correspondent pas")
     if len(password) < 10:
         return error("Le mot de passe doit contenir au moins 10 caractères")
+    if pdf_template and pdf_template.filename and not pdf_template.filename.lower().endswith(".pdf"):
+        return error("Le modèle de document doit être un fichier PDF")
 
     cursor = await db.execute("SELECT id FROM users WHERE email = ?", (email,))
     if await cursor.fetchone():
         return error("Cet email est déjà utilisé")
 
     pw_hash = hash_password(password)
-    await db.execute(
+    cursor = await db.execute(
         "INSERT INTO users (email, password_hash, first_name, last_name, role, specialty, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (email, pw_hash, first_name, last_name, role, specialty or None, phone or None),
     )
+    new_user_id = cursor.lastrowid
+
+    template_path = await _save_letterhead(pdf_template, new_user_id)
+    if template_path:
+        await db.execute("UPDATE users SET pdf_template_path = ? WHERE id = ?", (template_path, new_user_id))
+
     await db.commit()
     return RedirectResponse(url="/admin/users", status_code=302)
 
@@ -204,30 +251,25 @@ async def setup(
 
 
 @router.get("/admin/users/{user_id}/edit", response_class=HTMLResponse)
-async def edit_user_page(request: Request, user_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active FROM users WHERE id = ?", (user_id,))
+async def edit_user_page(request: Request, user_id: int, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
+    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active, pdf_template_path FROM users WHERE id = ?", (user_id,))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/admin/users", status_code=302)
-    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7]}
+    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7], "has_template": bool(row[8])}
     return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None, "form": edit_user, "editing": True})
 
 @router.post("/admin/users/{user_id}/edit", response_class=HTMLResponse)
 async def update_user(
     request: Request, user_id: int,
+    current_user: dict = Depends(require_admin),
     email: str = Form(...), first_name: str = Form(...), last_name: str = Form(...),
     role: str = Form(...), specialty: str = Form(""), phone: str = Form(""),
     password: str = Form(""), password_confirm: str = Form(""),
+    pdf_template: UploadFile = File(None), remove_pdf_template: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    current_user = get_current_user(request)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone}
+    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "has_template": True}
     def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg, "form": form_data, "editing": True
@@ -235,6 +277,8 @@ async def update_user(
 
     if role == "admin" and email != "abdelfilaliansary@gmail.com":
         return error("Le rôle admin est réservé à l'administrateur principal")
+    if pdf_template and pdf_template.filename and not pdf_template.filename.lower().endswith(".pdf"):
+        return error("Le modèle de document doit être un fichier PDF")
 
     if password:
         if password != password_confirm:
@@ -244,6 +288,18 @@ async def update_user(
         pw_hash = hash_password(password)
         await db.execute("UPDATE users SET password_hash=? WHERE id=?", (pw_hash, user_id))
 
+    # Letterhead / modèle PDF : suppression ou remplacement
+    cur = await db.execute("SELECT pdf_template_path FROM users WHERE id = ?", (user_id,))
+    trow = await cur.fetchone()
+    current_tpl = trow[0] if trow else None
+    if remove_pdf_template:
+        _delete_letterhead_file(current_tpl)
+        await db.execute("UPDATE users SET pdf_template_path = NULL WHERE id = ?", (user_id,))
+    else:
+        new_tpl = await _save_letterhead(pdf_template, user_id)
+        if new_tpl:
+            await db.execute("UPDATE users SET pdf_template_path = ? WHERE id = ?", (new_tpl, user_id))
+
     await db.execute(
         "UPDATE users SET email=?, first_name=?, last_name=?, role=?, specialty=?, phone=? WHERE id=?",
         (email, first_name, last_name, role, specialty or None, phone or None, user_id)
@@ -251,11 +307,20 @@ async def update_user(
     await db.commit()
     return RedirectResponse(url="/admin/users", status_code=302)
 
+
+@router.get("/admin/users/{user_id}/pdf-template")
+async def view_user_pdf_template(request: Request, user_id: int, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
+    cursor = await db.execute("SELECT pdf_template_path FROM users WHERE id = ?", (user_id,))
+    row = await cursor.fetchone()
+    path = row[0] if row else None
+    if not path or not os.path.exists(path):
+        return Response("Aucun modèle PDF pour cet utilisateur.", status_code=404)
+    return FileResponse(path, media_type="application/pdf",
+                        headers={"Content-Disposition": f'inline; filename="modele_user_{user_id}.pdf"'})
+
+
 @router.post("/admin/users/{user_id}/reset-password-link", response_class=HTMLResponse)
-async def generate_reset_link(request: Request, user_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    current_user = get_current_user(request)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
+async def generate_reset_link(request: Request, user_id: int, current_user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute("SELECT id, email, first_name, last_name FROM users WHERE id=?", (user_id,))
     row = await cursor.fetchone()
     if not row:
@@ -269,9 +334,9 @@ async def generate_reset_link(request: Request, user_id: int, db: aiosqlite.Conn
     await db.commit()
     base_url = str(request.base_url).rstrip("/")
     reset_link = f"{base_url}/reset-password/{token}"
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active FROM users ORDER BY created_at")
+    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active, pdf_template_path FROM users ORDER BY created_at")
     rows = await cursor.fetchall()
-    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6]} for r in rows]
+    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6], "has_template": bool(r[7])} for r in rows]
     return templates.TemplateResponse("admin/users.html", {
         "request": request, "user": current_user, "users": users, "active": "admin_users",
         "reset_link": reset_link, "reset_user": f"{row[2]} {row[3]}"
@@ -329,10 +394,7 @@ async def reset_password(
 
 
 @router.post("/admin/users/{user_id}/toggle-active")
-async def toggle_user_active(request: Request, user_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    current_user = get_current_user(request)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
+async def toggle_user_active(request: Request, user_id: int, current_user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
     await db.execute("UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", (user_id,))
     await db.commit()
     return RedirectResponse(url="/admin/users", status_code=302)
@@ -357,10 +419,7 @@ async def _get_invitations(db):
 
 
 @router.get("/admin/invite", response_class=HTMLResponse)
-async def invite_page(request: Request, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
+async def invite_page(request: Request, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
     invitations = await _get_invitations(db)
     return templates.TemplateResponse("admin/invite.html", {
         "request": request, "user": user, "active": "admin_users",
@@ -371,14 +430,12 @@ async def invite_page(request: Request, db: aiosqlite.Connection = Depends(get_d
 @router.post("/admin/invite", response_class=HTMLResponse)
 async def create_invite(
     request: Request,
+    user: dict = Depends(require_admin),
     role: str = Form("medecin"),
     specialty: str = Form(""),
     email: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
     token = secrets.token_urlsafe(32)
     expires_at = (datetime.utcnow() + timedelta(days=7)).isoformat()
     await db.execute(
@@ -396,10 +453,7 @@ async def create_invite(
 
 
 @router.post("/admin/invite/{inv_id}/delete")
-async def delete_invite(request: Request, inv_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
+async def delete_invite(request: Request, inv_id: int, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
     await db.execute("DELETE FROM invitations WHERE id = ? AND used_at IS NULL", (inv_id,))
     await db.commit()
     return RedirectResponse(url="/admin/invite", status_code=302)

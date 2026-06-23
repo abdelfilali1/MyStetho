@@ -8,7 +8,39 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
+import os
+from typing import Optional
 from datetime import date as _date
+
+
+# ─────────────────────────────────────────────────────────────
+# Letterhead / template support — stamp generated content on top
+# of a per-user PDF background ("le fond sur lequel on écrit").
+# ─────────────────────────────────────────────────────────────
+
+def _has_template(template_path: Optional[str]) -> bool:
+    return bool(template_path and os.path.exists(template_path))
+
+
+def _stamp_on_template(content_pdf: bytes, template_path: str) -> bytes:
+    """Overlay each page of the reportlab-generated PDF on top of the first page
+    of the user's template PDF (letterhead). Returns the merged PDF bytes.
+    Falls back to the untouched content on any error so a PDF is always produced."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        content_reader = PdfReader(io.BytesIO(content_pdf))
+        writer = PdfWriter()
+        for content_page in content_reader.pages:
+            # Re-read the template per page so each output page gets a fresh
+            # background (a pypdf page object can't be safely reused/merged twice).
+            tpl_page = PdfReader(template_path).pages[0]
+            tpl_page.merge_page(content_page)  # content drawn over the letterhead
+            writer.add_page(tpl_page)
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+    except Exception:
+        return content_pdf
 
 # ── Palette (matches the web app) ────────────────────────────
 PRIMARY      = HexColor("#1c8cf8")
@@ -173,7 +205,8 @@ def _sig_block(doctor_name):
 # ORDONNANCE
 # ═════════════════════════════════════════════════════════════
 
-def generate_prescription_pdf(prescription: dict, items: list) -> bytes:
+def generate_prescription_pdf(prescription: dict, items: list, template_path: Optional[str] = None) -> bytes:
+    use_tpl = _has_template(template_path)
     buf = io.BytesIO()
     doc = _make_doc(buf, top=32)
     S = _styles()
@@ -183,6 +216,8 @@ def generate_prescription_pdf(prescription: dict, items: list) -> bytes:
         doctor_hdr += f"  •  {prescription['specialty']}"
 
     def _page(canv, d):
+        if use_tpl:
+            return  # le papier à en-tête fournit l'en-tête / pied de page
         _draw_page(canv, d, "ORDONNANCE MÉDICALE", doctor_hdr)
 
     els = []
@@ -264,7 +299,8 @@ def generate_prescription_pdf(prescription: dict, items: list) -> bytes:
     els.append(_sig_block(f"{prescription['d_first']} {prescription['d_last']}"))
 
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
-    return buf.getvalue()
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out
 
 
 # ═════════════════════════════════════════════════════════════
@@ -272,8 +308,10 @@ def generate_prescription_pdf(prescription: dict, items: list) -> bytes:
 # ═════════════════════════════════════════════════════════════
 
 def generate_patient_brochure_pdf(
-    patient: dict, history: list, appointments: list, prescriptions: list
+    patient: dict, history: list, appointments: list, prescriptions: list,
+    template_path: Optional[str] = None,
 ) -> bytes:
+    use_tpl = _has_template(template_path)
     buf = io.BytesIO()
     doc = _make_doc(buf, top=32)
     S = _styles()
@@ -281,6 +319,8 @@ def generate_patient_brochure_pdf(
     full_name = f"{patient.get('last_name', '').upper()} {patient.get('first_name', '')}"
 
     def _page(canv, d):
+        if use_tpl:
+            return
         _draw_page(canv, d, "FICHE PATIENT", full_name)
 
     els = []
@@ -402,7 +442,8 @@ def generate_patient_brochure_pdf(
             els.append(Spacer(1, 6))
 
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
-    return buf.getvalue()
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out
 
 
 # ═════════════════════════════════════════════════════════════
@@ -410,8 +451,10 @@ def generate_patient_brochure_pdf(
 # ═════════════════════════════════════════════════════════════
 
 def generate_consultation_pdf(
-    consultation: dict, vitals: dict | None = None, summary: str | None = None
+    consultation: dict, vitals: dict | None = None, summary: str | None = None,
+    template_path: Optional[str] = None,
 ) -> bytes:
+    use_tpl = _has_template(template_path)
     buf = io.BytesIO()
     doc = _make_doc(buf, top=32)
     S = _styles()
@@ -420,6 +463,8 @@ def generate_consultation_pdf(
     doctor_name = consultation.get("doctor_name", "")
 
     def _page(canv, d):
+        if use_tpl:
+            return
         _draw_page(canv, d, "COMPTE RENDU DE CONSULTATION",
                    f"Dr. {doctor_name}  •  {doc_date}")
 
@@ -540,4 +585,123 @@ def generate_consultation_pdf(
     els.append(_sig_block(doctor_name))
 
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
-    return buf.getvalue()
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out
+
+
+# ═════════════════════════════════════════════════════════════
+# NOTE D'HONORAIRES (sur papier à en-tête si disponible)
+# ═════════════════════════════════════════════════════════════
+
+def generate_note_honoraires_pdf(
+    note: dict, actes: list, doctor_name: str = "", specialty: str = "",
+    template_path: Optional[str] = None,
+) -> bytes:
+    use_tpl = _has_template(template_path)
+    buf = io.BytesIO()
+    doc = _make_doc(buf, top=32)
+    S = _styles()
+
+    def _page(canv, d):
+        # Titre rendu dans le contenu → pas de bande d'en-tête de l'app.
+        return
+
+    els = []
+
+    # En-tête praticien (uniquement sans papier à en-tête — sinon fourni par le fond)
+    if not use_tpl and doctor_name:
+        els.append(Paragraph(doctor_name, ParagraphStyle(
+            "_nDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
+        if specialty:
+            els.append(Paragraph(specialty, ParagraphStyle(
+                "_nSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
+        els.append(Spacer(1, 12))
+
+    # Titre + sous-titre (toujours visibles, y compris sur l'en-tête)
+    els.append(Paragraph("NOTE D'HONORAIRES", ParagraphStyle(
+        "_nTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold",
+        fontSize=16, textColor=DARK, leading=20)))
+    els.append(Paragraph("CNOPS / CNSS — Note d'honoraires", ParagraphStyle(
+        "_nSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
+    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+
+    # N° + date
+    num = note.get("numero_note") or "—"
+    date_str = note.get("date_soin") or ""
+    meta = Table([[f"N° {num}", f"Date : {date_str}"]], colWidths=[85 * mm, 86 * mm])
+    meta.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TEXTCOLOR", (0, 0), (-1, -1), GRAY),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    els.append(meta)
+    els.append(Spacer(1, 8))
+
+    # Patient
+    els.append(_patient_box(S, f"Patient : {note.get('nom_beneficiaire') or '—'}"))
+    els.append(Spacer(1, 12))
+
+    # Tableau des actes
+    cell = ParagraphStyle("_nCell", parent=S["_BodySm"], textColor=DARK, fontSize=9.5, leading=12)
+    head = [Paragraph(f"<b>{h}</b>", ParagraphStyle("_nH", parent=cell, textColor=WHITE))
+            for h in ("Code", "Désignation", "Dent(s)", "Date", "Montant")]
+    data = [head]
+    total = 0.0
+    for a in actes:
+        try:
+            m = float(a.get("montant") or 0)
+        except (TypeError, ValueError):
+            m = 0.0
+        total += m
+        data.append([
+            Paragraph(str(a.get("code") or ""), cell),
+            Paragraph(str(a.get("libelle") or ""), cell),
+            Paragraph(str(a.get("toothNumber") or "—"), cell),
+            Paragraph(str(a.get("date") or ""), cell),
+            Paragraph(f"{m:.2f} DH", ParagraphStyle("_nAmt", parent=cell, alignment=TA_RIGHT)),
+        ])
+    try:
+        grand_total = float(note.get("total_montant"))
+    except (TypeError, ValueError):
+        grand_total = total
+    data.append([
+        "", "", "", Paragraph("<b>TOTAL</b>", cell),
+        Paragraph(f"<b>{grand_total:.2f} DH</b>", ParagraphStyle("_nTot", parent=cell, alignment=TA_RIGHT)),
+    ])
+    tbl = Table(data, colWidths=[20 * mm, 83 * mm, 18 * mm, 24 * mm, 26 * mm])
+    tstyle = [
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -2), 0.3, BORDER),
+        ("LINEABOVE", (0, -1), (-1, -1), 1.2, DARK),
+        ("SPAN", (0, -1), (2, -1)),
+    ]
+    for i in range(1, len(data) - 1):
+        if i % 2 == 0:
+            tstyle.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+    tbl.setStyle(TableStyle(tstyle))
+    els.append(tbl)
+
+    # Signatures
+    els.append(Spacer(1, 30))
+    sig = Table([[
+        Paragraph("Signature du patient", ParagraphStyle("_sp", parent=S["_BodySm"], alignment=TA_CENTER)),
+        Paragraph("Cachet et signature du praticien", ParagraphStyle("_sd", parent=S["_BodySm"], alignment=TA_CENTER)),
+    ]], colWidths=[85 * mm, 86 * mm])
+    sig.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY),
+        ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    els.append(sig)
+
+    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out

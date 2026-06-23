@@ -1,8 +1,9 @@
+import io
 import json
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 import aiosqlite
 
@@ -226,6 +227,49 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
         await db.commit()
 
     return JSONResponse({"ok": True, "id": note_id, "numero_note": numero_note})
+
+
+@router.get("/note/{note_id}/pdf")
+async def note_pdf(request: Request, note_id: int, db: aiosqlite.Connection = Depends(get_db)):
+    """Génère la note d'honoraires en PDF, posée sur le papier à en-tête du praticien."""
+    from fastapi.responses import RedirectResponse
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    cursor = await db.execute(
+        "SELECT * FROM feuilles_soin WHERE id = ? AND doctor_id = ? AND type_feuille = 'honoraires'",
+        (note_id, user["sub"]),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return HTMLResponse("<h2>Note introuvable</h2>", status_code=404)
+    note = dict(row)
+
+    try:
+        actes = json.loads(note.get("actes_json") or "[]")
+    except Exception:
+        actes = []
+    if not isinstance(actes, list):
+        actes = []
+
+    cursor = await db.execute(
+        "SELECT first_name, last_name, specialty, pdf_template_path FROM users WHERE id = ?",
+        (user["sub"],),
+    )
+    d = await cursor.fetchone()
+    doctor_name = f"Dr. {d['first_name']} {d['last_name']}" if d else ""
+    specialty = (d["specialty"] if d else "") or ""
+    template_path = d["pdf_template_path"] if d else None
+
+    from services.pdf_service import generate_note_honoraires_pdf
+    pdf_bytes = generate_note_honoraires_pdf(note, actes, doctor_name, specialty, template_path)
+    fname = f"note_honoraires_{note.get('numero_note') or note_id}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+    )
 
 
 @router.get("/note/next-number")

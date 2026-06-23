@@ -54,6 +54,7 @@ function copyReset() {
                     <th>Email</th>
                     <th>Rôle</th>
                     <th>Spécialité</th>
+                    <th>Modèle PDF</th>
                     <th>Statut</th>
                     <th></th>
                 </tr>
@@ -65,6 +66,13 @@ function copyReset() {
                     <td>{{ u.email }}</td>
                     <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
                     <td>{{ u.specialty or '—' }}</td>
+                    <td>
+                        {% if u.has_template %}
+                        <a href="/admin/users/{{ u.id }}/pdf-template" target="_blank" class="badge badge-success" style="text-decoration:none;">✓ PDF</a>
+                        {% else %}
+                        <span style="color:var(--gray-400);">—</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if u.is_active %}
                         <span class="badge badge-success">Actif</span>

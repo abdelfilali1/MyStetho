@@ -23,7 +23,7 @@
         {% if error %}
         <div class="alert alert-error" style="margin-bottom:16px;">{{ error }}</div>
         {% endif %}
-        <form method="POST" action="{{ '/admin/users/' ~ form.id ~ '/edit' if editing else '/admin/users/new' }}" class="auth-form" id="user-form">
+        <form method="POST" action="{{ '/admin/users/' ~ form.id ~ '/edit' if editing else '/admin/users/new' }}" class="auth-form" id="user-form" enctype="multipart/form-data">
             <div class="form-row">
                 <div class="form-group">
                     <label for="first_name">Prénom <span class="required-star">*</span></label>
@@ -109,6 +109,25 @@
                     <input type="password" id="password_confirm" name="password_confirm" {{ '' if editing else 'required' }} minlength="10" placeholder="{{ 'Confirmer le nouveau' if editing else 'Retapez le mot de passe' }}">
                     <div class="form-error" id="pw-match-error" style="display:none;">Les mots de passe ne correspondent pas</div>
                 </div>
+            </div>
+            <div class="form-group">
+                <label for="pdf_template">Modèle PDF — papier à en-tête</label>
+                <p style="font-size:12px;color:var(--gray-500);margin:2px 0 8px;">
+                    Document de fond utilisé pour générer l'ordonnance, le compte rendu, la fiche patient et les autres PDF de l'application (sauf la mutuelle). C'est le fond sur lequel le contenu est écrit.
+                </p>
+                {% if editing and form and form.has_template %}
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap;font-size:13px;">
+                    <span style="color:var(--success);font-weight:600;">✓ Modèle PDF enregistré</span>
+                    <a href="/admin/users/{{ form.id }}/pdf-template" target="_blank" class="btn btn-outline btn-sm">Voir le modèle</a>
+                    <label style="display:flex;align-items:center;gap:6px;font-weight:normal;color:var(--danger);margin:0;">
+                        <input type="checkbox" name="remove_pdf_template" value="1"> Supprimer le modèle
+                    </label>
+                </div>
+                {% endif %}
+                <input type="file" id="pdf_template" name="pdf_template" accept="application/pdf,.pdf">
+                <small style="display:block;color:var(--gray-500);margin-top:4px;">
+                    Format PDF, idéalement A4.{% if editing %} Laisser vide pour conserver le modèle actuel.{% endif %}
+                </small>
             </div>
             <button type="submit" class="btn btn-primary btn-full">{{ 'Enregistrer les modifications' if editing else 'Créer le compte' }}</button>
         </form>

@@ -42,10 +42,29 @@
             {% if _de %}
             <div class="clinical-section">
                 <h4>Examen clinique</h4>
-                {% set _delabels = [('douleur_spontanee','Douleur spontanée'),('sensibilite','Test de sensibilité'),('percussion','Percussion'),('palpation','Palpation apicale'),('mobilite','Mobilité dentaire'),('tumefaction','Tuméfaction / œdème'),('saignement','Saignement gingival')] %}
+                {% set _delabels = [
+                    ('douleur_spontanee','Douleur spontanée'),
+                    ('sensibilite','Test de sensibilité'),
+                    ('percussion','Percussion'),
+                    ('palpation','Palpation apicale'),
+                    ('mobilite','Mobilité dentaire'),
+                    ('tumefaction','Tuméfaction / œdème intra-oral'),
+                    ('oedeme_extra','Œdème / tuméfaction extra-orale'),
+                    ('oedeme_godet','Signe du godet (extra-oral)'),
+                    ('saignement','Saignement gingival'),
+                ] %}
                 <ul style="margin:0;padding-left:18px;">
                 {% for key, label in _delabels %}
-                  {% if _de[key] %}<li>{{ label }} : {{ 'Oui' if _de[key] is true else _de[key] }}</li>{% endif %}
+                  {% if _de[key] %}
+                    {% if _de[key] is true %}
+                      {% set _d = _de[key ~ '_desc'] %}
+                      <li>{{ label }} : Oui{% if _d %} ({{ _d | join(', ') if _d is iterable and _d is not string else _d }}){% endif %}</li>
+                    {% elif _de[key] is iterable and _de[key] is not string %}
+                      <li>{{ label }} : {{ _de[key] | join(', ') }}</li>
+                    {% else %}
+                      <li>{{ label }} : {{ _de[key] }}</li>
+                    {% endif %}
+                  {% endif %}
                 {% endfor %}
                 </ul>
             </div>
