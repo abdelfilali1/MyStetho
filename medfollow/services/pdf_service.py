@@ -59,11 +59,11 @@ WHITE        = white
 
 _PW, _PH = A4  # 595.27 × 841.89 pts
 
-# Marges quand un papier à en-tête est fourni : on laisse une zone
-# « en-tête » suffisante en haut (et un pied) pour ne JAMAIS écrire
-# par-dessus le logo / l'adresse du template, quel que soit le médecin.
-TPL_TOP_MM    = 55   # ~5,5 cm réservés en haut pour l'en-tête du template
-TPL_BOTTOM_MM = 30   # ~3 cm réservés en bas pour un éventuel pied de page
+# Marges de REPLI quand un papier à en-tête est fourni mais que la détection
+# automatique de sa hauteur d'en-tête échoue (voir _detect_letterhead_margins).
+# En fonctionnement normal les marges sont calculées par template.
+TPL_TOP_MM    = 60   # repli : ~6 cm réservés en haut
+TPL_BOTTOM_MM = 30   # repli : ~3 cm réservés en bas
 
 
 # ─────────────────────────────────────────────────────────────
@@ -116,14 +116,82 @@ def _make_doc(buf, top=32, bottom=24):
     )
 
 
-def _doc_for(buf, use_tpl, top=32):
+def _doc_for(buf, template_path, top=32):
     """Build the document with margins adapted to the letterhead.
-    With a template: réserve une zone d'en-tête (et de pied) suffisante
-    pour ne jamais écrire par-dessus le fond. Sans template : marges
-    normales (l'app dessine elle-même son en-tête)."""
-    if use_tpl:
-        return _make_doc(buf, top=TPL_TOP_MM, bottom=TPL_BOTTOM_MM)
+
+    Avec un papier à en-tête, on réserve une zone d'en-tête (et de pied)
+    pour ne JAMAIS écrire par-dessus le fond pré-imprimé. Cette zone est
+    DÉTECTÉE AUTOMATIQUEMENT à partir du template lui-même (chaque médecin a
+    un en-tête différent → aucun réglage manuel). Si la détection est
+    indisponible, on retombe sur une zone fixe généreuse."""
+    if _has_template(template_path):
+        m = _detect_letterhead_margins(template_path)
+        t, b = m if m else (TPL_TOP_MM, TPL_BOTTOM_MM)
+        return _make_doc(buf, top=t, bottom=b)
     return _make_doc(buf, top=top)
+
+
+# ── Détection automatique de la zone imprimable d'un papier à en-tête ────
+# On rastérise la 1re page du template et on repère l'encre la plus basse en
+# haut (= bas de l'en-tête) et la plus haute en bas (= haut du pied de page),
+# puis on réserve ces bandes + une petite marge. Résultat mis en cache par
+# (chemin, mtime). Nécessite PyMuPDF (fitz) ; repli sur marges fixes sinon.
+_TPL_MARGIN_CACHE: dict = {}
+
+
+def _detect_letterhead_margins(template_path):
+    try:
+        key = (template_path, os.path.getmtime(template_path))
+    except OSError:
+        return None
+    if key not in _TPL_MARGIN_CACHE:
+        _TPL_MARGIN_CACHE[key] = _compute_letterhead_margins(template_path)
+    return _TPL_MARGIN_CACHE[key]
+
+
+def _compute_letterhead_margins(template_path):
+    """Retourne (top_mm, bottom_mm) réservant l'en-tête/pied du template, ou
+    None si l'analyse échoue (PyMuPDF absent, erreur de rendu…)."""
+    try:
+        import fitz  # PyMuPDF
+        dpi = 100
+        ppm = dpi / 25.4
+        with fitz.open(template_path) as doc:
+            page = doc[0]
+            pix = page.get_pixmap(dpi=dpi, colorspace=fitz.csGRAY)
+        W, H, s = pix.width, pix.height, pix.samples
+        if W == 0 or H == 0 or len(s) < W * H:
+            return None
+        # Fond ≈ médiane d'un échantillon clairsemé ; encre = nettement plus sombre.
+        sub = s[::1009]
+        bg = sorted(sub)[len(sub) // 2] if sub else 255
+        ink_thr = max(60, min(bg - 25, 235))
+        x0, x1 = int(W * 0.18), int(W * 0.82)  # bande centrale → ignore bordures latérales
+
+        def has_ink(y):
+            return min(s[y * W + x0: y * W + x1]) < ink_thr
+
+        GAP_MM = 7  # respiration entre le fond et le texte généré
+        # En-tête : ligne d'encre la plus basse dans les 45 % supérieurs.
+        hb = 0
+        for y in range(int(H * 0.45), -1, -1):
+            if has_ink(y):
+                hb = y
+                break
+        top_mm = hb / ppm + GAP_MM
+        # Pied : ligne d'encre la plus haute dans les 20 % inférieurs.
+        ft = H
+        for y in range(int(H * 0.80), H):
+            if has_ink(y):
+                ft = y
+                break
+        bottom_mm = (H - ft) / ppm + GAP_MM
+        # Bornes raisonnables.
+        top_mm = max(20.0, min(top_mm, 135.0))
+        bottom_mm = max(18.0, min(bottom_mm, 60.0))
+        return (top_mm, bottom_mm)
+    except Exception:
+        return None
 
 
 def _styles():
@@ -225,7 +293,7 @@ def _sig_block(doctor_name):
 def generate_prescription_pdf(prescription: dict, items: list, template_path: Optional[str] = None) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _doc_for(buf, use_tpl)
+    doc = _doc_for(buf, template_path)
     S = _styles()
 
     doctor_hdr = f"Dr. {prescription['d_first']} {prescription['d_last']}"
@@ -330,7 +398,7 @@ def generate_patient_brochure_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _doc_for(buf, use_tpl)
+    doc = _doc_for(buf, template_path)
     S = _styles()
 
     full_name = f"{patient.get('last_name', '').upper()} {patient.get('first_name', '')}"
@@ -473,7 +541,7 @@ def generate_consultation_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _doc_for(buf, use_tpl)
+    doc = _doc_for(buf, template_path)
     S = _styles()
 
     doc_date    = consultation.get("consultation_date", "")[:10]
@@ -616,7 +684,7 @@ def generate_note_honoraires_pdf(
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
-    doc = _doc_for(buf, use_tpl)
+    doc = _doc_for(buf, template_path)
     S = _styles()
 
     def _page(canv, d):
