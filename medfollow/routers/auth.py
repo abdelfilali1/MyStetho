@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 import aiosqlite
 
 from database.connection import get_db
-from config import TEMPLATES_DIR, UPLOAD_DIR
+from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED
 from services.auth_service import hash_password, verify_password, create_token, decode_token
 
 router = APIRouter()
@@ -112,6 +112,7 @@ async def login(
         value=token,
         httponly=True,
         samesite="lax",
+        secure=HTTPS_ENABLED,
         max_age=8 * 3600,
     )
     return response
@@ -246,7 +247,7 @@ async def setup(
 
     token = create_token(user_id=cursor.lastrowid, email=email, role="admin", first_name=first_name, last_name=last_name)
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(key="access_token", value=token, httponly=True, samesite="lax", max_age=8 * 3600)
+    response.set_cookie(key="access_token", value=token, httponly=True, samesite="lax", secure=HTTPS_ENABLED, max_age=8 * 3600)
     return response
 
 
@@ -528,5 +529,5 @@ async def register(
     await db.commit()
     jwt = create_token(user_id=new_id, email=email, role=inv["role"], specialty=final_specialty, first_name=first_name, last_name=last_name)
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie(key="access_token", value=jwt, httponly=True, samesite="lax", max_age=8 * 3600)
+    response.set_cookie(key="access_token", value=jwt, httponly=True, samesite="lax", secure=HTTPS_ENABLED, max_age=8 * 3600)
     return response

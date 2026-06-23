@@ -77,6 +77,39 @@ async def _inject_active_consultation(request, call_next):
     return await call_next(request)
 
 
+# Security headers applied to every response. CSP intentionally allows the
+# origins the app actually loads (Google Fonts, jsDelivr/FullCalendar) plus
+# 'unsafe-inline' for the many inline <script>/<style> blocks the templates use.
+from config import HTTPS_ENABLED as _HTTPS_ENABLED
+
+_CSP = (
+    "default-src 'self'; "
+    "base-uri 'self'; "
+    "object-src 'none'; "
+    "frame-ancestors 'none'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self' https://fonts.gstatic.com data:; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "connect-src 'self'; "
+    "form-action 'self'"
+)
+
+
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Content-Security-Policy", _CSP)
+    if _HTTPS_ENABLED:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
+    return response
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

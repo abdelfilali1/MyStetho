@@ -54,14 +54,17 @@ async def new_message_form(
     )
     users_list = [dict(r) for r in await cursor.fetchall()]
 
-    cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE is_active = 1 ORDER BY last_name")
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 AND doctor_id = ? ORDER BY last_name",
+        (user["sub"],),
+    )
     patients = [dict(r) for r in await cursor.fetchall()]
 
     original = None
     if reply_to:
         cursor = await db.execute(
-            """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.id = ? """,
-            (reply_to,),
+            """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?) """,
+            (reply_to, user["sub"], user["sub"]),
         )
         row = await cursor.fetchone()
         if row:
@@ -90,6 +93,12 @@ async def send_message(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    # Only allow attaching a patient the sender actually owns.
+    if patient_id:
+        cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+        if not await cur.fetchone():
+            patient_id = None
+
     await db.execute(
         """INSERT INTO messages (sender_id, recipient_id, patient_id, subject, body, parent_message_id) VALUES (?, ?, ?, ?, ?, ?)""",
         (user["sub"], recipient_id, patient_id if patient_id else None,
@@ -106,8 +115,8 @@ async def view_message(request: Request, message_id: int, db: aiosqlite.Connecti
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name, r.first_name || ' ' || r.last_name AS recipient_name, p.first_name || ' ' || p.last_name AS patient_name FROM messages m JOIN users u ON m.sender_id = u.id JOIN users r ON m.recipient_id = r.id LEFT JOIN patients p ON m.patient_id = p.id WHERE m.id = ? """,
-        (message_id,),
+        """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name, r.first_name || ' ' || r.last_name AS recipient_name, p.first_name || ' ' || p.last_name AS patient_name FROM messages m JOIN users u ON m.sender_id = u.id JOIN users r ON m.recipient_id = r.id LEFT JOIN patients p ON m.patient_id = p.id WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?) """,
+        (message_id, user["sub"], user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:

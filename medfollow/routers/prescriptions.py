@@ -129,6 +129,11 @@ async def create_prescription(request: Request, db: aiosqlite.Connection = Depen
     notes = form.get("notes", "")
     is_renewable = form.get("is_renewable") == "on"
 
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cur.fetchone():
+        return RedirectResponse(url="/prescriptions", status_code=302)
+    doctor_id = user["sub"]
+
     cursor = await db.execute(
         """INSERT INTO prescriptions (patient_id, doctor_id, consultation_id, notes, is_renewable) VALUES (?, ?, ?, ?, ?)""",
         (patient_id, doctor_id, consultation_id, notes or None, is_renewable),
@@ -164,8 +169,8 @@ async def view_prescription(request: Request, prescription_id: int, db: aiosqlit
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT pr.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.social_security_number, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? """,
-        (prescription_id,),
+        """SELECT pr.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.social_security_number, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? AND pr.doctor_id = ? """,
+        (prescription_id, user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:
@@ -190,8 +195,8 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
     from services.pdf_service import generate_prescription_pdf
 
     cursor = await db.execute(
-        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty, u.pdf_template_path FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? """,
-        (prescription_id,),
+        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty, u.pdf_template_path FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? AND pr.doctor_id = ? """,
+        (prescription_id, user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:
@@ -220,8 +225,8 @@ async def edit_prescription_form(request: Request, prescription_id: int, db: aio
     uid = user["sub"]
 
     cursor = await db.execute(
-        """SELECT pr.* FROM prescriptions pr WHERE pr.id = ?""",
-        (prescription_id,),
+        """SELECT pr.* FROM prescriptions pr WHERE pr.id = ? AND pr.doctor_id = ?""",
+        (prescription_id, uid),
     )
     row = await cursor.fetchone()
     if not row:
@@ -268,6 +273,11 @@ async def update_prescription(request: Request, prescription_id: int, db: aiosql
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    uid = user["sub"]
+    cursor = await db.execute("SELECT 1 FROM prescriptions WHERE id = ? AND doctor_id = ?", (prescription_id, uid))
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/prescriptions", status_code=302)
+
     form = await request.form()
     patient_id = int(form["patient_id"])
     doctor_id = int(form["doctor_id"])
@@ -276,9 +286,14 @@ async def update_prescription(request: Request, prescription_id: int, db: aiosql
     notes = form.get("notes", "")
     is_renewable = form.get("is_renewable") == "on"
 
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, uid))
+    if not await cur.fetchone():
+        return RedirectResponse(url="/prescriptions", status_code=302)
+    doctor_id = uid
+
     await db.execute(
-        """UPDATE prescriptions SET patient_id = ?, doctor_id = ?, consultation_id = ?, notes = ?, is_renewable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-        (patient_id, doctor_id, consultation_id, notes or None, is_renewable, prescription_id),
+        """UPDATE prescriptions SET patient_id = ?, doctor_id = ?, consultation_id = ?, notes = ?, is_renewable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?""",
+        (patient_id, doctor_id, consultation_id, notes or None, is_renewable, prescription_id, uid),
     )
 
     # Delete old items and insert new ones

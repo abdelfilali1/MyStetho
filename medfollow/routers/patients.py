@@ -506,6 +506,11 @@ async def add_history(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    # Only the owning doctor may append history to a patient record.
+    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/patients", status_code=302)
+
     await db.execute(
         "INSERT INTO medical_history (patient_id, type, description, date_recorded, consultation_id) VALUES (?, ?, ?, ?, ?)",
         (patient_id, type, description, date_recorded or None, consultation_id),

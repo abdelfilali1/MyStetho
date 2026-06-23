@@ -1,16 +1,37 @@
 import os
+import re
+import uuid
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 import aiosqlite
 
-from config import TEMPLATES_DIR, UPLOAD_DIR
+from config import TEMPLATES_DIR, UPLOAD_DIR, MAX_UPLOAD_SIZE_MB
 from database.connection import get_db
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/documents")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Upload hardening: only known-safe document/image types, a hard size cap, and a
+# server-generated on-disk name (never the client filename — which can carry
+# path traversal like '../../evil' or backslashes).
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff",
+    ".heic", ".heif", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".txt", ".csv", ".rtf", ".odt", ".dcm",
+}
+MAX_UPLOAD_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+_UPLOAD_CHUNK = 1024 * 1024  # 1 MiB
+
+
+def _sanitize_basename(filename: str) -> str:
+    """Reduce a client-supplied filename to a safe base name: strip directory
+    components (handles '/', '\\' and '..') and replace unsafe characters."""
+    name = os.path.basename((filename or "").replace("\\", "/")).strip()
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name).lstrip(".")
+    return name or "fichier"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -124,29 +145,60 @@ async def upload_document(
     if not await cur.fetchone():
         return RedirectResponse(url="/documents", status_code=302)
 
+    # Validate the upload type by extension (blocks executables / HTML / scripts).
+    safe_base = _sanitize_basename(file.filename)
+    ext = os.path.splitext(safe_base)[1].lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        return HTMLResponse(
+            "<h2>Type de fichier non autorisé.</h2>"
+            "<p><a href='/documents/upload'>Retour</a></p>",
+            status_code=400,
+        )
+
     # Create patient upload directory
     patient_dir = os.path.join(UPLOAD_DIR, f"patient_{patient_id}")
     os.makedirs(patient_dir, exist_ok=True)
 
-    # Save file
-    safe_filename = file.filename.replace(" ", "_")
-    file_path = os.path.join(patient_dir, safe_filename)
+    # Store under a server-generated random name (keep the sanitized stem for
+    # readability). This is confined to patient_dir regardless of the input name.
+    stem = os.path.splitext(safe_base)[0][:60] or "fichier"
+    stored_name = f"{uuid.uuid4().hex}_{stem}{ext}"
+    file_path = os.path.join(patient_dir, stored_name)
 
-    # Handle duplicate filenames
-    counter = 1
-    base, ext = os.path.splitext(safe_filename)
-    while os.path.exists(file_path):
-        file_path = os.path.join(patient_dir, f"{base}_{counter}{ext}")
-        counter += 1
+    # Stream to disk with a hard byte cap so an oversized upload can't exhaust memory.
+    size = 0
+    try:
+        with open(file_path, "wb") as f:
+            while True:
+                chunk = await file.read(_UPLOAD_CHUNK)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    f.close()
+                    os.remove(file_path)
+                    return HTMLResponse(
+                        f"<h2>Fichier trop volumineux (max {MAX_UPLOAD_SIZE_MB} Mo).</h2>"
+                        "<p><a href='/documents/upload'>Retour</a></p>",
+                        status_code=413,
+                    )
+                f.write(chunk)
+    except Exception:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
 
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+    if size == 0:
+        os.remove(file_path)
+        return HTMLResponse(
+            "<h2>Fichier vide.</h2><p><a href='/documents/upload'>Retour</a></p>",
+            status_code=400,
+        )
 
     await db.execute(
         """INSERT INTO documents (patient_id, consultation_id, title, category, file_path, file_type, file_size, description, uploaded_by)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, consultation_id, title, category, file_path, file.content_type, len(content),
+        (patient_id, consultation_id, title, category, file_path, file.content_type, size,
          description or None, user["sub"]),
     )
     await db.commit()

@@ -51,6 +51,14 @@ TOOTH_NAMES = {
 }
 
 
+async def _owns_patient(db: aiosqlite.Connection, patient_id: int, uid: int) -> bool:
+    """True only if the patient belongs to the calling doctor. Every dental data
+    endpoint must call this before reading/writing — the patient_id comes from the
+    URL and is otherwise unverified (IDOR)."""
+    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, uid))
+    return await cursor.fetchone() is not None
+
+
 @router.get("/{patient_id}", response_class=HTMLResponse)
 async def dental_chart(request: Request, patient_id: int, consultation_id: Optional[int] = None, db: aiosqlite.Connection = Depends(get_db)):
     user = get_current_user(request)
@@ -96,6 +104,8 @@ async def get_tooth_data(request: Request, patient_id: int, tooth_number: int, d
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
     cursor = await db.execute("SELECT * FROM dental_teeth WHERE patient_id = ? AND tooth_number = ?", (patient_id, tooth_number))
     row = await cursor.fetchone()
     tooth = dict(row) if row else {"tooth_number": tooth_number, "condition": "sain", "notes": ""}
@@ -124,6 +134,8 @@ async def update_tooth_condition(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     # Check previous condition to avoid duplicate consecutive entries
     cursor = await db.execute(
@@ -161,6 +173,8 @@ async def get_tooth_condition_history(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
     cursor = await db.execute(
         """SELECT h.condition, h.notes, h.changed_at,
                   u.first_name || ' ' || u.last_name AS doctor_name
@@ -193,6 +207,8 @@ async def add_treatment(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
     tdate = treatment_date or date.today().isoformat()
     stime = start_time or "09:00"
 
@@ -227,6 +243,8 @@ async def delete_treatment(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
     # Cancel linked appointment if it's still planifie/confirme
     cursor = await db.execute(
         "SELECT appointment_id FROM dental_treatments WHERE id = ? AND patient_id = ?",
@@ -259,6 +277,8 @@ async def add_bulk_treatment(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     data = await request.json()
     treatment_type = data.get("treatment_type", "Détartrage")
@@ -300,6 +320,8 @@ async def get_endo_data(request: Request, patient_id: int, tooth_number: int, db
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     # Get canals
     cursor = await db.execute(
@@ -344,6 +366,8 @@ async def save_endo_data(request: Request, patient_id: int, tooth_number: int, d
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     body = await request.json()
     canals_data = body.get("canals", [])
@@ -442,6 +466,8 @@ async def correct_endo_history(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not await _owns_patient(db, patient_id, user["sub"]):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     body = await request.json()
     corrected_value = body.get("corrected_value", "")

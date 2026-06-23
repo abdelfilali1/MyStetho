@@ -467,6 +467,11 @@ async def create_consultation(
             },
         )
 
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cur.fetchone():
+        return RedirectResponse(url="/consultations", status_code=302)
+    doctor_id = user["sub"]
+
     appointment_id = _int("appointment_id")
     reason = form.get("reason", "") or None
     symptoms = form.get("symptoms", "") or None
@@ -538,6 +543,10 @@ async def start_consultation(
     appointment_id_raw = form.get("appointment_id")
     appointment_id = int(appointment_id_raw) if appointment_id_raw else None
     uid = user["sub"]
+
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, uid))
+    if not await cur.fetchone():
+        return RedirectResponse(url="/patients", status_code=302)
 
     # Questionnaire de début de consultation (QCM + texte libre)
     intake: dict = {}
@@ -650,8 +659,8 @@ async def view_consultation(request: Request, consultation_id: int, db: aiosqlit
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, p.id AS pid, u.first_name || ' ' || u.last_name AS doctor_name FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? """,
-        (consultation_id,),
+        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, p.id AS pid, u.first_name || ' ' || u.last_name AS doctor_name FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
+        (consultation_id, user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:
@@ -688,8 +697,8 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? """,
-        (consultation_id,),
+        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
+        (consultation_id, user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:
@@ -716,7 +725,7 @@ async def edit_consultation_form(request: Request, consultation_id: int, db: aio
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    cursor = await db.execute("SELECT * FROM consultations WHERE id = ? ", (consultation_id,))
+    cursor = await db.execute("SELECT * FROM consultations WHERE id = ? AND doctor_id = ? ", (consultation_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/consultations", status_code=302)
@@ -778,6 +787,10 @@ async def update_consultation(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    cursor = await db.execute("SELECT id FROM consultations WHERE id = ? AND doctor_id = ?", (consultation_id, user["sub"]))
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/consultations", status_code=302)
+
     form = await request.form()
 
     def _int(key):
@@ -795,7 +808,11 @@ async def update_consultation(
             return None
 
     patient_id = _int("patient_id")
-    doctor_id = _int("doctor_id")
+    doctor_id = user["sub"]
+    if patient_id is not None:
+        cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+        if not await cur.fetchone():
+            return RedirectResponse(url="/consultations", status_code=302)
     reason = form.get("reason", "") or None
     symptoms = form.get("symptoms", "") or None
     clinical_exam = form.get("clinical_exam", "") or None
@@ -821,8 +838,8 @@ async def update_consultation(
     vitals_notes = json.dumps(vitals_notes_payload, ensure_ascii=False) if vitals_notes_payload else None
 
     await db.execute(
-        """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? """,
-        (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id),
+        """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ? """,
+        (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id, user["sub"]),
     )
 
     cursor = await db.execute("SELECT id FROM vitals WHERE consultation_id = ? ", (consultation_id,))
@@ -1001,6 +1018,10 @@ async def get_summary_data(
     user = get_current_user(request)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    cursor = await db.execute("SELECT 1 FROM consultations WHERE id = ? AND doctor_id = ?", (consultation_id, user["sub"]))
+    if not await cursor.fetchone():
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     cursor = await db.execute(
         """SELECT p.id, GROUP_CONCAT(pi.medication_name, ', ') AS meds

@@ -132,6 +132,10 @@ async def save_feuille(request: Request, db: aiosqlite.Connection = Depends(get_
     if not patient_id:
         return JSONResponse({"error": "patient_id requis"}, status_code=400)
 
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cur.fetchone():
+        return JSONResponse({"error": "not found"}, status_code=404)
+
     consultation_id = data.get("consultation_id") or None
 
     cursor = await db.execute(
@@ -197,6 +201,10 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
     patient_id = data.get("patient_id")
     if not patient_id:
         return JSONResponse({"error": "patient_id requis"}, status_code=400)
+
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cur.fetchone():
+        return JSONResponse({"error": "not found"}, status_code=404)
 
     numero_note = await _next_numero_note(db, user["sub"])
 

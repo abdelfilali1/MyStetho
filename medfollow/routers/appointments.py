@@ -104,6 +104,7 @@ async def get_free_slots(
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
+    doctor_id = user["sub"]  # ignore any client-supplied doctor_id; only your own slots
     # Fetch all non-cancelled appointments for that doctor on that date
     cursor = await db.execute(
         """SELECT start_datetime, end_datetime FROM appointments
@@ -149,7 +150,7 @@ async def create_appointment_api(
 
     data = await request.json()
     patient_id = data.get("patient_id")
-    doctor_id = data.get("doctor_id")
+    doctor_id = user["sub"]  # always the logged-in doctor; never trust the client body
     title = data.get("title", "")
     appointment_type = data.get("appointment_type", "consultation")
     status = data.get("status", "planifie")
@@ -158,6 +159,11 @@ async def create_appointment_api(
     room = data.get("room", "") or None
     notes = data.get("notes", "") or None
     exclude_id = data.get("exclude_id", 0)
+
+    # The patient must belong to the current doctor.
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cur.fetchone():
+        return JSONResponse(status_code=404, content={"error": "Not found"})
 
     # Conflict check: any non-cancelled appointment for same doctor that overlaps
     cursor = await db.execute(
@@ -230,6 +236,11 @@ async def create_appointment(
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
+
+    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/appointments", status_code=302)
+    doctor_id = user["sub"]
 
     await db.execute(
         """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, status, start_datetime, end_datetime, room, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",

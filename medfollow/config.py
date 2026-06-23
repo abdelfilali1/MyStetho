@@ -60,6 +60,12 @@ if not os.environ.get("MEDFOLLOW_SECRET_KEY"):
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 8
 
+# When the app is served over HTTPS (TLS terminated at the reverse proxy), set
+# MEDFOLLOW_HTTPS=1 so auth cookies are flagged Secure and HSTS is emitted.
+# Defaults OFF so local HTTP dev — and an HTTP-only deployment — keep working
+# (a Secure cookie is never sent over plain HTTP, which would break login).
+HTTPS_ENABLED = os.getenv("MEDFOLLOW_HTTPS", "0").lower() in ("1", "true", "yes")
+
 # Uploads
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")

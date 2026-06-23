@@ -140,6 +140,11 @@ async def create_invoice(request: Request, db: aiosqlite.Connection = Depends(ge
     notes = form.get("notes", "")
     tiers_payant = form.get("tiers_payant") == "on"
 
+    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/invoices", status_code=302)
+    doctor_id = user["sub"]
+
     today = date.today()
 
     # Calculate total from items
@@ -196,8 +201,8 @@ async def view_invoice(request: Request, invoice_id: int, db: aiosqlite.Connecti
         return RedirectResponse(url="/login", status_code=302)
 
     cursor = await db.execute(
-        """SELECT i.*, p.first_name || ' ' || p.last_name AS patient_name, p.address, p.city, p.postal_code, p.social_security_number, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty FROM invoices i JOIN patients p ON i.patient_id = p.id JOIN users u ON i.doctor_id = u.id WHERE i.id = ? """,
-        (invoice_id,),
+        """SELECT i.*, p.first_name || ' ' || p.last_name AS patient_name, p.address, p.city, p.postal_code, p.social_security_number, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty FROM invoices i JOIN patients p ON i.patient_id = p.id JOIN users u ON i.doctor_id = u.id WHERE i.id = ? AND i.doctor_id = ? """,
+        (invoice_id, user["sub"]),
     )
     row = await cursor.fetchone()
     if not row:
@@ -303,6 +308,16 @@ async def add_payment(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
+    # Verify the invoice belongs to the current doctor before reading/writing.
+    cursor = await db.execute(
+        "SELECT total_amount FROM invoices WHERE id = ? AND doctor_id = ?",
+        (invoice_id, user["sub"]),
+    )
+    inv = await cursor.fetchone()
+    if not inv:
+        return RedirectResponse(url="/invoices", status_code=302)
+    total_amount = inv[0]
+
     await db.execute(
         "INSERT INTO payments (invoice_id, amount, payment_method, reference) VALUES (?, ?, ?, ?)",
         (invoice_id, amount, payment_method, reference or None),
@@ -312,9 +327,6 @@ async def add_payment(
     cursor = await db.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE invoice_id = ? ", (invoice_id,))
     total_paid = (await cursor.fetchone())[0]
 
-    cursor = await db.execute("SELECT total_amount FROM invoices WHERE id = ? ", (invoice_id,))
-    total_amount = (await cursor.fetchone())[0]
-
     if total_paid >= total_amount:
         status = "payee"
     elif total_paid > 0:
@@ -323,8 +335,8 @@ async def add_payment(
         status = "emise"
 
     await db.execute(
-        "UPDATE invoices SET paid_amount = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? ",
-        (total_paid, status, invoice_id),
+        "UPDATE invoices SET paid_amount = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ? ",
+        (total_paid, status, invoice_id, user["sub"]),
     )
     await db.commit()
     return RedirectResponse(url=f"/invoices/{invoice_id}", status_code=302)
