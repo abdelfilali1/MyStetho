@@ -9,8 +9,10 @@ from fastapi.templating import Jinja2Templates
 import aiosqlite
 
 from database.connection import get_db
-from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED
+from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED, ADMIN_EMAIL
 from services.auth_service import hash_password, verify_password, create_token, decode_token
+from services.rate_limit import retry_after, record_failure, reset as rate_limit_reset
+from services.audit import log_audit, client_ip
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -93,19 +95,36 @@ async def login(
     if count == 0:
         return RedirectResponse(url="/setup", status_code=302)
 
+    # Anti force-brute : fenêtre glissante par IP et par compte
+    ip = client_ip(request)
+    wait = retry_after(f"login:ip:{ip}", max_attempts=20, window_seconds=900) or \
+        retry_after(f"login:email:{email.lower()}", max_attempts=5, window_seconds=900)
+    if wait:
+        minutes = max(1, (wait + 59) // 60)
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": f"Trop de tentatives. Réessayez dans {minutes} minute(s)."},
+            status_code=429,
+        )
+
     cursor = await db.execute(
-        "SELECT id, email, password_hash, first_name, last_name, role, specialty FROM users WHERE email = ? AND is_active = 1",
+        "SELECT id, email, password_hash, first_name, last_name, role, specialty, linked_doctor_id FROM users WHERE email = ? AND is_active = 1",
         (email,),
     )
     row = await cursor.fetchone()
 
     if not row or not verify_password(password, row[2]):
+        record_failure(f"login:ip:{ip}")
+        record_failure(f"login:email:{email.lower()}")
+        await log_audit(db, None, "login_echec", ip=ip, details=f"email={email}")
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Email ou mot de passe incorrect"},
         )
 
-    token = create_token(user_id=row[0], email=row[1], role=row[5], specialty=row[6], first_name=row[3], last_name=row[4])
+    rate_limit_reset(f"login:email:{email.lower()}")
+    await log_audit(db, {"sub": row[0], "email": row[1]}, "login", ip=ip)
+    token = create_token(user_id=row[0], email=row[1], role=row[5], specialty=row[6], first_name=row[3], last_name=row[4], linked_doctor_id=row[7])
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(
         key="access_token",
@@ -127,15 +146,29 @@ async def logout():
 
 @router.get("/admin/users", response_class=HTMLResponse)
 async def list_users(request: Request, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active, pdf_template_path FROM users ORDER BY created_at")
+    cursor = await db.execute(
+        """SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.specialty, u.is_active, u.pdf_template_path,
+                  d.first_name || ' ' || d.last_name
+           FROM users u LEFT JOIN users d ON u.linked_doctor_id = d.id
+           ORDER BY u.created_at"""
+    )
     rows = await cursor.fetchall()
-    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6], "has_template": bool(r[7])} for r in rows]
+    users = [{"id": r[0], "email": r[1], "first_name": r[2], "last_name": r[3], "role": r[4], "specialty": r[5], "is_active": r[6], "has_template": bool(r[7]), "linked_doctor_name": r[8]} for r in rows]
     return templates.TemplateResponse("admin/users.html", {"request": request, "user": user, "users": users, "active": "admin_users"})
 
 
+async def _get_doctors(db) -> list:
+    """Praticiens auxquels une secrétaire peut être liée (médecins + admin praticien)."""
+    cursor = await db.execute(
+        "SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') AND is_active = 1 ORDER BY last_name, first_name"
+    )
+    return [{"id": r[0], "first_name": r[1], "last_name": r[2]} for r in await cursor.fetchall()]
+
+
 @router.get("/admin/users/new", response_class=HTMLResponse)
-async def new_user_page(request: Request, user: dict = Depends(require_admin)):
-    return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None})
+async def new_user_page(request: Request, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
+    doctors = await _get_doctors(db)
+    return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None, "doctors": doctors})
 
 
 @router.post("/admin/users/new", response_class=HTMLResponse)
@@ -150,34 +183,46 @@ async def create_user(
     role: str = Form(...),
     specialty: str = Form(""),
     phone: str = Form(""),
+    linked_doctor_id: str = Form(""),
     pdf_template: UploadFile = File(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    def error(msg):
+    async def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg,
-            "form": {"email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone}
+            "form": {"email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "linked_doctor_id": linked_doctor_id},
+            "doctors": await _get_doctors(db),
         })
 
-    if role == "admin" and email != "abdelfilaliansary@gmail.com":
-        return error("Le rôle admin est réservé à l'administrateur principal")
-    if not specialty:
-        return error("Veuillez choisir une spécialité")
+    if role == "admin" and email != ADMIN_EMAIL:
+        return await error("Le rôle admin est réservé à l'administrateur principal")
+    if role != "secretaire" and not specialty:
+        return await error("Veuillez choisir une spécialité")
     if password != password_confirm:
-        return error("Les mots de passe ne correspondent pas")
+        return await error("Les mots de passe ne correspondent pas")
     if len(password) < 10:
-        return error("Le mot de passe doit contenir au moins 10 caractères")
+        return await error("Le mot de passe doit contenir au moins 10 caractères")
     if pdf_template and pdf_template.filename and not pdf_template.filename.lower().endswith(".pdf"):
-        return error("Le modèle de document doit être un fichier PDF")
+        return await error("Le modèle de document doit être un fichier PDF")
+
+    # Secrétaire : liaison obligatoire à un praticien (cloisonnement des données)
+    ldi = None
+    if role == "secretaire":
+        if not linked_doctor_id.strip().isdigit():
+            return await error("Veuillez choisir le médecin lié à cette secrétaire")
+        ldi = int(linked_doctor_id)
+        cursor = await db.execute("SELECT 1 FROM users WHERE id = ? AND role IN ('medecin', 'admin') AND is_active = 1", (ldi,))
+        if not await cursor.fetchone():
+            return await error("Médecin lié invalide")
 
     cursor = await db.execute("SELECT id FROM users WHERE email = ?", (email,))
     if await cursor.fetchone():
-        return error("Cet email est déjà utilisé")
+        return await error("Cet email est déjà utilisé")
 
     pw_hash = hash_password(password)
     cursor = await db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role, specialty, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (email, pw_hash, first_name, last_name, role, specialty or None, phone or None),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role, specialty, phone, linked_doctor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (email, pw_hash, first_name, last_name, role, specialty or None, phone or None, ldi),
     )
     new_user_id = cursor.lastrowid
 
@@ -214,7 +259,7 @@ async def setup(
     if count > 0:
         return RedirectResponse(url="/login", status_code=302)
 
-    if email != "abdelfilaliansary@gmail.com":
+    if email != ADMIN_EMAIL:
         return templates.TemplateResponse(
             "setup.html",
             {"request": request, "error": "Seul l'administrateur principal peut créer le premier compte"},
@@ -253,12 +298,12 @@ async def setup(
 
 @router.get("/admin/users/{user_id}/edit", response_class=HTMLResponse)
 async def edit_user_page(request: Request, user_id: int, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active, pdf_template_path FROM users WHERE id = ?", (user_id,))
+    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active, pdf_template_path, linked_doctor_id FROM users WHERE id = ?", (user_id,))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/admin/users", status_code=302)
-    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7], "has_template": bool(row[8])}
-    return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None, "form": edit_user, "editing": True})
+    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7], "has_template": bool(row[8]), "linked_doctor_id": row[9]}
+    return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None, "form": edit_user, "editing": True, "doctors": await _get_doctors(db)})
 
 @router.post("/admin/users/{user_id}/edit", response_class=HTMLResponse)
 async def update_user(
@@ -266,26 +311,41 @@ async def update_user(
     current_user: dict = Depends(require_admin),
     email: str = Form(...), first_name: str = Form(...), last_name: str = Form(...),
     role: str = Form(...), specialty: str = Form(""), phone: str = Form(""),
+    linked_doctor_id: str = Form(""),
     password: str = Form(""), password_confirm: str = Form(""),
     pdf_template: UploadFile = File(None), remove_pdf_template: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "has_template": True}
-    def error(msg):
+    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "has_template": True, "linked_doctor_id": linked_doctor_id}
+    async def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
-            "request": request, "user": current_user, "active": "admin_users", "error": msg, "form": form_data, "editing": True
+            "request": request, "user": current_user, "active": "admin_users", "error": msg, "form": form_data, "editing": True,
+            "doctors": await _get_doctors(db),
         })
 
-    if role == "admin" and email != "abdelfilaliansary@gmail.com":
-        return error("Le rôle admin est réservé à l'administrateur principal")
+    if role == "admin" and email != ADMIN_EMAIL:
+        return await error("Le rôle admin est réservé à l'administrateur principal")
     if pdf_template and pdf_template.filename and not pdf_template.filename.lower().endswith(".pdf"):
-        return error("Le modèle de document doit être un fichier PDF")
+        return await error("Le modèle de document doit être un fichier PDF")
+
+    # Secrétaire : liaison obligatoire à un praticien ; effacée pour les autres rôles.
+    # NB : la secrétaire devra se reconnecter pour que le changement prenne effet (JWT).
+    ldi = None
+    if role == "secretaire":
+        if not linked_doctor_id.strip().isdigit():
+            return await error("Veuillez choisir le médecin lié à cette secrétaire")
+        ldi = int(linked_doctor_id)
+        if ldi == user_id:
+            return await error("Une secrétaire ne peut pas être liée à elle-même")
+        cursor = await db.execute("SELECT 1 FROM users WHERE id = ? AND role IN ('medecin', 'admin') AND is_active = 1", (ldi,))
+        if not await cursor.fetchone():
+            return await error("Médecin lié invalide")
 
     if password:
         if password != password_confirm:
-            return error("Les mots de passe ne correspondent pas")
+            return await error("Les mots de passe ne correspondent pas")
         if len(password) < 10:
-            return error("Le mot de passe doit contenir au moins 10 caractères")
+            return await error("Le mot de passe doit contenir au moins 10 caractères")
         pw_hash = hash_password(password)
         await db.execute("UPDATE users SET password_hash=? WHERE id=?", (pw_hash, user_id))
 
@@ -302,8 +362,8 @@ async def update_user(
             await db.execute("UPDATE users SET pdf_template_path = ? WHERE id = ?", (new_tpl, user_id))
 
     await db.execute(
-        "UPDATE users SET email=?, first_name=?, last_name=?, role=?, specialty=?, phone=? WHERE id=?",
-        (email, first_name, last_name, role, specialty or None, phone or None, user_id)
+        "UPDATE users SET email=?, first_name=?, last_name=?, role=?, specialty=?, phone=?, linked_doctor_id=? WHERE id=?",
+        (email, first_name, last_name, role, specialty or None, phone or None, ldi, user_id)
     )
     await db.commit()
     return RedirectResponse(url="/admin/users", status_code=302)
@@ -377,11 +437,18 @@ async def reset_password(
             "request": request, "error": msg, "valid": valid, "token": token,
             "email": row[3] if row else ""
         })
+    ip = client_ip(request)
+    wait = retry_after(f"reset:ip:{ip}", max_attempts=10, window_seconds=900)
+    if wait:
+        return err(f"Trop de tentatives. Réessayez dans {max(1, (wait + 59) // 60)} minute(s).")
     if not row:
+        record_failure(f"reset:ip:{ip}")
         return err("Lien invalide.")
     if row[2]:
+        record_failure(f"reset:ip:{ip}")
         return err("Ce lien a déjà été utilisé.")
     if datetime.utcnow().isoformat() > row[1]:
+        record_failure(f"reset:ip:{ip}")
         return err("Ce lien a expiré.")
     if password != password_confirm:
         return err("Les mots de passe ne correspondent pas.", valid=True)
@@ -391,6 +458,7 @@ async def reset_password(
     await db.execute("UPDATE users SET password_hash=? WHERE id=?", (pw_hash, row[0]))
     await db.execute("UPDATE password_resets SET used_at=? WHERE token=?", (datetime.utcnow().isoformat(), token))
     await db.commit()
+    await log_audit(db, {"sub": row[0], "email": row[3]}, "reset_mot_de_passe", ip=ip)
     return RedirectResponse(url="/login", status_code=302)
 
 
@@ -488,11 +556,16 @@ async def register(
     specialty: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    ip = client_ip(request)
+    wait = retry_after(f"register:ip:{ip}", max_attempts=10, window_seconds=900)
+    if wait:
+        return templates.TemplateResponse("register.html", {"request": request, "error": f"Trop de tentatives. Réessayez dans {max(1, (wait + 59) // 60)} minute(s).", "inv": None, "token": token, "form": {}})
     cursor = await db.execute(
         "SELECT id, email, role, specialty, expires_at, used_at FROM invitations WHERE token = ?", (token,)
     )
     row = await cursor.fetchone()
     if not row:
+        record_failure(f"register:ip:{ip}")
         return templates.TemplateResponse("register.html", {"request": request, "error": "Lien invalide.", "inv": None, "token": token, "form": {}})
     inv = {"id": row[0], "email": row[1], "role": row[2], "specialty": row[3], "expires_at": row[4], "used_at": row[5]}
 

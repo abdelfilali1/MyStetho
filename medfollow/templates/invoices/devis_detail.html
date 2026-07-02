@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Devis {{ devis.devis_number }} — Doctivo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Devis {{ devis.devis_number }}</h2>
+        <p class="subtitle">{{ devis.devis_date }} — {{ devis.patient_name }}{% if devis.valid_until %} — valable jusqu'au {{ devis.valid_until }}{% endif %}</p>
+    </div>
+    <div class="no-print" style="display:flex;gap:8px;align-items:center;">
+        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+        <a href="/invoices/devis/{{ devis.id }}/pdf" class="btn btn-primary" target="_blank">Télécharger PDF</a>
+    </div>
+</div>
+
+<!-- Workflow stepper -->
+{% set steps = [('propose','Proposé'), ('accepte','Accepté'), ('converti','Converti')] %}
+{% set order = {'propose':0,'accepte':1,'converti':2} %}
+<div class="card no-print" style="margin-bottom:16px;">
+    <div class="card-body">
+        {% if devis.status == 'refuse' %}
+        <div style="display:flex;align-items:center;gap:10px;color:var(--danger);font-weight:600;">
+            <span class="badge badge-annule">Refusé</span> Ce devis a été refusé par le patient.
+        </div>
+        {% else %}
+        <div style="display:flex;align-items:center;gap:8px;">
+            {% for key, label in steps %}
+            {% set done = order[devis.status] is defined and order[devis.status] >= loop.index0 %}
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;{{ 'background:var(--primary);color:#fff;' if done else 'background:var(--gray-200);color:var(--gray-500);' }}">{{ loop.index }}</span>
+                <span style="font-weight:600;{{ '' if done else 'color:var(--gray-400);' }}">{{ label }}</span>
+            </div>
+            {% if not loop.last %}<span style="flex:0 0 30px;height:2px;background:var(--gray-200);"></span>{% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Actions selon le statut -->
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+            {% if devis.status == 'propose' %}
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="accepte"><button class="btn btn-success btn-sm">Marquer accepté</button></form>
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-outline btn-sm" style="color:var(--danger);">Marquer refusé</button></form>
+            {% elif devis.status == 'accepte' %}
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/convert" style="margin:0;" onsubmit="return confirm('Convertir ce devis en facture ?');"><button class="btn btn-primary btn-sm">Convertir en facture</button></form>
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-outline btn-sm" style="color:var(--danger);">Marquer refusé</button></form>
+            {% elif devis.status == 'refuse' %}
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="propose"><button class="btn btn-outline btn-sm">Repasser en proposé</button></form>
+            {% elif devis.status == 'converti' and devis.converted_invoice_id %}
+            <a href="/invoices/{{ devis.converted_invoice_id }}" class="btn btn-primary btn-sm">Voir la facture</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Détail du devis</h3></div>
+    <div class="card-body" style="padding:0;">
+        <table class="table">
+            <thead><tr><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.description }}</td>
+                    <td>{{ item.tooth_numbers or '—' }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ '%.2f' | format(item.unit_price) }} DH</td>
+                    <td><strong>{{ '%.2f' | format(item.total_price) }} DH</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="border-top:2px solid var(--gray-300);">
+                    <td colspan="4" style="text-align:right;font-weight:700;">Total</td>
+                    <td style="font-weight:700;font-size:16px;">{{ '%.2f' | format(devis.total_amount) }} DH</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+{% if devis.notes %}
+<div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Notes</h3></div>
+    <div class="card-body"><p style="margin:0;">{{ devis.notes }}</p></div>
+</div>
+{% endif %}
+{% endblock %}

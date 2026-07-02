@@ -25,6 +25,9 @@
 .med-sugg-item:last-child { border-bottom: none; }
 .med-sugg-item:hover, .med-sugg-item.active { background: var(--primary-50, #eff6ff); }
 .med-sugg-form { font-size: 11px; color: #94a3b8; margin-left: 6px; }
+.patient-alert { padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+.patient-alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+.patient-alert-warning { background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; }
 </style>
 <div class="page-header">
     <h2>{{ 'Modifier l\'ordonnance #' ~ prescription.id if prescription else 'Nouvelle ordonnance' }}</h2>
@@ -33,7 +36,10 @@
 
 <form method="POST" action="{{ '/prescriptions/' ~ prescription.id ~ '/edit' if prescription else '/prescriptions/new' }}" id="prescriptionForm">
     <div class="detail-grid">
-        <div class="card">
+        <div>
+            <!-- Alertes patient (allergies / grossesse / allaitement) — remplies en JS -->
+            <div id="patient-alerts-wide" style="display:none; margin-bottom: 12px;"></div>
+            <div class="card">
             <div class="card-header"><h3>Médicaments</h3></div>
             <div class="card-body">
                 <div id="medications-list">
@@ -160,6 +166,7 @@
                 </datalist>
                 <!-- medication search uses /prescriptions/medications/search API -->
             </div>
+            </div>
         </div>
 
         <div>
@@ -178,6 +185,8 @@
                             <a href="/patients/new?next=/prescriptions/new" class="btn btn-outline btn-sm" title="Créer un nouveau patient">+</a>
                         </div>
                     </div>
+                    <!-- Alertes patient (allergies / grossesse / allaitement) — remplies en JS -->
+                    <div id="patient-alerts-side" style="display:none; margin-bottom: 12px;"></div>
                     <div class="form-group">
                         <label>Praticien *</label>
                         <select name="doctor_id" required>
@@ -304,6 +313,44 @@ function hideMedSugg(inp, delay) {
         if (box) box.style.display = 'none';
     }, delay);
 }
+
+// ===== Alertes patient (allergies / grossesse / allaitement) — item 27 =====
+function _renderAlertsHtml(data) {
+    let parts = '';
+    if (data.allergies && data.allergies.length) {
+        parts += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:8px;color:#b91c1c;font-size:13px;">'
+            + '<strong>⚠️ Allergies connues :</strong> '
+            + data.allergies.map(a => a.replace(/</g, '&lt;')).join(', ') + '</div>';
+    }
+    if (data.pregnant) {
+        parts += '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin-bottom:8px;color:#c2410c;font-size:13px;"><strong>⚠️ Patiente enceinte</strong> — vérifier la compatibilité des molécules.</div>';
+    }
+    if (data.breastfeeding) {
+        parts += '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin-bottom:8px;color:#c2410c;font-size:13px;"><strong>⚠️ Allaitement en cours</strong> — vérifier la compatibilité des molécules.</div>';
+    }
+    return parts;
+}
+function loadPatientAlerts(pid) {
+    const wide = document.getElementById('patient-alerts-wide');
+    const side = document.getElementById('patient-alerts-side');
+    if (!pid) { wide.style.display = side.style.display = 'none'; wide.innerHTML = side.innerHTML = ''; return; }
+    fetch('/prescriptions/patient/' + pid + '/alerts')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (!data) { wide.style.display = side.style.display = 'none'; return; }
+            const html = _renderAlertsHtml(data);
+            wide.innerHTML = html; side.innerHTML = html;
+            wide.style.display = html ? 'block' : 'none';
+            side.style.display = html ? 'block' : 'none';
+        })
+        .catch(() => { wide.style.display = side.style.display = 'none'; });
+}
+(function initAlerts() {
+    const sel = document.getElementById('sel-patient-p');
+    if (!sel) return;
+    sel.addEventListener('change', () => loadPatientAlerts(sel.value));
+    if (sel.value) loadPatientAlerts(sel.value);
+})();
 </script>
 {% endblock %}
 

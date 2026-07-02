@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Modifier un document — Doctivo{% endblock %}
+
+{% block content %}
+{% set back_url = '/patients/' ~ doc.patient_id ~ '?tab=documents' if from_page == 'patient' else '/documents' %}
+<div class="page-header">
+    <h2>Modifier le document</h2>
+    <a href="{{ back_url }}" class="btn btn-outline">Retour</a>
+</div>
+
+<div class="card" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="POST" action="/documents/{{ doc.id }}/edit" style="display: flex; flex-direction: column; gap: 16px;">
+            {% if from_page %}<input type="hidden" name="from_page" value="{{ from_page }}">{% endif %}
+            <div class="form-group">
+                <label>Patient</label>
+                <input type="text" value="{{ doc.patient_name }}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Fichier</label>
+                <input type="text" value="{{ doc.file_name }}" readonly>
+            </div>
+            <div class="form-group">
+                <label>Titre du document *</label>
+                <input type="text" name="title" required value="{{ doc.title }}" placeholder="Radio thorax du 14/03/2026">
+            </div>
+            <div class="form-group">
+                <label>Catégorie *</label>
+                <select name="category" required>
+                    {% for value, label in categories %}
+                    <option value="{{ value }}" {{ 'selected' if doc.category == value }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" rows="2" placeholder="Description optionnelle...">{{ doc.description or '' }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

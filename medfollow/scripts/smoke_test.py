@@ -1,0 +1,132 @@
+"""Smoke test : exerce les principaux endpoints en écriture contre une base
+fraîchement initialisée, et vérifie qu'aucun ne renvoie 500.
+
+Usage :
+    cd medfollow && py scripts/smoke_test.py
+
+Utilise une base SQLite temporaire (MEDFOLLOW_DATABASE_PATH) et le TestClient
+Starlette (pas de serveur à lancer). Gère le jeton CSRF double-submit.
+"""
+import os
+import sys
+import tempfile
+
+# Base temporaire + email admin déterministe AVANT l'import de l'app
+_TMP_DB = os.path.join(tempfile.gettempdir(), "medfollow_smoke.db")
+for suffix in ("", "-wal", "-shm"):
+    try:
+        os.remove(_TMP_DB + suffix)
+    except OSError:
+        pass
+os.environ["MEDFOLLOW_DATABASE_PATH"] = _TMP_DB
+os.environ["MEDFOLLOW_ADMIN_EMAIL"] = "admin@smoke.test"
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi.testclient import TestClient  # noqa: E402
+from main import app  # noqa: E402
+
+failures = []
+# Le "with" déclenche le lifespan (init_db + seed_db) — indispensable.
+_ctx = TestClient(app)
+client = _ctx.__enter__()
+
+
+def csrf():
+    # GET une page pour (re)poser le cookie csrf_token, puis le renvoyer
+    client.get("/login")
+    return client.cookies.get("csrf_token", "")
+
+
+def post(path, data=None, files=None, expect=(200, 302, 303), label=None):
+    token = csrf()
+    headers = {"X-CSRF-Token": token}
+    payload = dict(data or {})
+    payload["csrf_token"] = token
+    if files:
+        r = client.post(path, data=payload, files=files, headers=headers, follow_redirects=False)
+    else:
+        r = client.post(path, data=payload, headers=headers, follow_redirects=False)
+    ok = r.status_code in expect
+    tag = label or path
+    print(f"  {'OK ' if ok else 'XX '} POST {tag} -> {r.status_code}")
+    if not ok:
+        failures.append(f"POST {tag} -> {r.status_code} (attendu {expect})")
+    return r
+
+
+def get(path, expect=(200, 302, 303), label=None):
+    r = client.get(path, follow_redirects=False)
+    ok = r.status_code in expect
+    tag = label or path
+    print(f"  {'OK ' if ok else 'XX '} GET  {tag} -> {r.status_code}")
+    if not ok:
+        failures.append(f"GET {tag} -> {r.status_code} (attendu {expect})")
+    return r
+
+
+print("== Setup ==")
+post("/setup", {
+    "email": "admin@smoke.test", "password": "Password123!", "password_confirm": "Password123!",
+    "first_name": "Smoke", "last_name": "Admin", "specialty": "Dentiste",
+})
+
+print("== Patients ==")
+post("/patients/quick", {"first_name": "Jean", "last_name": "Test", "date_of_birth": "1990-01-01", "gender": "M"})
+get("/patients/?sort_by=last_visit&sort_order=desc", label="/patients (sort last_visit)")
+get("/patients/1")
+post("/patients/1/history", {"type": "allergy", "description": "Pénicilline", "date_recorded": ""})
+post("/patients/1/history/1/edit", {"type": "allergy", "description": "Pénicilline (grave)"})
+
+print("== Consultations (item 23/28) ==")
+post("/consultations/new", {"patient_id": "1", "doctor_id": "1", "consultation_date": "2026-02-10", "reason": "Controle", "dental_medical_history": "Diabète"})
+get("/consultations/1")
+
+print("== Prescriptions (item 27) ==")
+get("/prescriptions/patient/1/alerts")
+post("/prescriptions/new", {"patient_id": "1", "doctor_id": "1", "notes": "Test", "med_name_0": "Amoxicilline", "med_dosage_0": "1g", "med_frequency_0": "2x/j", "med_duration_0": "7 jours", "med_quantity_0": "1"})
+
+print("== Appointments (item 30) ==")
+post("/appointments/new", {"patient_id": "1", "doctor_id": "1", "title": "RDV", "appointment_type": "consultation", "status": "planifie", "start_datetime": "2026-03-01T09:00", "end_datetime": "2026-03-01T09:30"})
+
+print("== Invoices (item 14) ==")
+post("/invoices/new", {"patient_id": "1", "doctor_id": "1", "notes": "", "item_desc_0": "Consultation", "item_qty_0": "1", "item_price_0": "300"})
+get("/invoices/1")
+get("/invoices/1/pdf", label="/invoices/1/pdf")
+post("/invoices/1/pay", {"amount": "300", "payment_method": "especes", "reference": ""})
+
+print("== Devis workflow (item 21) ==")
+post("/invoices/devis/new", {"patient_id": "1", "valid_until": "2026-08-01", "notes": "", "item_desc_0": "Couronne", "item_teeth_0": "26", "item_qty_0": "1", "item_price_0": "2000"})
+get("/invoices/devis/1")
+get("/invoices/devis/1/pdf", label="/invoices/devis/1/pdf")
+post("/invoices/devis/1/status", {"status": "accepte"})
+post("/invoices/devis/1/convert")
+
+print("== Dental (item 24) ==")
+post("/dental/1/tooth/26/condition", {"condition": "carie"})
+post("/dental/1/tooth/26/condition", {"condition": "obturation", "surface": "occlusal"}, label="/dental tooth surface")
+
+print("== Rappels (item 31) ==")
+post("/rappels/new", {"patient_id": "1", "description": "Détartrage", "due_date": "2026-09-01"})
+post("/rappels/1/status", {"status": "contacte"})
+post("/rappels/1/close")
+
+print("== Messages (item 4) ==")
+get("/messages/")
+get("/messages/api/unread-count", label="/messages/api/unread-count")
+
+print("== CSRF négatif (POST sans jeton -> 403) ==")
+r = client.post("/rappels/new", data={"patient_id": "1", "description": "x"}, follow_redirects=False)
+if r.status_code == 403:
+    print("  OK  POST sans CSRF -> 403")
+else:
+    print(f"  XX  POST sans CSRF -> {r.status_code} (attendu 403)")
+    failures.append(f"CSRF négatif -> {r.status_code}")
+
+print("\n" + ("=" * 50))
+if failures:
+    print(f"ÉCHECS ({len(failures)}) :")
+    for f in failures:
+        print("  -", f)
+    sys.exit(1)
+print("Tous les endpoints testés OK (aucun 500).")

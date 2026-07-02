@@ -269,9 +269,38 @@
                 <button type="button" class="btn btn-primary btn-sm" onclick="confirmReschedule()" style="flex-shrink:0;">Confirmer</button>
             </div>
         </div>
+        <!-- Edit section (motif / type / salle / notes) -->
+        <div id="edit-section" style="padding:0 24px 16px;display:none;">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Modifier le rendez-vous</div>
+            <div class="form-group" style="margin-bottom:10px;">
+                <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Motif</label>
+                <input type="text" id="edit-title" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Type</label>
+                    <select id="edit-type" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+                        <option value="consultation">Consultation</option>
+                        <option value="suivi">Suivi</option>
+                        <option value="intervention">Intervention</option>
+                        <option value="urgence">Urgence</option>
+                    </select>
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Salle</label>
+                    <input type="text" id="edit-room" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:10px;">
+                <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Notes</label>
+                <textarea id="edit-notes" rows="2" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="confirmEdit()">Enregistrer</button>
+        </div>
         <!-- Footer -->
         <div style="display:flex;gap:8px;padding:14px 24px;background:var(--gray-50);border-top:1px solid var(--gray-200);border-radius:0 0 var(--radius) var(--radius);">
             <a id="ev-consult-link" href="#" class="btn btn-primary btn-sm">+ Créer consultation</a>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-edit-apt" onclick="toggleEditApt()">✏️ Modifier</button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-reschedule" onclick="toggleReschedule()">📅 Déplacer</button>
             <div style="flex:1;"></div>
             <button type="button" class="btn btn-sm" onclick="deleteAppt()" style="background:var(--danger-light);color:var(--danger);border:none;">Supprimer</button>
@@ -485,8 +514,13 @@ document.addEventListener('DOMContentLoaded', function() {
             _evStatus = props.status;
             _evStart = ev.start;
             _evEnd = ev.end;
+            _evTitle = ev.title;
+            _evType = props.type;
+            _evRoom = props.room || '';
+            _evNotes = props.notes || '';
             document.getElementById('reschedule-section').style.display = 'none';
             document.getElementById('reschedule-conflict').style.display = 'none';
+            document.getElementById('edit-section').style.display = 'none';
 
             // Color bar
             document.getElementById('ev-color-bar').style.background = EVT_COLORS[props.type] || '#2563eb';
@@ -645,7 +679,48 @@ function showConflict(suggestions) {
 }
 
 // ===== RESCHEDULE =====
-let _evStart, _evEnd;
+let _evStart, _evEnd, _evTitle, _evType, _evRoom, _evNotes;
+
+function toggleEditApt() {
+    const sec = document.getElementById('edit-section');
+    const open = sec.style.display !== 'none';
+    sec.style.display = open ? 'none' : 'block';
+    if (!open) {
+        document.getElementById('edit-title').value = _evTitle || '';
+        document.getElementById('edit-type').value = _evType || 'consultation';
+        document.getElementById('edit-room').value = _evRoom || '';
+        document.getElementById('edit-notes').value = _evNotes || '';
+    }
+}
+
+async function confirmEdit() {
+    if (!_evId) return;
+    const title = document.getElementById('edit-title').value.trim();
+    if (!title) { if (window.showToast) showToast('Le motif est obligatoire', 'error'); return; }
+    const payload = {
+        title: title,
+        appointment_type: document.getElementById('edit-type').value,
+        room: document.getElementById('edit-room').value.trim(),
+        notes: document.getElementById('edit-notes').value.trim(),
+    };
+    try {
+        const res = await fetch(`/appointments/${_evId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+            if (window.showToast) showToast('Rendez-vous modifié', 'success');
+            _calendar.refetchEvents();
+            closeEventModal();
+        } else {
+            const d = await res.json().catch(() => ({}));
+            if (window.showToast) showToast(d.error || 'Erreur lors de la modification', 'error');
+        }
+    } catch (e) {
+        if (window.showToast) showToast('Erreur réseau', 'error');
+    }
+}
 
 function toggleReschedule() {
     const sec = document.getElementById('reschedule-section');

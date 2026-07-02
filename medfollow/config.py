@@ -60,6 +60,10 @@ if not os.environ.get("MEDFOLLOW_SECRET_KEY"):
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 8
 
+# Compte administrateur principal : seul cet email peut créer le premier compte
+# (/setup) ou recevoir le rôle admin. Surchargez via MEDFOLLOW_ADMIN_EMAIL.
+ADMIN_EMAIL = os.getenv("MEDFOLLOW_ADMIN_EMAIL", "abdelfilaliansary@gmail.com")
+
 # When the app is served over HTTPS (TLS terminated at the reverse proxy), set
 # MEDFOLLOW_HTTPS=1 so auth cookies are flagged Secure and HSTS is emitted.
 # Defaults OFF so local HTTP dev — and an HTTP-only deployment — keep working

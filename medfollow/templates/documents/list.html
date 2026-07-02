@@ -74,10 +74,11 @@
                     <td>{{ '%.1f' | format(d.file_size / 1024) }} Ko</td>
                     <td>{{ d.created_at[:10] }}</td>
                     <td>
-                        {% set is_previewable = d.file_name and (d.file_name.endswith('.pdf') or d.file_name.endswith('.png') or d.file_name.endswith('.jpg') or d.file_name.endswith('.jpeg') or d.file_name.endswith('.gif') or d.file_name.endswith('.webp')) %}
+                        {% set is_previewable = d.file_name and (d.file_name.endswith('.pdf') or d.file_name.endswith('.png') or d.file_name.endswith('.jpg') or d.file_name.endswith('.jpeg') or d.file_name.endswith('.gif') or d.file_name.endswith('.webp') or d.file_name.endswith('.bmp')) %}
                         {% if is_previewable %}
-                        <button type="button" class="btn btn-outline btn-sm" onclick='previewDoc("/documents/{{ d.id }}/download", {{ d.title|tojson }}, {{ d.file_name|tojson }})'>Aperçu</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick='previewDoc("/documents/{{ d.id }}/view", {{ d.title|tojson }}, {{ d.file_name|tojson }})'>Aperçu</button>
                         {% endif %}
+                        <a href="/documents/{{ d.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
                         <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
                         <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer le document « {{ d.title }} » ?')">
                             <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">×</button>

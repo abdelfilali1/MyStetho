@@ -1,24 +1,25 @@
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import aiosqlite
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
-from routers.auth import get_current_user
+from routers.deps import require_login, require_login_api, effective_doctor_id, set_flash
+from services.audit import log_audit, client_ip
 
 router = APIRouter(prefix="/appointments")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("/", response_class=HTMLResponse)
-async def agenda(request: Request, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    uid = user["sub"]
+async def agenda(
+    request: Request,
+    user: dict = Depends(require_login),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    uid = effective_doctor_id(user)
 
     # Get all patients for the new appointment form
     cursor = await db.execute(
@@ -43,14 +44,11 @@ async def get_events(
     request: Request,
     start: str = "",
     end: str = "",
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Return appointments as JSON for the calendar."""
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    uid = user["sub"]
+    uid = effective_doctor_id(user)
     query = """ SELECT a.*, p.first_name || ' ' || p.last_name AS patient_name FROM appointments a JOIN patients p ON a.patient_id = p.id WHERE a.doctor_id = ? """
     params = [uid]
 
@@ -80,6 +78,7 @@ async def get_events(
             "color": colors.get(r["appointment_type"], "#2563eb"),
             "extendedProps": {
                 "patient_id": r["patient_id"],
+                "motif": r["title"],
                 "status": r["status"],
                 "type": r["appointment_type"],
                 "room": r["room"],
@@ -97,14 +96,11 @@ async def get_free_slots(
     date: str,
     duration: int = 30,
     exclude_id: int = 0,
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Return up to 5 available slots for a given doctor and date."""
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    doctor_id = user["sub"]  # ignore any client-supplied doctor_id; only your own slots
+    doctor_id = effective_doctor_id(user)  # ignore any client-supplied doctor_id; only your own slots
     # Fetch all non-cancelled appointments for that doctor on that date
     cursor = await db.execute(
         """SELECT start_datetime, end_datetime FROM appointments
@@ -116,7 +112,6 @@ async def get_free_slots(
     booked = [(row[0], row[1]) for row in await cursor.fetchall()]
 
     # Generate candidate slots 08:00 – 19:30
-    from datetime import timedelta
     base = datetime.strptime(f"{date} 08:00", "%Y-%m-%d %H:%M")
     end_of_day = datetime.strptime(f"{date} 19:30", "%Y-%m-%d %H:%M")
     slots = []
@@ -141,16 +136,13 @@ async def get_free_slots(
 @router.post("/api/new")
 async def create_appointment_api(
     request: Request,
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Create appointment via JSON. Returns conflict info if slot is taken."""
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
     data = await request.json()
     patient_id = data.get("patient_id")
-    doctor_id = user["sub"]  # always the logged-in doctor; never trust the client body
+    doctor_id = effective_doctor_id(user)  # always the logged-in doctor; never trust the client body
     title = data.get("title", "")
     appointment_type = data.get("appointment_type", "consultation")
     status = data.get("status", "planifie")
@@ -161,9 +153,9 @@ async def create_appointment_api(
     exclude_id = data.get("exclude_id", 0)
 
     # The patient must belong to the current doctor.
-    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, doctor_id))
     if not await cur.fetchone():
-        return JSONResponse(status_code=404, content={"error": "Not found"})
+        return JSONResponse(status_code=404, content={"error": "Patient introuvable"})
 
     # Conflict check: any non-cancelled appointment for same doctor that overlaps
     cursor = await db.execute(
@@ -177,7 +169,6 @@ async def create_appointment_api(
     if conflict_row:
         # Return next available slots for same date
         date_str = start_datetime[:10]
-        from datetime import timedelta
         base = datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
         end_of_day = datetime.strptime(f"{date_str} 19:30", "%Y-%m-%d %H:%M")
 
@@ -208,13 +199,15 @@ async def create_appointment_api(
 
         return JSONResponse(status_code=409, content={"conflict": True, "suggestions": suggestions})
 
-    await db.execute(
+    cur = await db.execute(
         """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, status,
            start_datetime, end_datetime, room, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (patient_id, doctor_id, title, appointment_type, status,
          start_datetime, end_datetime, room, notes),
     )
     await db.commit()
+    await log_audit(db, user, "rdv_cree", entity_type="appointment", entity_id=cur.lastrowid,
+                    patient_id=patient_id, ip=client_ip(request))
     return JSONResponse(content={"ok": True})
 
 
@@ -230,37 +223,34 @@ async def create_appointment(
     end_datetime: str = Form(...),
     room: str = Form(""),
     notes: str = Form(""),
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Fallback form POST (no conflict check — kept for compatibility)."""
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     if not await cursor.fetchone():
         return RedirectResponse(url="/appointments", status_code=302)
     doctor_id = user["sub"]
 
-    await db.execute(
+    cur = await db.execute(
         """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, status, start_datetime, end_datetime, room, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (patient_id, doctor_id, title, appointment_type, status, start_datetime, end_datetime, room or None, notes or None),
     )
     await db.commit()
-    return RedirectResponse(url="/appointments", status_code=302)
+    await log_audit(db, user, "rdv_cree", entity_type="appointment", entity_id=cur.lastrowid, patient_id=patient_id, ip=client_ip(request))
+    resp = RedirectResponse(url="/appointments", status_code=302)
+    set_flash(resp, "Rendez-vous créé")
+    return resp
 
 
 @router.post("/{appointment_id}/reschedule")
 async def reschedule_appointment(
     request: Request,
     appointment_id: int,
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Reschedule an appointment to a new start/end datetime. Checks for conflicts."""
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
     data = await request.json()
     start_datetime = data.get("start_datetime", "")
     end_datetime = data.get("end_datetime", "")
@@ -316,6 +306,7 @@ async def reschedule_appointment(
         (start_datetime, end_datetime, appointment_id),
     )
     await db.commit()
+    await log_audit(db, user, "rdv_deplace", entity_type="appointment", entity_id=appointment_id, ip=client_ip(request))
     return JSONResponse(content={"ok": True})
 
 
@@ -324,17 +315,15 @@ async def update_status(
     request: Request,
     appointment_id: int,
     status: str = Form(...),
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
     cursor = await db.execute(
-        "SELECT id FROM appointments WHERE id = ? AND doctor_id = ?",
+        "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
         (appointment_id, user["sub"]),
     )
-    if not await cursor.fetchone():
+    row = await cursor.fetchone()
+    if not row:
         return JSONResponse(status_code=403, content={"error": "Accès refusé"})
 
     await db.execute(
@@ -342,6 +331,43 @@ async def update_status(
         (status, appointment_id),
     )
     await db.commit()
+    await log_audit(db, user, "rdv_statut", entity_type="appointment", entity_id=appointment_id, patient_id=row[1], ip=client_ip(request), details=f"status={status}")
+    return JSONResponse(content={"ok": True})
+
+
+@router.post("/{appointment_id}/update")
+async def update_appointment(
+    request: Request,
+    appointment_id: int,
+    user: dict = Depends(require_login_api),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Modifier le motif / type / salle / notes d'un RDV existant (item 30)."""
+    data = await request.json()
+    title = (data.get("title") or "").strip()
+    appointment_type = (data.get("appointment_type") or "").strip()
+    room = (data.get("room") or "").strip()
+    notes = (data.get("notes") or "").strip()
+
+    if not title:
+        return JSONResponse(status_code=400, content={"error": "Le motif est obligatoire"})
+    if appointment_type not in ("consultation", "suivi", "intervention", "urgence"):
+        return JSONResponse(status_code=400, content={"error": "Type de rendez-vous invalide"})
+
+    cursor = await db.execute(
+        "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
+        (appointment_id, user["sub"]),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return JSONResponse(status_code=403, content={"error": "Accès refusé"})
+
+    await db.execute(
+        "UPDATE appointments SET title = ?, appointment_type = ?, room = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? ",
+        (title, appointment_type, room or None, notes or None, appointment_id),
+    )
+    await db.commit()
+    await log_audit(db, user, "rdv_modifie", entity_type="appointment", entity_id=appointment_id, patient_id=row[1], ip=client_ip(request))
     return JSONResponse(content={"ok": True})
 
 
@@ -349,17 +375,15 @@ async def update_status(
 async def delete_appointment(
     request: Request,
     appointment_id: int,
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     cursor = await db.execute(
-        "SELECT id FROM appointments WHERE id = ? AND doctor_id = ?",
+        "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
         (appointment_id, user["sub"]),
     )
-    if not await cursor.fetchone():
+    row = await cursor.fetchone()
+    if not row:
         return RedirectResponse(url="/appointments", status_code=302)
 
     # Keep downstream records valid when an appointment has already been used.
@@ -373,4 +397,7 @@ async def delete_appointment(
     )
     await db.execute("DELETE FROM appointments WHERE id = ? ", (appointment_id,))
     await db.commit()
-    return RedirectResponse(url="/appointments", status_code=302)
+    await log_audit(db, user, "rdv_supprime", entity_type="appointment", entity_id=appointment_id, patient_id=row[1], ip=client_ip(request))
+    resp = RedirectResponse(url="/appointments", status_code=302)
+    set_flash(resp, "Rendez-vous supprimé")
+    return resp

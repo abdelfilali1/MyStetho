@@ -7,18 +7,16 @@ import aiosqlite
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
-from routers.auth import get_current_user
+from routers.deps import require_login, require_login_api, deny_secretaire
+from services.audit import log_audit, client_ip
+from services.flash import set_flash
 
-router = APIRouter(prefix="/prescriptions")
+router = APIRouter(prefix="/prescriptions", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_prescriptions(request: Request, page: int = 1, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def list_prescriptions(request: Request, page: int = 1, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     uid = user["sub"]
     per_page = 20
     offset = (page - 1) * per_page
@@ -49,11 +47,9 @@ async def list_prescriptions(request: Request, page: int = 1, db: aiosqlite.Conn
 async def search_medications(
     request: Request,
     q: str = "",
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content=[])
     if not q or len(q.strip()) < 1:
         return JSONResponse(content=[])
     term = q.strip().lower()
@@ -73,17 +69,59 @@ async def search_medications(
     )
 
 
+# NB : déclarée AVANT GET /{prescription_id} pour éviter tout conflit de routage.
+@router.get("/patient/{patient_id}/alerts")
+async def patient_prescription_alerts(
+    request: Request,
+    patient_id: int,
+    user: dict = Depends(require_login_api),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Alertes de sécurité (allergies, grossesse, allaitement) affichées au moment de prescrire."""
+    cursor = await db.execute(
+        "SELECT gender, pregnant, breastfeeding FROM patients WHERE id = ? AND doctor_id = ?",
+        (patient_id, user["sub"]),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return JSONResponse(status_code=404, content={"error": "Patient introuvable"})
+    patient = dict(row)
+
+    cursor = await db.execute(
+        "SELECT description FROM medical_history WHERE patient_id = ? AND type = 'allergy' ORDER BY date_recorded DESC, created_at DESC",
+        (patient_id,),
+    )
+    seen, allergies = set(), []
+    for r in await cursor.fetchall():
+        desc = (r["description"] or "").strip()
+        low = desc.lower()
+        for pref in ("allergie:", "allergie :", "allergy:", "allergy :"):
+            if low.startswith(pref):
+                desc = desc[len(pref):].strip()
+                break
+        if desc and desc.lower() not in seen:
+            seen.add(desc.lower())
+            allergies.append(desc)
+
+    return JSONResponse(
+        content={
+            "allergies": allergies,
+            "pregnant": bool(patient.get("pregnant")),
+            "breastfeeding": bool(patient.get("breastfeeding")),
+            "gender": patient.get("gender"),
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def new_prescription_form(
     request: Request,
     patient_id: Optional[int] = None,
     consultation_id: Optional[int] = None,
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     uid = user["sub"]
     cursor = await db.execute(
         "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,)
@@ -116,11 +154,7 @@ async def new_prescription_form(
 
 
 @router.post("/new")
-async def create_prescription(request: Request, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def create_prescription(request: Request, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     form = await request.form()
     patient_id = int(form["patient_id"])
     doctor_id = int(form["doctor_id"])
@@ -159,15 +193,14 @@ async def create_prescription(request: Request, db: aiosqlite.Connection = Depen
         idx += 1
 
     await db.commit()
-    return RedirectResponse(url=f"/prescriptions/{prescription_id}", status_code=302)
+    await log_audit(db, user, "ordonnance_creee", entity_type="prescription", entity_id=prescription_id, patient_id=patient_id, ip=client_ip(request))
+    response = RedirectResponse(url=f"/prescriptions/{prescription_id}", status_code=302)
+    set_flash(response, "Ordonnance créée")
+    return response
 
 
 @router.get("/{prescription_id}", response_class=HTMLResponse)
-async def view_prescription(request: Request, prescription_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def view_prescription(request: Request, prescription_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
         """SELECT pr.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.social_security_number, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? AND pr.doctor_id = ? """,
         (prescription_id, user["sub"]),
@@ -180,6 +213,8 @@ async def view_prescription(request: Request, prescription_id: int, db: aiosqlit
     cursor = await db.execute("SELECT * FROM prescription_items WHERE prescription_id = ? ", (prescription_id,))
     items = [dict(r) for r in await cursor.fetchall()]
 
+    await log_audit(db, user, "ordonnance_consultee", entity_type="prescription", entity_id=prescription_id, patient_id=prescription["patient_id"], ip=client_ip(request))
+
     return templates.TemplateResponse(
         "prescriptions/detail.html",
         {"request": request, "user": user, "active": "prescriptions", "prescription": prescription, "items": items},
@@ -187,11 +222,7 @@ async def view_prescription(request: Request, prescription_id: int, db: aiosqlit
 
 
 @router.get("/{prescription_id}/pdf")
-async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def prescription_pdf(request: Request, prescription_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     from services.pdf_service import generate_prescription_pdf
 
     cursor = await db.execute(
@@ -227,6 +258,7 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
     from fastapi.responses import StreamingResponse
     import io
     pdf_bytes = generate_prescription_pdf(prescription, items, prescription.get("pdf_template_path"), allergies)
+    await log_audit(db, user, "ordonnance_pdf_exportee", entity_type="prescription", entity_id=prescription_id, patient_id=prescription["patient_id"], ip=client_ip(request))
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -235,11 +267,7 @@ async def prescription_pdf(request: Request, prescription_id: int, db: aiosqlite
 
 
 @router.get("/{prescription_id}/edit", response_class=HTMLResponse)
-async def edit_prescription_form(request: Request, prescription_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def edit_prescription_form(request: Request, prescription_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     uid = user["sub"]
 
     cursor = await db.execute(
@@ -286,11 +314,7 @@ async def edit_prescription_form(request: Request, prescription_id: int, db: aio
 
 
 @router.post("/{prescription_id}/edit")
-async def update_prescription(request: Request, prescription_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def update_prescription(request: Request, prescription_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     uid = user["sub"]
     cursor = await db.execute("SELECT 1 FROM prescriptions WHERE id = ? AND doctor_id = ?", (prescription_id, uid))
     if not await cursor.fetchone():
@@ -335,4 +359,7 @@ async def update_prescription(request: Request, prescription_id: int, db: aiosql
         idx += 1
 
     await db.commit()
-    return RedirectResponse(url=f"/prescriptions/{prescription_id}", status_code=302)
+    await log_audit(db, user, "ordonnance_modifiee", entity_type="prescription", entity_id=prescription_id, patient_id=patient_id, ip=client_ip(request))
+    response = RedirectResponse(url=f"/prescriptions/{prescription_id}", status_code=302)
+    set_flash(response, "Ordonnance modifiée")
+    return response

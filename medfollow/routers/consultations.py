@@ -2,6 +2,7 @@
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+from datetime import date, datetime
 import io
 import json
 import aiosqlite
@@ -9,8 +10,10 @@ import aiosqlite
 from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.auth import get_current_user
+from routers.deps import require_login, require_login_api, set_flash, deny_secretaire
+from services.audit import log_audit, client_ip
 
-router = APIRouter(prefix="/consultations")
+router = APIRouter(prefix="/consultations", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 DENTAL_HISTORY_PRESETS = [
@@ -36,6 +39,18 @@ def _clean_text(value: Optional[str]) -> str:
     if not value:
         return ""
     return str(value).strip()
+
+
+def _parse_form_date(value: Optional[str]) -> Optional[str]:
+    """Valide une date de formulaire au format YYYY-MM-DD (None si vide ou invalide)."""
+    v = _clean_text(value)
+    if not v:
+        return None
+    try:
+        datetime.strptime(v, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return v
 
 
 # --- Examen clinique dentaire structuré (douleur spontanée, sensibilité, etc.) ---
@@ -213,6 +228,7 @@ async def _save_history_item_if_new(
     db: aiosqlite.Connection,
     patient_id: Optional[int],
     entry: str,
+    consultation_id: Optional[int] = None,
 ) -> None:
     value = _clean_text(entry)
     if not patient_id or not value:
@@ -249,8 +265,8 @@ async def _save_history_item_if_new(
         return
 
     await db.execute(
-        "INSERT INTO medical_history (patient_id, type, description, date_recorded) VALUES (?, ?, ?, DATE('now'))",
-        (patient_id, history_type, description),
+        "INSERT INTO medical_history (patient_id, type, description, date_recorded, consultation_id) VALUES (?, ?, ?, DATE('now'), ?)",
+        (patient_id, history_type, description, consultation_id),
     )
 
 
@@ -262,13 +278,14 @@ async def _persist_intake_patient_data(
     allergies: list[str],
     tabac_statut: str,
     tabac_paquets: str,
+    consultation_id: Optional[int] = None,
 ) -> None:
     """Enregistre sur la fiche patient les antécédents/allergies/tabac saisis dans le
     questionnaire de début de consultation (indépendant de la consultation active)."""
     for pathologie in pathologies:
-        await _save_history_item_if_new(db, patient_id, pathologie)
+        await _save_history_item_if_new(db, patient_id, pathologie, consultation_id)
     for allergie in allergies:
-        await _save_history_item_if_new(db, patient_id, f"Allergie: {allergie}")
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {allergie}", consultation_id)
     if tabac_statut:
         if tabac_statut == "Non":
             smoking_val = "Non"
@@ -290,11 +307,8 @@ async def list_consultations(
     date_to: str = "",
     page: int = 1,
     db: aiosqlite.Connection = Depends(get_db),
+    user: dict = Depends(require_login),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     uid = user["sub"]
     per_page = 20
     offset = (page - 1) * per_page
@@ -354,11 +368,8 @@ async def new_consultation_form(
     patient_id: Optional[int] = None,
     appointment_id: Optional[int] = None,
     db: aiosqlite.Connection = Depends(get_db),
+    user: dict = Depends(require_login),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     uid = user["sub"]
     cursor = await db.execute(
         "SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name",
@@ -388,6 +399,7 @@ async def new_consultation_form(
             "selected_dental_history": "",
             "selected_dental_allergies": await _fetch_patient_allergies(db, patient_id),
             "dental_history_presets_json": json.dumps(DENTAL_HISTORY_PRESETS, ensure_ascii=False),
+            "consultation_date_value": date.today().isoformat(),
             "error": None,
         },
     )
@@ -398,11 +410,8 @@ async def patient_history_for_consultation(
     request: Request,
     patient_id: int,
     db: aiosqlite.Connection = Depends(get_db),
+    user: dict = Depends(require_login_api),
 ):
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
     history = await _fetch_patient_history(db, patient_id, user["sub"])
     return JSONResponse(content={"items": history})
 
@@ -411,11 +420,8 @@ async def patient_history_for_consultation(
 async def create_consultation(
     request: Request,
     db: aiosqlite.Connection = Depends(get_db),
+    user: dict = Depends(require_login),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     form = await request.form()
 
     def _int(key):
@@ -436,6 +442,7 @@ async def create_consultation(
     doctor_id = _int("doctor_id")
     dental_medical_history = _clean_text(form.get("dental_medical_history"))
     dental_allergies = _clean_text(form.get("dental_allergies"))
+    consultation_date = _parse_form_date(form.get("consultation_date"))
 
     if not patient_id or not doctor_id:
         cursor = await db.execute(
@@ -463,6 +470,7 @@ async def create_consultation(
                 "selected_dental_history": dental_medical_history,
                 "selected_dental_allergies": dental_allergies,
                 "dental_history_presets_json": json.dumps(DENTAL_HISTORY_PRESETS, ensure_ascii=False),
+                "consultation_date_value": consultation_date or date.today().isoformat(),
                 "error": "Veuillez sélectionner un patient et un praticien.",
             },
         )
@@ -495,10 +503,17 @@ async def create_consultation(
         vitals_notes_payload["dental_allergies"] = dental_allergies
     vitals_notes = json.dumps(vitals_notes_payload, ensure_ascii=False) if vitals_notes_payload else None
 
-    cursor = await db.execute(
-        """INSERT INTO consultations (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json),
-    )
+    if consultation_date:
+        # Date choisie par le praticien — stockée à 12:00:00 pour un tri prévisible.
+        cursor = await db.execute(
+            """INSERT INTO consultations (patient_id, doctor_id, appointment_id, consultation_date, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (patient_id, doctor_id, appointment_id, f"{consultation_date} 12:00:00", reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json),
+        )
+    else:
+        cursor = await db.execute(
+            """INSERT INTO consultations (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (patient_id, doctor_id, appointment_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json),
+        )
     consultation_id = cursor.lastrowid
 
     has_vitals = any(
@@ -512,9 +527,9 @@ async def create_consultation(
             (consultation_id, patient_id, weight, height, blood_pressure_sys, blood_pressure_dia, heart_rate, temperature, spo2, vitals_notes),
         )
 
-    await _save_history_item_if_new(db, patient_id, dental_medical_history)
+    await _save_history_item_if_new(db, patient_id, dental_medical_history, consultation_id)
     if dental_allergies:
-        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}")
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}", consultation_id)
 
     if appointment_id:
         await db.execute(
@@ -523,18 +538,18 @@ async def create_consultation(
         )
 
     await db.commit()
-    return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
+    await log_audit(db, user, "consultation_creee", entity_type="consultation", entity_id=consultation_id, patient_id=patient_id, ip=client_ip(request))
+    response = RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
+    set_flash(response, "Consultation créée")
+    return response
 
 
 @router.post("/start")
 async def start_consultation(
     request: Request,
     db: aiosqlite.Connection = Depends(get_db),
+    user: dict = Depends(require_login),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     form = await request.form()
     try:
         patient_id = int(form.get("patient_id", 0))
@@ -612,7 +627,7 @@ async def start_consultation(
     if existing:
         # On ne réécrit pas le questionnaire d'une session déjà en cours, mais les
         # données patient (antécédents/allergies/tabac) saisies doivent être conservées.
-        await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets)
+        await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets, existing["id"])
         # Compléter le questionnaire de la session existante seulement s'il est vide.
         if intake_json:
             cur2 = await db.execute("SELECT intake_json, reason FROM consultations WHERE id = ?", (existing["id"],))
@@ -623,10 +638,12 @@ async def start_consultation(
                     (intake_json, motif or None, existing["id"]),
                 )
         await db.commit()
-        return RedirectResponse(
+        response = RedirectResponse(
             url=f"/patients/{patient_id}?consultation_id={existing['id']}",
             status_code=302,
         )
+        set_flash(response, "Consultation en cours reprise", "info")
+        return response
 
     if appointment_id:
         await db.execute(
@@ -642,22 +659,21 @@ async def start_consultation(
     consultation_id = cursor.lastrowid
 
     # Persister antécédents / allergies / tabac sur la fiche patient
-    await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets)
+    await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets, consultation_id)
 
     await db.commit()
+    await log_audit(db, user, "consultation_creee", entity_type="consultation", entity_id=consultation_id, patient_id=patient_id, ip=client_ip(request))
 
-    return RedirectResponse(
+    response = RedirectResponse(
         url=f"/patients/{patient_id}?consultation_id={consultation_id}",
         status_code=302,
     )
+    set_flash(response, "Consultation démarrée")
+    return response
 
 
 @router.get("/{consultation_id}", response_class=HTMLResponse)
-async def view_consultation(request: Request, consultation_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def view_consultation(request: Request, consultation_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
         """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, p.id AS pid, u.first_name || ' ' || u.last_name AS doctor_name FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
         (consultation_id, user["sub"]),
@@ -666,6 +682,7 @@ async def view_consultation(request: Request, consultation_id: int, db: aiosqlit
     if not row:
         return RedirectResponse(url="/consultations", status_code=302)
     consultation = dict(row)
+    await log_audit(db, user, "consultation_consultee", entity_type="consultation", entity_id=consultation_id, patient_id=consultation.get("pid"), ip=client_ip(request))
 
     cursor = await db.execute("SELECT * FROM vitals WHERE consultation_id = ? ", (consultation_id,))
     vitals_row = await cursor.fetchone()
@@ -691,11 +708,7 @@ async def view_consultation(request: Request, consultation_id: int, db: aiosqlit
 
 
 @router.get("/{consultation_id}/pdf")
-async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def consultation_pdf(request: Request, consultation_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
         """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
         (consultation_id, user["sub"]),
@@ -711,6 +724,7 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
 
     from services.pdf_service import generate_consultation_pdf
 
+    await log_audit(db, user, "consultation_pdf_exportee", entity_type="consultation", entity_id=consultation_id, patient_id=consultation.get("patient_id"), ip=client_ip(request))
     pdf_bytes = generate_consultation_pdf(consultation, vitals, consultation.get("summary"), consultation.get("pdf_template_path"))
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -720,11 +734,7 @@ async def consultation_pdf(request: Request, consultation_id: int, db: aiosqlite
 
 
 @router.get("/{consultation_id}/edit", response_class=HTMLResponse)
-async def edit_consultation_form(request: Request, consultation_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def edit_consultation_form(request: Request, consultation_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute("SELECT * FROM consultations WHERE id = ? AND doctor_id = ? ", (consultation_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
@@ -772,6 +782,7 @@ async def edit_consultation_form(request: Request, consultation_id: int, db: aio
             "selected_dental_history": selected_dental_history,
             "selected_dental_allergies": selected_dental_allergies,
             "dental_history_presets_json": json.dumps(DENTAL_HISTORY_PRESETS, ensure_ascii=False),
+            "consultation_date_value": (consultation.get("consultation_date") or "")[:10] or date.today().isoformat(),
             "error": None,
         },
     )
@@ -781,12 +792,9 @@ async def edit_consultation_form(request: Request, consultation_id: int, db: aio
 async def update_consultation(
     request: Request,
     consultation_id: int,
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     cursor = await db.execute("SELECT id FROM consultations WHERE id = ? AND doctor_id = ?", (consultation_id, user["sub"]))
     if not await cursor.fetchone():
         return RedirectResponse(url="/consultations", status_code=302)
@@ -813,6 +821,7 @@ async def update_consultation(
         cur = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
         if not await cur.fetchone():
             return RedirectResponse(url="/consultations", status_code=302)
+    consultation_date = _parse_form_date(form.get("consultation_date"))
     reason = form.get("reason", "") or None
     symptoms = form.get("symptoms", "") or None
     clinical_exam = form.get("clinical_exam", "") or None
@@ -837,10 +846,16 @@ async def update_consultation(
         vitals_notes_payload["dental_allergies"] = dental_allergies
     vitals_notes = json.dumps(vitals_notes_payload, ensure_ascii=False) if vitals_notes_payload else None
 
-    await db.execute(
-        """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ? """,
-        (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id, user["sub"]),
-    )
+    if consultation_date:
+        await db.execute(
+            """UPDATE consultations SET patient_id= ?, doctor_id= ?, consultation_date= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ? """,
+            (patient_id, doctor_id, f"{consultation_date} 12:00:00", reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id, user["sub"]),
+        )
+    else:
+        await db.execute(
+            """UPDATE consultations SET patient_id= ?, doctor_id= ?, reason= ?, symptoms= ?, clinical_exam= ?, diagnosis= ?, treatment_plan= ?, notes= ?, dental_exam_json= ?, updated_at=CURRENT_TIMESTAMP WHERE id= ? AND doctor_id= ? """,
+            (patient_id, doctor_id, reason, symptoms, clinical_exam, diagnosis, treatment_plan, notes, dental_exam_json, consultation_id, user["sub"]),
+        )
 
     cursor = await db.execute("SELECT id FROM vitals WHERE consultation_id = ? ", (consultation_id,))
     existing = await cursor.fetchone()
@@ -855,12 +870,15 @@ async def update_consultation(
             (consultation_id, patient_id, weight, height, blood_pressure_sys, blood_pressure_dia, heart_rate, temperature, spo2, vitals_notes),
         )
 
-    await _save_history_item_if_new(db, patient_id, dental_medical_history)
+    await _save_history_item_if_new(db, patient_id, dental_medical_history, consultation_id)
     if dental_allergies:
-        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}")
+        await _save_history_item_if_new(db, patient_id, f"Allergie: {dental_allergies}", consultation_id)
 
     await db.commit()
-    return RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
+    await log_audit(db, user, "consultation_modifiee", entity_type="consultation", entity_id=consultation_id, patient_id=patient_id, ip=client_ip(request))
+    resp = RedirectResponse(url=f"/consultations/{consultation_id}", status_code=302)
+    set_flash(resp, "Consultation modifiée")
+    return resp
 
 
 # ---------------------------------------------------------------------------

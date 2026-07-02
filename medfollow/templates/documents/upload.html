@@ -42,8 +42,9 @@
                 <textarea name="description" rows="2" placeholder="Description optionnelle..."></textarea>
             </div>
             <div class="form-group">
-                <label>Fichier *</label>
-                <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.dicom">
+                <label>Fichier(s) *</label>
+                <input type="file" name="files" required multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.tif,.tiff,.doc,.docx,.dcm">
+                <small style="color: var(--gray-400); display: block; margin-top: 4px;">Vous pouvez sélectionner plusieurs fichiers : le premier prendra le titre saisi, les suivants seront numérotés automatiquement.</small>
             </div>
             <button type="submit" class="btn btn-primary">Importer</button>
         </form>

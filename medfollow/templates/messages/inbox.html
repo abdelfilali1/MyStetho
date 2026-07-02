@@ -61,8 +61,8 @@
 {% block scripts %}
 <script>
 function showTab(name, btn) {
-    document.getElementById('tab-received').style.display = name === 'received'  '' : 'none';
-    document.getElementById('tab-sent').style.display = name === 'sent'  '' : 'none';
+    document.getElementById('tab-received').style.display = name === 'received' ? '' : 'none';
+    document.getElementById('tab-sent').style.display = name === 'sent' ? '' : 'none';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
 }

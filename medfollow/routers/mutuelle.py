@@ -10,8 +10,9 @@ import aiosqlite
 from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.auth import get_current_user
+from routers.deps import deny_secretaire
 
-router = APIRouter(prefix="/mutuelle")
+router = APIRouter(prefix="/mutuelle", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 

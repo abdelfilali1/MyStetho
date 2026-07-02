@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Rappels - Doctivo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Rappels patients</h2>
+        <p class="subtitle">Détartrage, contrôle annuel, suites de plan de traitement — relancez au bon moment.</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('new-rappel-card').style.display='block';this.style.display='none';">+ Nouveau rappel</button>
+</div>
+
+<!-- Chips statistiques -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <div class="stat-chip" style="background:var(--warning-light,#fff7ed);color:#c2410c;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;">À contacter : {{ nb_a_contacter }}</div>
+    <div class="stat-chip" style="background:#fef2f2;color:#b91c1c;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;">En retard : {{ nb_en_retard }}</div>
+    <div class="stat-chip" style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;">Échéance ce mois : {{ nb_ce_mois }}</div>
+</div>
+
+<!-- Formulaire création (masqué par défaut) -->
+<div class="card" id="new-rappel-card" style="display:none;margin-bottom:16px;">
+    <div class="card-header"><h3>Nouveau rappel</h3></div>
+    <div class="card-body">
+        <form method="POST" action="/rappels/new">
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label>Patient <span class="required-star">*</span></label>
+                    <select name="patient_id" required>
+                        <option value="">-- Choisir --</option>
+                        {% for p in patients %}
+                        <option value="{{ p.id }}">{{ p.last_name | upper }} {{ p.first_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Échéance</label>
+                    <input type="date" name="due_date">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description <span class="required-star">*</span></label>
+                <input type="text" name="description" required list="rappel-suggestions" placeholder="Ex. Détartrage (6 mois)">
+                <datalist id="rappel-suggestions">
+                    <option value="Détartrage (6 mois)">
+                    <option value="Contrôle annuel">
+                    <option value="Suite plan de traitement">
+                    <option value="Contrôle post-opératoire">
+                </datalist>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea name="notes" rows="2" placeholder="Optionnel"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Créer le rappel</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('new-rappel-card').style.display='none';">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Onglets filtres -->
+<div class="card">
+    <div class="card-header" style="padding-bottom:0;">
+        <div class="tabs" style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% set tabs = [('a_contacter','À contacter'), ('ce_mois','Ce mois'), ('contacte','Contactés'), ('clotures','Clôturés'), ('tous','Tous')] %}
+            {% for key, label in tabs %}
+            <a href="/rappels?filtre={{ key }}" class="tab {{ 'active' if filtre == key }}" style="padding:8px 14px;text-decoration:none;border-radius:8px 8px 0 0;{{ 'background:var(--primary-light);color:var(--primary-dark);font-weight:600;' if filtre == key else 'color:var(--gray-500);' }}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if rappels %}
+        <table class="table">
+            <thead>
+                <tr><th>Patient</th><th>Téléphone</th><th>Description</th><th>Échéance</th><th>Statut</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for r in rappels %}
+                <tr>
+                    <td><a href="/patients/{{ r.patient_id }}" style="font-weight:600;">{{ r.patient_name }}</a></td>
+                    <td>{{ r.patient_phone or '—' }}</td>
+                    <td>
+                        {{ r.description }}
+                        {% if r.notes %}<div style="font-size:12px;color:var(--gray-500);">{{ r.notes }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {% if r.due_date %}
+                        <span style="{{ 'color:var(--danger);font-weight:600;' if r.due_date < today and not r.is_closed and r.status == 'a_contacter' else '' }}">{{ r.due_date }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if r.is_closed %}
+                        <span class="badge" style="background:var(--gray-100);color:var(--gray-500);">Clôturé</span>
+                        {% elif r.status == 'contacte' %}
+                        <span class="badge badge-success">Contacté</span>
+                        {% else %}
+                        <span class="badge" style="background:#fff7ed;color:#c2410c;">À contacter</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                            {% if not r.is_closed %}
+                                {% if r.status == 'a_contacter' %}
+                                <form method="POST" action="/rappels/{{ r.id }}/status" style="margin:0;"><input type="hidden" name="status" value="contacte"><button class="btn btn-outline btn-sm" title="Marquer contacté">✓ Contacté</button></form>
+                                {% else %}
+                                <form method="POST" action="/rappels/{{ r.id }}/status" style="margin:0;"><input type="hidden" name="status" value="a_contacter"><button class="btn btn-outline btn-sm" title="Remettre à contacter">↩ À contacter</button></form>
+                                {% endif %}
+                                <form method="POST" action="/rappels/{{ r.id }}/close" style="margin:0;"><button class="btn btn-outline btn-sm">Clôturer</button></form>
+                            {% else %}
+                                <form method="POST" action="/rappels/{{ r.id }}/reopen" style="margin:0;"><button class="btn btn-outline btn-sm">Rouvrir</button></form>
+                            {% endif %}
+                            <form method="POST" action="/rappels/{{ r.id }}/delete" style="margin:0;" onsubmit="return confirm('Supprimer ce rappel ?');"><button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Suppr.</button></form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state" style="padding:24px;text-align:center;color:var(--gray-500);">Aucun rappel dans cette catégorie.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

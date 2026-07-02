@@ -664,4 +664,107 @@ async def init_db():
     except Exception:
         pass
 
+    # Migration: prescriptions.updated_at (l'UPDATE d'édition écrivait une colonne inexistante)
+    try:
+        await db.execute("ALTER TABLE prescriptions ADD COLUMN updated_at DATETIME")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Migration: secrétaire liée à un médecin (cloisonnement de ses données)
+    try:
+        await db.execute("ALTER TABLE users ADD COLUMN linked_doctor_id INTEGER REFERENCES users(id)")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Journal d'audit des accès aux données de santé (loi 09-08 / RGPD) — append-only
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            user_email TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id INTEGER,
+            patient_id INTEGER REFERENCES patients(id),
+            ip TEXT,
+            details TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
+    # Rappels patients (détartrage 6 mois, contrôle annuel, plan de traitement...)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS rappels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            description TEXT NOT NULL,
+            due_date DATE,
+            status TEXT CHECK(status IN ('a_contacter', 'contacte')) DEFAULT 'a_contacter',
+            is_closed INTEGER DEFAULT 0,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
+    # Devis / plans de traitement chiffrés (workflow proposé → accepté/refusé → converti en facture)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS devis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            devis_number TEXT UNIQUE NOT NULL,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            consultation_id INTEGER REFERENCES consultations(id),
+            devis_date DATE DEFAULT CURRENT_DATE,
+            total_amount REAL NOT NULL DEFAULT 0,
+            status TEXT CHECK(status IN ('propose', 'accepte', 'refuse', 'converti')) DEFAULT 'propose',
+            notes TEXT,
+            valid_until DATE,
+            converted_invoice_id INTEGER REFERENCES invoices(id),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS devis_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            devis_id INTEGER NOT NULL REFERENCES devis(id),
+            medical_act_id INTEGER REFERENCES medical_acts(id),
+            description TEXT NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            unit_price REAL NOT NULL,
+            total_price REAL NOT NULL,
+            tooth_numbers TEXT
+        )
+    """)
+    await db.commit()
+
+    # Odontogramme : conditions par face dentaire (mésial/distal/occlusal/vestibulaire/lingual).
+    # dental_teeth garde la condition « dent entière » (UNIQUE(patient_id, tooth_number)).
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS dental_tooth_surfaces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            tooth_number INTEGER NOT NULL,
+            surface TEXT CHECK(surface IN ('mesial', 'distal', 'occlusal', 'vestibulaire', 'lingual')) NOT NULL,
+            condition TEXT NOT NULL DEFAULT 'sain',
+            notes TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(patient_id, tooth_number, surface)
+        )
+    """)
+    await db.commit()
+
+    # Migration: historiser aussi la face concernée par un changement de condition
+    try:
+        await db.execute("ALTER TABLE dental_condition_history ADD COLUMN surface TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     await db.close()

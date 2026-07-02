@@ -7,6 +7,7 @@ import aiosqlite
 from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.auth import get_current_user
+from routers.deps import effective_doctor_id
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -25,7 +26,8 @@ async def dashboard(request: Request, db: aiosqlite.Connection = Depends(get_db)
 
     today = date.today().isoformat()
 
-    uid = user["sub"]
+    # Une secrétaire voit le tableau de bord de son médecin lié.
+    uid = effective_doctor_id(user)
 
     # Stats
     cursor = await db.execute("SELECT COUNT(*) FROM patients WHERE doctor_id = ? AND is_active = 1", (uid,))
@@ -88,7 +90,7 @@ async def global_search(request: Request, q: str = "", db: aiosqlite.Connection 
     user = get_current_user(request)
     if not user or len(q) < 2:
         return JSONResponse(content={"patients": [], "consultations": []})
-    uid = user["sub"]
+    uid = effective_doctor_id(user)
     term = f"%{q.lower()}%"
 
     cursor = await db.execute(

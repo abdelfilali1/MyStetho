@@ -508,12 +508,34 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
             {% if history %}
             <ul class="list">
                 {% for h in history %}
-                <li class="list-item">
+                <li class="list-item" id="hist-row-{{ h.id }}">
                     <span class="badge badge-{{ h.type }}">{{ h.type }}</span>
-                    <div class="list-info" style="margin-left: 8px;">
+                    <div class="list-info" style="margin-left: 8px;flex:1;">
                         <span class="list-title">{{ h.description }}</span>
                         <span class="list-subtitle">{{ h.date_recorded or '' }}</span>
                     </div>
+                    <div style="display:flex;gap:6px;">
+                        <button type="button" class="btn btn-outline btn-sm"
+                                onclick='toggleHistEdit({{ h.id }})'>Modifier</button>
+                        <form method="POST" action="/patients/{{ patient.id }}/history/{{ h.id }}/delete" style="margin:0;"
+                              onsubmit="return confirm('Supprimer cet antécédent ?');">
+                            <button type="submit" class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Suppr.</button>
+                        </form>
+                    </div>
+                </li>
+                <li class="list-item" id="hist-edit-{{ h.id }}" style="display:none;">
+                    <form method="POST" action="/patients/{{ patient.id }}/history/{{ h.id }}/edit" style="display:flex;gap:8px;flex-wrap:wrap;width:100%;align-items:center;">
+                        <select name="type" required>
+                            <option value="medical" {{ 'selected' if h.type == 'medical' }}>Médical</option>
+                            <option value="surgical" {{ 'selected' if h.type == 'surgical' }}>Chirurgical</option>
+                            <option value="family" {{ 'selected' if h.type == 'family' }}>Familial</option>
+                            <option value="allergy" {{ 'selected' if h.type == 'allergy' }}>Allergie</option>
+                        </select>
+                        <input type="text" name="description" value="{{ h.description }}" required style="flex:1;min-width:160px;">
+                        <input type="date" name="date_recorded" value="{{ h.date_recorded or '' }}">
+                        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick='toggleHistEdit({{ h.id }})'>Annuler</button>
+                    </form>
                 </li>
                 {% endfor %}
             </ul>
@@ -668,7 +690,13 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                         <td>{{ d.title }}</td>
                         <td><span class="badge">{{ d.category or '—' }}</span></td>
                         <td>{{ (d.created_at or '')[:10] }}</td>
-                        <td><a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a></td>
+                        <td style="display:flex;gap:6px;align-items:center;">
+                            {% if d.is_previewable %}
+                            <button type="button" class="btn btn-outline btn-sm" onclick='previewPatientDoc({{ d.id }}, {{ d.title|tojson }}, {{ d.file_name|tojson }})'>Aperçu</button>
+                            {% endif %}
+                            <a href="/documents/{{ d.id }}/edit?from=patient" class="btn btn-outline btn-sm">Modifier</a>
+                            <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -1209,6 +1237,20 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
 </div>
 {% endif %}
 
+<!-- Aperçu document patient -->
+<div id="doc-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.65);z-index:5000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closePatientDocPreview()">
+    <div style="background:#fff;width:100%;max-width:900px;height:90vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.4);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e2e8f0;">
+            <h3 id="doc-preview-title" style="margin:0;font-size:16px;">Aperçu</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <a id="doc-preview-open" href="#" target="_blank" class="btn btn-outline btn-sm">Ouvrir dans un onglet</a>
+                <button onclick="closePatientDocPreview()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+            </div>
+        </div>
+        <div id="doc-preview-body" style="flex:1;overflow:auto;background:#f8fafc;display:flex;align-items:center;justify-content:center;"></div>
+    </div>
+</div>
+
 <!-- Feuille / Note d'honoraires preview modal -->
 <div id="feuille-preview-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.65);z-index:5000;align-items:center;justify-content:center;padding:24px;" onclick="if(event.target===this)closeFeuillePreview()">
     <div style="background:#fff;width:100%;max-width:900px;height:90vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.4);">
@@ -1295,6 +1337,43 @@ function histTypeChanged() {
         histFilter(inp.value || '');
     }
 }
+
+// ===== Édition inline d'un antécédent (item 29) =====
+function toggleHistEdit(id) {
+    const row = document.getElementById('hist-row-' + id);
+    const edit = document.getElementById('hist-edit-' + id);
+    if (!row || !edit) return;
+    const editing = edit.style.display !== 'none';
+    edit.style.display = editing ? 'none' : 'flex';
+    row.style.display = editing ? '' : 'none';
+}
+
+// ===== Aperçu d'un document patient (item 18) =====
+function previewPatientDoc(id, title, fileName) {
+    const url = '/documents/' + id + '/view';
+    const body = document.getElementById('doc-preview-body');
+    const lower = (fileName || '').toLowerCase();
+    if (lower.endsWith('.pdf')) {
+        body.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;background:#fff;"></iframe>';
+    } else {
+        body.innerHTML = '<img src="' + url + '" alt="Aperçu" style="max-width:100%;max-height:100%;object-fit:contain;">';
+    }
+    document.getElementById('doc-preview-title').textContent = title || 'Aperçu';
+    document.getElementById('doc-preview-open').href = url;
+    document.getElementById('doc-preview-overlay').style.display = 'flex';
+}
+function closePatientDocPreview() {
+    const ov = document.getElementById('doc-preview-overlay');
+    if (!ov) return;
+    document.getElementById('doc-preview-body').innerHTML = '';
+    ov.style.display = 'none';
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const ov = document.getElementById('doc-preview-overlay');
+        if (ov && ov.style.display !== 'none') closePatientDocPreview();
+    }
+});
 
 // ===== Feuille / Note d'honoraires preview modal =====
 function previewFeuille(id, title) {
@@ -1651,6 +1730,14 @@ async function fuCreate() {
     <div class="panel-body">
         <div>
             <div class="panel-section-label">Condition de la dent</div>
+            <div class="surface-picker" id="p-surface-picker">
+                <button type="button" class="surface-btn active" data-surface="" onclick="selectSurface('')" title="Dent entière">Dent entière</button>
+                <button type="button" class="surface-btn" data-surface="mesial" onclick="selectSurface('mesial')" title="Mésial">M</button>
+                <button type="button" class="surface-btn" data-surface="distal" onclick="selectSurface('distal')" title="Distal">D</button>
+                <button type="button" class="surface-btn" data-surface="occlusal" onclick="selectSurface('occlusal')" title="Occlusal">O</button>
+                <button type="button" class="surface-btn" data-surface="vestibulaire" onclick="selectSurface('vestibulaire')" title="Vestibulaire">V</button>
+                <button type="button" class="surface-btn" data-surface="lingual" onclick="selectSurface('lingual')" title="Lingual / Palatin">L</button>
+            </div>
             <select id="p-cond" class="panel-select">
                 <option value="sain">Sain</option>
                 <option value="carie">Carie</option>
@@ -1666,6 +1753,7 @@ async function fuCreate() {
             </select>
             <textarea id="p-notes" rows="3" placeholder="Notes cliniques..." class="panel-textarea"></textarea>
             <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
+            <div id="p-surface-summary" style="margin-top:10px;font-size:12px;color:#64748b;"></div>
         </div>
         <div>
             <div class="panel-section-label" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1674,41 +1762,15 @@ async function fuCreate() {
             </div>
             <div id="p-condition-history" style="display:none;max-height:140px;overflow-y:auto;"></div>
         </div>
-        <div>
-            <div class="panel-section-label">Traitements</div>
-            <div id="p-treatments"></div>
-        </div>
-        <div class="panel-add-box">
-            <div class="panel-section-label">Ajouter un traitement</div>
-            <select id="new-t-type" class="panel-select">
-                <option value="Examen">Examen</option>
-                <option value="Détartrage">Détartrage</option>
-                <option value="Extraction">Extraction</option>
-                <option value="Obturation composite">Obturation composite</option>
-                <option value="Amalgame">Amalgame</option>
-                <option value="Traitement endodontique">Traitement endodontique</option>
-                <option value="Couronne">Couronne</option>
-                <option value="Couronne provisoire">Couronne provisoire</option>
-                <option value="Bridge">Bridge</option>
-                <option value="Implant">Implant</option>
-                <option value="Prothèse partielle">Prothèse partielle</option>
-                <option value="Prothèse totale">Prothèse totale</option>
-                <option value="Blanchiment">Blanchiment</option>
-                <option value="Orthodontie">Orthodontie</option>
-                <option value="Radiographie">Radiographie</option>
-                <option value="Autre">Autre</option>
-            </select>
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <input type="date" id="new-t-date" class="panel-select" style="flex:1;margin-bottom:0;">
-                <input type="time" id="new-t-time" class="panel-select" value="09:00" style="width:100px;margin-bottom:0;">
-            </div>
-            <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
-            <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
-            <button id="btn-bulk-treatment" onclick="addBulkTreatment()" class="panel-btn-dark" style="display:none;background:linear-gradient(135deg,#0f172a,#1e3a5f);margin-top:6px;">🦷 Appliquer à toutes les dents (32)</button>
-        </div>
     </div>
 </div>
 <div id="toast"></div>
+<style>
+.surface-picker { display:flex; gap:4px; margin-bottom:10px; flex-wrap:wrap; }
+.surface-btn { padding:5px 9px; border:1px solid #cbd5e1; background:#fff; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; color:#475569; }
+.surface-btn.active { background:#1c8cf8; color:#fff; border-color:#1c8cf8; }
+.surface-btn.has-cond { border-color:#f59e0b; }
+</style>
 
 <script src="/static/js/odontogram-view.iife.js?v=20260510-1"></script>
 <script>
@@ -1956,15 +2018,20 @@ function buildChart() {
 }
 
 // ===== PANEL (copié depuis chart.html) =====
+let currentSurface = '';
+let surfaceData = {};
+const SURF_LABELS = { mesial:'M', distal:'D', occlusal:'O', vestibulaire:'V', lingual:'L' };
+
 function openPanel(toothNum) {
     currentTooth = toothNum;
+    currentSurface = '';
+    surfaceData = {};
     setSelectedTooth(toothNum);
     document.getElementById('p-num').textContent  = 'Dent ' + toothNum;
     document.getElementById('p-name').textContent = TOOTH_NAMES[toothNum] || '';
     const d = teethData[String(toothNum)] || {};
     document.getElementById('p-cond').value  = d.condition || 'sain';
     document.getElementById('p-notes').value = d.notes || '';
-    document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#94a3b8;font-size:13px;text-align:center;">Chargement...</div>';
     // Reset condition history
     _condHistoryVisible = false;
     const histEl = document.getElementById('p-condition-history');
@@ -1976,8 +2043,38 @@ function openPanel(toothNum) {
     document.body.style.overflow = 'hidden';
     fetch(`/dental/${PATIENT_ID}/tooth/${toothNum}/data`)
         .then(r => r.json())
-        .then(data => { renderTreatments(data.treatments); document.getElementById('new-t-date').value = new Date().toISOString().split('T')[0]; })
-        .catch(() => { document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13px;">Erreur de chargement</div>'; });
+        .then(data => {
+            surfaceData = {};
+            (data.surfaces || []).forEach(s => { surfaceData[s.surface] = { condition: s.condition, notes: s.notes }; });
+            _renderSurfacePicker();
+        })
+        .catch(() => {});
+}
+
+function _renderSurfacePicker() {
+    document.querySelectorAll('#p-surface-picker .surface-btn').forEach(btn => {
+        const s = btn.dataset.surface;
+        btn.classList.toggle('active', s === currentSurface);
+        btn.classList.toggle('has-cond', !!(s && surfaceData[s] && surfaceData[s].condition && surfaceData[s].condition !== 'sain'));
+    });
+    const parts = Object.keys(surfaceData)
+        .filter(s => surfaceData[s].condition && surfaceData[s].condition !== 'sain')
+        .map(s => `${SURF_LABELS[s] || s}: ${surfaceData[s].condition}`);
+    document.getElementById('p-surface-summary').textContent = parts.length ? ('Faces : ' + parts.join(' · ')) : '';
+}
+
+function selectSurface(surface) {
+    currentSurface = surface;
+    const d = teethData[String(currentTooth)] || {};
+    if (surface) {
+        const sd = surfaceData[surface] || {};
+        document.getElementById('p-cond').value = sd.condition || 'sain';
+        document.getElementById('p-notes').value = sd.notes || '';
+    } else {
+        document.getElementById('p-cond').value = d.condition || 'sain';
+        document.getElementById('p-notes').value = d.notes || '';
+    }
+    _renderSurfacePicker();
 }
 
 function closePanel() {
@@ -1985,27 +2082,6 @@ function closePanel() {
     document.getElementById('overlay').classList.remove('open');
     document.body.style.overflow = '';
     currentTooth = null;
-}
-
-const APPT_STATUS_LABELS = {planifie:'Planifié', confirme:'Confirmé', en_cours:'En cours', termine:'Terminé', annule:'Annulé', absent:'Absent'};
-
-function renderTreatments(list) {
-    const el = document.getElementById('p-treatments');
-    if (!list || list.length === 0) { el.innerHTML = '<p style="padding:10px 0;color:#94a3b8;font-size:13px;text-align:center;">Aucun traitement enregistré</p>'; return; }
-    const active = list.filter(t => !t.appt_status || t.appt_status !== 'termine');
-    const done   = list.filter(t => t.appt_status === 'termine');
-    const renderCard = t => {
-        const isDone = t.appt_status === 'termine';
-        const apptHtml = t.appt_status ? `<span class="appt-badge ${t.appt_status}">${APPT_STATUS_LABELS[t.appt_status] || t.appt_status}</span>` : '';
-        const dtLabel = t.appt_datetime ? t.appt_datetime.substring(0,16).replace('T',' ') : t.treatment_date;
-        return `<div class="treatment-card${isDone ? ' is-done' : ''}"><div style="flex:1;min-width:0;"><div class="treatment-type">${escapeHtml(t.treatment_type)}</div>${t.description ? `<div class="treatment-desc">${escapeHtml(t.description)}</div>` : ''}<div class="treatment-date">📅 ${escapeHtml(dtLabel)}</div>${apptHtml}</div><button onclick="delTreatment(${t.id})" class="treatment-del">✕</button></div>`;
-    };
-    let html = active.map(renderCard).join('');
-    if (done.length > 0) {
-        html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);margin:12px 0 6px;padding-top:10px;border-top:1px solid var(--border);">Historique (${done.length})</div>`;
-        html += done.map(renderCard).join('');
-    }
-    el.innerHTML = html;
 }
 
 function escapeHtml(str) {
@@ -2019,48 +2095,24 @@ async function saveCondition() {
     const notes     = document.getElementById('p-notes').value;
     const fd = new FormData();
     fd.append('condition', condition); fd.append('notes', notes);
+    if (currentSurface) fd.append('surface', currentSurface);
     {% if active_consultation %}fd.append('consultation_id', '{{ active_consultation.id }}');{% endif %}
     try {
         const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition`, {method:'POST', body:fd});
         if (r.ok) {
-            teethData[String(currentTooth)] = {condition, notes};
-            if (_setReactConditions) _setReactConditions(buildTeethConditions());
-            if (document.getElementById('stats-row-layout')) buildStats('stats-row-layout');
-            if (document.getElementById('stats-row-odo'))    buildStats('stats-row-odo');
-            showToast('Condition enregistrée ✓');
+            if (currentSurface) {
+                surfaceData[currentSurface] = {condition, notes};
+                _renderSurfacePicker();
+                showToast('Condition de face enregistrée ✓');
+            } else {
+                teethData[String(currentTooth)] = {condition, notes};
+                if (_setReactConditions) _setReactConditions(buildTeethConditions());
+                if (document.getElementById('stats-row-layout')) buildStats('stats-row-layout');
+                if (document.getElementById('stats-row-odo'))    buildStats('stats-row-odo');
+                showToast('Condition enregistrée ✓');
+            }
         } else { showToast('Erreur lors de l\'enregistrement'); }
     } catch (e) { showToast('Erreur réseau'); }
-}
-
-const BULK_TREATMENT_TYPES = ['Détartrage', 'Blanchiment', 'Radiographie'];
-
-document.getElementById('new-t-type')?.addEventListener('change', function() {
-    const btn = document.getElementById('btn-bulk-treatment');
-    if (btn) btn.style.display = BULK_TREATMENT_TYPES.includes(this.value) ? 'block' : 'none';
-});
-
-async function addBulkTreatment() {
-    const treatmentType = document.getElementById('new-t-type').value;
-    const desc = document.getElementById('new-t-desc').value;
-    const tdate = document.getElementById('new-t-date').value;
-    const stime = document.getElementById('new-t-time').value || '09:00';
-    if (!confirm(`Appliquer "${treatmentType}" à toutes les dents (32) ?\nCela créera un rendez-vous et 32 traitements liés.`)) return;
-    try {
-        const r = await fetch(`/dental/${PATIENT_ID}/bulk-treatment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ treatment_type: treatmentType, description: desc, treatment_date: tdate, start_time: stime{% if active_consultation %}, consultation_id: {{ active_consultation.id }}{% endif %} }),
-        });
-        if (r.ok) {
-            showToast(`${treatmentType} appliqué à 32 dents ✓`);
-            document.getElementById('new-t-desc').value = '';
-            // Refresh current tooth treatments if a tooth is selected
-            if (currentTooth) {
-                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
-                renderTreatments(data.treatments);
-            }
-        } else { showToast('Erreur lors de l\'application', 'error'); }
-    } catch (e) { showToast('Erreur réseau', 'error'); }
 }
 
 const CONDITION_LABELS = {
@@ -2094,40 +2146,6 @@ async function toggleConditionHistory() {
             </div>`;
         }).join('');
     } catch (e) { el.innerHTML = '<div style="padding:8px;color:#ef4444;font-size:12px;">Erreur réseau</div>'; }
-}
-
-async function addTreatment() {
-    if (!currentTooth) return;
-    const fd = new FormData();
-    fd.append('treatment_type', document.getElementById('new-t-type').value);
-    fd.append('description',    document.getElementById('new-t-desc').value);
-    fd.append('treatment_date', document.getElementById('new-t-date').value);
-    fd.append('start_time',     document.getElementById('new-t-time').value || '09:00');
-    {% if active_consultation %}fd.append('consultation_id', '{{ active_consultation.id }}');{% endif %}
-    try {
-        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
-        if (r.ok) {
-            const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
-            renderTreatments(data.treatments);
-            document.getElementById('new-t-desc').value = '';
-            showToast('Traitement ajouté ✓');
-        } else { showToast('Erreur lors de l\'ajout'); }
-    } catch (e) { showToast('Erreur réseau'); }
-}
-
-function delTreatment(id) {
-    const doDelete = async () => {
-        try {
-            const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment/${id}/delete`, {method:'POST', body:new FormData()});
-            if (r.ok) {
-                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
-                renderTreatments(data.treatments);
-                showToast('Traitement supprimé');
-            } else { showToast('Erreur lors de la suppression'); }
-        } catch (e) { showToast('Erreur réseau'); }
-    };
-    if (window.confirmAction) { window.confirmAction('Supprimer ce traitement ?', doDelete); }
-    else { if (confirm('Supprimer ce traitement ?')) doDelete(); }
 }
 
 function getToothPos(n) {

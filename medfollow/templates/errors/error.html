@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — Doctivo{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:14px;">
+    <div style="font-family:'Sora',sans-serif;font-size:72px;font-weight:800;color:var(--primary, #0f172a);line-height:1;">{{ code }}</div>
+    <h2 style="margin:0;">{{ title }}</h2>
+    <p style="color:#64748b;max-width:480px;">{{ message }}</p>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+        <a href="/" class="btn btn-primary">Tableau de bord</a>
+        <a href="javascript:history.back()" class="btn btn-outline">Retour</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content_full %}
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;gap:14px;font-family:'Manrope',sans-serif;">
+    <div style="font-family:'Sora',sans-serif;font-size:72px;font-weight:800;color:#0f172a;line-height:1;">{{ code }}</div>
+    <h2 style="margin:0;">{{ title }}</h2>
+    <p style="color:#64748b;max-width:480px;">{{ message }}</p>
+    <a href="/login" class="btn btn-primary" style="margin-top:8px;">Se connecter</a>
+</div>
+{% endblock %}

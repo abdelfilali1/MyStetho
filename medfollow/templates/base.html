@@ -7,7 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260503-15">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260702-1">
+    <style>
+    /* Recherche globale + badge messagerie (intégration) */
+    .sidebar-search { padding: 10px 14px 4px; position: relative; }
+    .sidebar-search input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 8px; color: #fff; padding: 8px 10px; font-size: 13px; }
+    .sidebar-search input::placeholder { color: rgba(255,255,255,.45); }
+    .sidebar-search input:focus { outline: none; border-color: #25b7ff; background: rgba(255,255,255,.12); }
+    #global-search-results { position: absolute; top: 100%; left: 14px; right: 14px; background: #fff; border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.35); z-index: 300; max-height: 320px; overflow-y: auto; }
+    #global-search-results .gsr-section { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; padding: 8px 12px 2px; }
+    #global-search-results .gsr-item { display: block; padding: 8px 12px; font-size: 13px; color: #0f172a; text-decoration: none; cursor: pointer; }
+    #global-search-results .gsr-item:hover, #global-search-results .gsr-item.kbd-active { background: #eef6ff; }
+    #global-search-results .gsr-empty { padding: 10px 12px; font-size: 13px; color: #94a3b8; }
+    .msg-unread-badge { background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
+    </style>
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -21,6 +34,12 @@
                 <p class="brand-tag" style="text-align:center;">La santé, mieux organisée</p>
             </div>
         </div>
+        {% if user.role != 'secretaire' %}
+        <div class="sidebar-search no-print" id="sidebar-search">
+            <input type="text" id="global-search-input" placeholder="Rechercher un patient…  (Ctrl+K)" autocomplete="off" aria-label="Recherche patient">
+            <div id="global-search-results" style="display:none;"></div>
+        </div>
+        {% endif %}
         <ul class="nav-links">
             <li class="{% if active == 'dashboard' %}active{% endif %}">
                 <a href="/">
@@ -40,6 +59,13 @@
                     <span>Agenda</span>
                 </a>
             </li>
+            <li class="{% if active == 'rappels' %}active{% endif %}">
+                <a href="/rappels">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                    <span>Rappels</span>
+                </a>
+            </li>
+            {% if user.role != 'secretaire' %}
             <li class="nav-separator"></li>
             <li class="{% if active == 'consultations' %}active{% endif %}">
                 <a href="/consultations">
@@ -73,19 +99,23 @@
                     <span>Formation Continue</span>
                 </a>
             </li>
+            {% endif %}
             <li class="nav-separator"></li>
             <li class="{% if active == 'messages' %}active{% endif %}">
                 <a href="/messages">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     <span>Messagerie</span>
+                    <span class="msg-unread-badge" id="msg-unread-badge" style="display:none;margin-left:auto;"></span>
                 </a>
             </li>
+            {% if user.role != 'secretaire' %}
             <li class="{% if active == 'invoices' %}active{% endif %}">
                 <a href="/invoices">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                     <span>Facturation</span>
                 </a>
             </li>
+            {% endif %}
             {% if user.role == 'admin' %}
             <li class="nav-separator"></li>
             <li class="{% if active == 'admin_users' %}active{% endif %}">
@@ -100,7 +130,7 @@
             <div class="user-info">
                 <div class="user-avatar">{{ (user.first_name or user.email)[0]|upper }}</div>
                 <div class="user-details">
-                    <span class="user-name">{% if user.first_name or user.last_name %}Dr. {{ user.first_name }} {{ user.last_name }}{% else %}{{ user.email }}{% endif %}</span>
+                    <span class="user-name">{% if user.first_name or user.last_name %}{% if user.role == 'secretaire' %}{{ user.first_name }} {{ user.last_name }}{% else %}Dr. {{ user.first_name }} {{ user.last_name }}{% endif %}{% else %}{{ user.email }}{% endif %}</span>
                     <span class="user-role">{{ user.email }}</span>
                 </div>
             </div>
@@ -214,9 +244,149 @@
             });
         });
 
+
+        // === Recherche globale patient (Ctrl+K ou /) ===
+        const gsInput = document.getElementById('global-search-input');
+        if (gsInput) {
+            const gsResults = document.getElementById('global-search-results');
+            let gsTimer = null, gsIdx = -1, gsItems = [];
+            function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+            function gsClose() { gsResults.style.display = 'none'; gsIdx = -1; }
+            function gsRender(data) {
+                let html = '';
+                const pats = (data && data.patients) || [], cons = (data && data.consultations) || [];
+                if (pats.length) {
+                    html += '<div class="gsr-section">Patients</div>';
+                    pats.forEach(p => { html += '<a class="gsr-item" href="/patients/' + p.id + '">' + escapeHtml(p.name) + '</a>'; });
+                }
+                if (cons.length) {
+                    html += '<div class="gsr-section">Consultations</div>';
+                    cons.forEach(c => { html += '<a class="gsr-item" href="/consultations/' + c.id + '">' + escapeHtml(c.label) + '</a>'; });
+                }
+                if (!html) html = '<div class="gsr-empty">Aucun résultat</div>';
+                gsResults.innerHTML = html;
+                gsResults.style.display = 'block';
+                gsItems = Array.from(gsResults.querySelectorAll('.gsr-item'));
+                gsIdx = -1;
+            }
+            gsInput.addEventListener('input', function() {
+                const q = this.value.trim();
+                clearTimeout(gsTimer);
+                if (q.length < 2) { gsClose(); return; }
+                gsTimer = setTimeout(() => {
+                    fetch('/api/search?q=' + encodeURIComponent(q))
+                        .then(r => r.ok ? r.json() : null)
+                        .then(d => { if (d) gsRender(d); else gsClose(); })
+                        .catch(() => gsClose());
+                }, 220);
+            });
+            gsInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { gsClose(); this.blur(); return; }
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!gsItems.length) return;
+                    gsIdx = e.key === 'ArrowDown' ? Math.min(gsIdx + 1, gsItems.length - 1) : Math.max(gsIdx - 1, 0);
+                    gsItems.forEach((el, i) => el.classList.toggle('kbd-active', i === gsIdx));
+                    gsItems[gsIdx].scrollIntoView({ block: 'nearest' });
+                } else if (e.key === 'Enter' && gsIdx >= 0) {
+                    e.preventDefault();
+                    window.location.href = gsItems[gsIdx].getAttribute('href');
+                }
+            });
+            document.addEventListener('click', function(e) { if (!e.target.closest('#sidebar-search')) gsClose(); });
+            document.addEventListener('keydown', function(e) {
+                const el = document.activeElement;
+                const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); gsInput.focus(); gsInput.select(); }
+                else if (e.key === '/' && !typing) { e.preventDefault(); gsInput.focus(); gsInput.select(); }
+            });
+        }
+
+        // === Badge messagerie non lus + notification à la réception ===
+        const msgBadge = document.getElementById('msg-unread-badge');
+        if (msgBadge) {
+            let lastCount = null;
+            function pollUnread() {
+                fetch('/messages/api/unread-count')
+                    .then(r => r.ok ? r.json() : null)
+                    .then(d => {
+                        if (!d || typeof d.count !== 'number') return;
+                        msgBadge.textContent = d.count > 99 ? '99+' : d.count;
+                        msgBadge.style.display = d.count > 0 ? 'inline-flex' : 'none';
+                        if (lastCount !== null && d.count > lastCount && window.showToast) {
+                            window.showToast('Nouveau message reçu', 'info');
+                        }
+                        lastCount = d.count;
+                    })
+                    .catch(() => {});
+            }
+            pollUnread();
+            setInterval(pollUnread, 30000);
+        }
+
     })();
     </script>
     {% endif %}
+
+    <script>
+    (function() {
+        function getCookie(name) {
+            const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+            return m ? decodeURIComponent(m[1]) : '';
+        }
+
+        // === CSRF : injecte le jeton caché dans chaque formulaire POST ===
+        function injectCsrf(form) {
+            const method = (form.getAttribute('method') || 'get').toLowerCase();
+            if (method !== 'post') return;
+            const token = getCookie('csrf_token');
+            if (!token) return;
+            let input = form.querySelector('input[name="csrf_token"]');
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                form.appendChild(input);
+            }
+            input.value = token;
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('form').forEach(injectCsrf);
+        });
+        // Couvre aussi les formulaires créés dynamiquement (capture avant l'envoi)
+        document.addEventListener('submit', function(e) {
+            if (e.target && e.target.tagName === 'FORM') injectCsrf(e.target);
+        }, true);
+
+        // === CSRF + marqueur AJAX sur tous les fetch() même origine ===
+        const _origFetch = window.fetch;
+        window.fetch = function(input, init) {
+            try {
+                const url = (typeof input === 'string') ? input : ((input && input.url) || '');
+                const sameOrigin = !/^https?:\/\//i.test(url) || url.indexOf(location.origin) === 0;
+                const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+                if (sameOrigin && method !== 'GET' && method !== 'HEAD') {
+                    init = init || {};
+                    const headers = new Headers(init.headers || (typeof input !== 'string' && input ? input.headers : undefined) || {});
+                    if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', getCookie('csrf_token'));
+                    if (!headers.has('X-Requested-With')) headers.set('X-Requested-With', 'fetch');
+                    init.headers = headers;
+                }
+            } catch (err) { /* ne jamais casser un appel réseau */ }
+            return _origFetch.call(this, input, init);
+        };
+
+        // === Message flash (posé par le serveur via le cookie 'flash') ===
+        document.addEventListener('DOMContentLoaded', function() {
+            const raw = getCookie('flash');
+            if (!raw) return;
+            document.cookie = 'flash=; Max-Age=0; path=/';
+            let data;
+            try { data = JSON.parse(raw); } catch (err) { data = { m: raw, t: 'success' }; }
+            if (data && data.m && window.showToast) window.showToast(data.m, data.t || 'success');
+        });
+    })();
+    </script>
 
     {% block scripts %}{% endblock %}
 

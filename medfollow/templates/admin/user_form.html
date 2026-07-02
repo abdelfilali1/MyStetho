@@ -52,7 +52,20 @@
                     <input type="text" id="phone" name="phone" value="{{ form.phone if form and form.phone else '' }}" placeholder="Optionnel">
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="linked-doctor-group" style="{{ '' if form and form.role == 'secretaire' else 'display:none;' }}">
+                <label for="linked_doctor_id">Médecin lié <span class="required-star">*</span></label>
+                <select id="linked_doctor_id" name="linked_doctor_id">
+                    <option value="">-- Choisir le médecin --</option>
+                    {% for d in doctors %}
+                    <option value="{{ d.id }}" {% if form and form.linked_doctor_id|string == d.id|string %}selected{% endif %}>Dr {{ d.last_name }} {{ d.first_name }}</option>
+                    {% endfor %}
+                </select>
+                <small style="color:var(--gray-500);display:block;margin-top:4px;">
+                    La secrétaire ne voit que les patients, l'agenda, les rappels et la messagerie de ce médecin.
+                    {% if editing %}Elle devra se reconnecter pour que le changement prenne effet.{% endif %}
+                </small>
+            </div>
+            <div class="form-group" id="specialty-group">
                 <label for="specialty">Spécialité <span class="required-star">*</span></label>
                 <select id="specialty" name="specialty" required>
                     <option value="" disabled {% if not form or not form.specialty %}selected{% endif %}>-- Choisissez une spécialité --</option>
@@ -181,6 +194,20 @@
             pwc.focus();
         }
     });
+
+    // Rôle secrétaire : afficher le médecin lié, rendre la spécialité optionnelle
+    const roleSel = document.getElementById('role');
+    const linkedGroup = document.getElementById('linked-doctor-group');
+    const specialtyGroup = document.getElementById('specialty-group');
+    const specialtySel = document.getElementById('specialty');
+    function syncRoleFields() {
+        const isSec = roleSel.value === 'secretaire';
+        linkedGroup.style.display = isSec ? '' : 'none';
+        specialtyGroup.style.display = isSec ? 'none' : '';
+        specialtySel.required = !isSec;
+    }
+    roleSel.addEventListener('change', syncRoleFields);
+    syncRoleFields();
 })();
 </script>
 {% endblock %}

@@ -9,11 +9,15 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
         <span class="badge badge-{{ 'confirme' if invoice.status == 'payee' else 'planifie' if invoice.status == 'emise' else 'en_cours' }}" style="font-size: 14px; padding: 6px 16px;">{{ {'brouillon':'Brouillon','emise':'Émise','en_attente':'En attente','payee':'Payée','partiellement_payee':'Part. payée','annulee':'Annulée'}.get(invoice.status, invoice.status) }}</span>
-        {% if invoice.status != 'annulee' %}
-        <form method="POST" action="/invoices/{{ invoice.id }}/cancel" style="margin:0;" onsubmit="return confirm('Annuler cette facture ?')">
-            <button type="submit" class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Annuler la facture</button>
-        </form>
-        {% endif %}
+        <div class="no-print" style="display:flex;gap:8px;">
+            <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
+            <a href="/invoices/{{ invoice.id }}/pdf" class="btn btn-primary" target="_blank">Télécharger PDF</a>
+            {% if invoice.status != 'annulee' %}
+            <form method="POST" action="/invoices/{{ invoice.id }}/cancel" style="margin:0;" onsubmit="return confirm('Annuler cette facture ?')">
+                <button type="submit" class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Annuler la facture</button>
+            </form>
+            {% endif %}
+        </div>
     </div>
 </div>
 
@@ -66,7 +70,7 @@
                 {% endif %}
 
                 {% if invoice.status != 'payee' %}
-                <form method="POST" action="/invoices/{{ invoice.id }}/pay" class="history-form" style="margin-top: 16px;">
+                <form method="POST" action="/invoices/{{ invoice.id }}/pay" class="history-form no-print" style="margin-top: 16px;">
                     <h4 style="font-size: 14px; color: var(--gray-600); margin-bottom: 8px;">Enregistrer un paiement</h4>
                     <div class="form-row">
                         <div class="form-group">

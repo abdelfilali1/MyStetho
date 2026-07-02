@@ -9,9 +9,14 @@ from datetime import date, datetime, timedelta
 from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.auth import get_current_user
+from routers.deps import deny_secretaire
+from services.audit import log_audit, client_ip
 
-router = APIRouter(prefix="/dental")
+router = APIRouter(prefix="/dental", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Faces dentaires (item 24)
+TOOTH_SURFACES = ("mesial", "distal", "occlusal", "vestibulaire", "lingual")
 
 # Default canals per tooth type (FDI numbering)
 ENDO_CANALS = {
@@ -118,8 +123,14 @@ async def get_tooth_data(request: Request, patient_id: int, tooth_number: int, d
         (patient_id, tooth_number)
     )
     treatments = [dict(r) for r in await cursor.fetchall()]
+    # Conditions par face (item 24)
+    cursor = await db.execute(
+        "SELECT surface, condition, notes FROM dental_tooth_surfaces WHERE patient_id = ? AND tooth_number = ?",
+        (patient_id, tooth_number),
+    )
+    surfaces = [dict(r) for r in await cursor.fetchall()]
     return JSONResponse(content={
-        "tooth": tooth, "treatments": treatments,
+        "tooth": tooth, "treatments": treatments, "surfaces": surfaces,
         "tooth_name": TOOTH_NAMES.get(tooth_number, f"Dent {tooth_number}")
     })
 
@@ -129,6 +140,7 @@ async def update_tooth_condition(
     request: Request, patient_id: int, tooth_number: int,
     condition: str = Form(...), notes: str = Form(""),
     consultation_id: Optional[int] = Form(None),
+    surface: Optional[str] = Form(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     user = get_current_user(request)
@@ -137,7 +149,36 @@ async def update_tooth_condition(
     if not await _owns_patient(db, patient_id, user["sub"]):
         return JSONResponse(status_code=404, content={"error": "Not found"})
 
-    # Check previous condition to avoid duplicate consecutive entries
+    surface = (surface or "").strip().lower() or None
+    if surface and surface not in TOOTH_SURFACES:
+        return JSONResponse(status_code=400, content={"error": "Face dentaire invalide"})
+
+    if surface:
+        # Condition par face (item 24) — stockée séparément, la dent entière reste inchangée
+        cursor = await db.execute(
+            "SELECT condition FROM dental_tooth_surfaces WHERE patient_id = ? AND tooth_number = ? AND surface = ?",
+            (patient_id, tooth_number, surface),
+        )
+        prev = await cursor.fetchone()
+        prev_condition = prev["condition"] if prev else None
+        await db.execute(
+            """INSERT INTO dental_tooth_surfaces (patient_id, tooth_number, surface, condition, notes, updated_at)
+               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(patient_id, tooth_number, surface) DO UPDATE SET
+               condition=excluded.condition, notes=excluded.notes, updated_at=excluded.updated_at""",
+            (patient_id, tooth_number, surface, condition, notes or None),
+        )
+        if condition != prev_condition:
+            await db.execute(
+                """INSERT INTO dental_condition_history (patient_id, tooth_number, condition, notes, changed_by, consultation_id, surface)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (patient_id, tooth_number, condition, notes or None, user["sub"], consultation_id, surface),
+            )
+        await db.commit()
+        await log_audit(db, user, "dent_condition_modifiee", entity_type="dental_surface", entity_id=tooth_number, patient_id=patient_id, ip=client_ip(request), details=f"dent {tooth_number} face {surface}: {condition}")
+        return JSONResponse(content={"ok": True, "surface": surface})
+
+    # Condition « dent entière »
     cursor = await db.execute(
         "SELECT condition FROM dental_teeth WHERE patient_id = ? AND tooth_number = ?",
         (patient_id, tooth_number)
@@ -162,6 +203,7 @@ async def update_tooth_condition(
         )
 
     await db.commit()
+    await log_audit(db, user, "dent_condition_modifiee", entity_type="dental", entity_id=tooth_number, patient_id=patient_id, ip=client_ip(request), details=f"dent {tooth_number}: {condition}")
     return JSONResponse(content={"ok": True})
 
 
@@ -176,7 +218,7 @@ async def get_tooth_condition_history(
     if not await _owns_patient(db, patient_id, user["sub"]):
         return JSONResponse(status_code=404, content={"error": "Not found"})
     cursor = await db.execute(
-        """SELECT h.condition, h.notes, h.changed_at,
+        """SELECT h.condition, h.notes, h.changed_at, h.surface,
                   u.first_name || ' ' || u.last_name AS doctor_name
            FROM dental_condition_history h
            LEFT JOIN users u ON h.changed_by = u.id

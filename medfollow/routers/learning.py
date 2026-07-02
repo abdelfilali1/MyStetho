@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from config import TEMPLATES_DIR
 from routers.auth import get_current_user
+from routers.deps import deny_secretaire
 from routers.learning_content import COURSE_CONTENT
 
-router = APIRouter(prefix="/learning")
+router = APIRouter(prefix="/learning", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 COURSES = [

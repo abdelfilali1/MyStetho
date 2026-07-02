@@ -4,23 +4,20 @@ from fastapi.templating import Jinja2Templates
 from typing import Optional
 import aiosqlite
 import json
+import os
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
-from routers.auth import get_current_user
+from routers.deps import require_login, require_login_api, effective_doctor_id, set_flash, deny_secretaire
+from services.audit import log_audit, client_ip
 
 router = APIRouter(prefix="/patients")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
-def require_user(request: Request) -> dict:
-    user = get_current_user(request)
-    if not user:
-        raise Exception("Not authenticated")
-    return user
+SORT_WHITELIST = {"last_name", "date_of_birth", "city", "created_at", "last_visit"}
 
-
-SORT_WHITELIST = {"last_name", "date_of_birth", "city", "created_at"}
+HISTORY_TYPES = {"medical", "surgical", "family", "allergy"}
 
 @router.get("/", response_class=HTMLResponse)
 async def list_patients(
@@ -29,17 +26,21 @@ async def list_patients(
     page: int = 1,
     sort_by: str = "last_name",
     sort_order: str = "asc",
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
+    doctor_id = effective_doctor_id(user)
 
     if sort_by not in SORT_WHITELIST:
         sort_by = "last_name"
     if sort_order not in ("asc", "desc"):
         sort_order = "asc"
-    order_clause = f"ORDER BY {sort_by} {sort_order.upper()}, last_name ASC"
+    if sort_by == "last_visit":
+        # last_visit est un alias SELECT pouvant être NULL (patient sans consultation) :
+        # on repousse toujours les NULL en fin de liste.
+        order_clause = f"ORDER BY (last_visit IS NULL), last_visit {sort_order.upper()}, last_name ASC"
+    else:
+        order_clause = f"ORDER BY {sort_by} {sort_order.upper()}, last_name ASC"
 
     per_page = 20
     offset = (page - 1) * per_page
@@ -48,7 +49,7 @@ async def list_patients(
         like = f"%{q.lower()}%"
         count_cursor = await db.execute(
             """SELECT COUNT(*) FROM patients WHERE doctor_id = ? AND is_active = 1 AND (lower(first_name) LIKE ? OR lower(last_name) LIKE ? OR phone LIKE ? OR social_security_number LIKE ?)""",
-            (user["sub"], like, like, f"%{q}%", f"%{q}%"),
+            (doctor_id, like, like, f"%{q}%", f"%{q}%"),
         )
         total_count = (await count_cursor.fetchone())[0]
 
@@ -57,19 +58,19 @@ async def list_patients(
                 FROM patients p WHERE p.doctor_id = ? AND p.is_active = 1
                 AND (lower(p.first_name) LIKE ? OR lower(p.last_name) LIKE ? OR p.phone LIKE ? OR p.social_security_number LIKE ?)
                 {order_clause} LIMIT ? OFFSET ?""",
-            (user["sub"], like, like, f"%{q}%", f"%{q}%", per_page, offset),
+            (doctor_id, like, like, f"%{q}%", f"%{q}%", per_page, offset),
         )
     else:
         count_cursor = await db.execute(
             "SELECT COUNT(*) FROM patients WHERE doctor_id = ? AND is_active = 1",
-            (user["sub"],),
+            (doctor_id,),
         )
         total_count = (await count_cursor.fetchone())[0]
 
         cursor = await db.execute(
             f"""SELECT p.*, (SELECT MAX(consultation_date) FROM consultations WHERE patient_id = p.id) AS last_visit
                 FROM patients p WHERE p.doctor_id = ? AND p.is_active = 1 {order_clause} LIMIT ? OFFSET ?""",
-            (user["sub"], per_page, offset),
+            (doctor_id, per_page, offset),
         )
 
     rows = await cursor.fetchall()
@@ -88,11 +89,7 @@ async def list_patients(
 
 
 @router.get("/new", response_class=HTMLResponse)
-async def new_patient_form(request: Request, next: str = ""):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def new_patient_form(request: Request, next: str = "", user: dict = Depends(require_login)):
     return templates.TemplateResponse(
         "patients/form.html",
         {"request": request, "user": user, "active": "patients", "patient": None, "error": None, "next": next},
@@ -105,17 +102,20 @@ async def quick_create_patient(
     first_name: str = Form(...),
     last_name: str = Form(...),
     date_of_birth: str = Form(...),
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     cursor = await db.execute(
         "INSERT INTO patients (doctor_id, first_name, last_name, date_of_birth) VALUES (?, ?, ?, ?)",
-        (user["sub"], first_name.strip(), last_name.strip(), date_of_birth),
+        (effective_doctor_id(user), first_name.strip(), last_name.strip(), date_of_birth),
     )
     await db.commit()
-    return JSONResponse(content={"id": cursor.lastrowid, "name": f"{last_name.upper()} {first_name}"})
+    new_id = cursor.lastrowid
+    await log_audit(
+        db, user, "patient_cree", entity_type="patient", entity_id=new_id,
+        patient_id=new_id, ip=client_ip(request), details="création rapide",
+    )
+    return JSONResponse(content={"id": new_id, "name": f"{last_name.upper()} {first_name}"})
 
 
 def _parse_int(v):
@@ -167,12 +167,9 @@ async def create_patient(
     gdpr_consent: str = Form(""),
     notes: str = Form(""),
     next_url: str = Form(""),
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     height_i = _parse_int(height_cm)
     weight_f = _parse_float(weight_kg)
     pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
@@ -192,7 +189,7 @@ async def create_patient(
                 pregnant, breastfeeding, current_medications, gdpr_consent, notes
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                user["sub"],
+                effective_doctor_id(user),
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
                 identity_document_type or None,
@@ -208,10 +205,17 @@ async def create_patient(
         )
         await db.commit()
         new_id = cur.lastrowid
+        await log_audit(
+            db, user, "patient_cree", entity_type="patient", entity_id=new_id,
+            patient_id=new_id, ip=client_ip(request),
+        )
         if next_url:
             sep = "&" if "?" in next_url else "?"
-            return RedirectResponse(url=f"{next_url}{sep}patient_id={new_id}", status_code=302)
-        return RedirectResponse(url=f"/patients/{new_id}", status_code=302)
+            response = RedirectResponse(url=f"{next_url}{sep}patient_id={new_id}", status_code=302)
+        else:
+            response = RedirectResponse(url=f"/patients/{new_id}", status_code=302)
+        set_flash(response, "Patient créé")
+        return response
     except Exception as e:
         error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {
@@ -239,23 +243,26 @@ async def create_patient(
         )
 
 
-@router.get("/{patient_id}", response_class=HTMLResponse)
+@router.get("/{patient_id}", response_class=HTMLResponse, dependencies=[Depends(deny_secretaire)])
 async def view_patient(
     request: Request,
     patient_id: int,
     consultation_id: Optional[int] = None,
     tab: str = "info",
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    doctor_id = effective_doctor_id(user)
+    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, doctor_id))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/patients", status_code=302)
     patient = dict(row)
+
+    await log_audit(
+        db, user, "patient_consulte", entity_type="patient", entity_id=patient_id,
+        patient_id=patient_id, ip=client_ip(request),
+    )
 
     cursor = await db.execute(
         "SELECT * FROM medical_history WHERE patient_id = ? ORDER BY date_recorded DESC", (patient_id,)
@@ -282,6 +289,11 @@ async def view_patient(
         "SELECT * FROM documents WHERE patient_id = ? ORDER BY created_at DESC LIMIT 20", (patient_id,)
     )
     documents = [dict(r) for r in await cursor.fetchall()]
+    previewable_exts = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+    for d in documents:
+        fp = d.get("file_path") or ""
+        d["file_name"] = os.path.basename(fp)
+        d["is_previewable"] = os.path.splitext(fp)[1].lower() in previewable_exts
 
     cursor = await db.execute(
         "SELECT * FROM feuilles_soin WHERE patient_id = ? ORDER BY created_at DESC LIMIT 30", (patient_id,)
@@ -293,7 +305,7 @@ async def view_patient(
     if consultation_id:
         cursor = await db.execute(
             "SELECT * FROM consultations WHERE id = ? AND patient_id = ? AND doctor_id = ? AND status = 'en_cours'",
-            (consultation_id, patient_id, user["sub"]),
+            (consultation_id, patient_id, doctor_id),
         )
         row = await cursor.fetchone()
         if row:
@@ -303,7 +315,7 @@ async def view_patient(
             """SELECT * FROM consultations
                WHERE patient_id = ? AND doctor_id = ? AND status = 'en_cours'
                ORDER BY created_at DESC LIMIT 1""",
-            (patient_id, user["sub"]),
+            (patient_id, doctor_id),
         )
         row = await cursor.fetchone()
         if row:
@@ -360,12 +372,13 @@ async def view_patient(
 
 
 @router.get("/{patient_id}/edit", response_class=HTMLResponse)
-async def edit_patient_form(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+async def edit_patient_form(
+    request: Request,
+    patient_id: int,
+    user: dict = Depends(require_login),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, effective_doctor_id(user)))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/patients", status_code=302)
@@ -411,12 +424,9 @@ async def update_patient(
     current_medications: str = Form(""),
     gdpr_consent: str = Form(""),
     notes: str = Form(""),
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     height_i = _parse_int(height_cm)
     weight_f = _parse_float(weight_kg)
     pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
@@ -448,11 +458,17 @@ async def update_patient(
                 profession or None, marital_status or None, height_i, weight_f,
                 smoking or None, alcohol or None,
                 pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None,
-                patient_id, user["sub"],
+                patient_id, effective_doctor_id(user),
             ),
         )
         await db.commit()
-        return RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
+        await log_audit(
+            db, user, "patient_modifie", entity_type="patient", entity_id=patient_id,
+            patient_id=patient_id, ip=client_ip(request),
+        )
+        response = RedirectResponse(url=f"/patients/{patient_id}", status_code=302)
+        set_flash(response, "Patient modifié")
+        return response
     except Exception as e:
         error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {"id": patient_id, "first_name": first_name, "last_name": last_name,
@@ -481,15 +497,22 @@ async def update_patient(
 
 
 @router.post("/{patient_id}/delete")
-async def delete_patient(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
+async def delete_patient(
+    request: Request,
+    patient_id: int,
+    user: dict = Depends(require_login),
+    db: aiosqlite.Connection = Depends(get_db),
+):
     # Soft delete
-    await db.execute("UPDATE patients SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    await db.execute("UPDATE patients SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?", (patient_id, effective_doctor_id(user)))
     await db.commit()
-    return RedirectResponse(url="/patients", status_code=302)
+    await log_audit(
+        db, user, "patient_supprime", entity_type="patient", entity_id=patient_id,
+        patient_id=patient_id, ip=client_ip(request),
+    )
+    response = RedirectResponse(url="/patients", status_code=302)
+    set_flash(response, "Patient supprimé")
+    return response
 
 
 @router.post("/{patient_id}/history", response_class=HTMLResponse)
@@ -500,12 +523,9 @@ async def add_history(
     description: str = Form(...),
     date_recorded: str = Form(""),
     consultation_id: Optional[int] = Form(None),
+    user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
     # Only the owning doctor may append history to a patient record.
     cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     if not await cursor.fetchone():
@@ -516,18 +536,74 @@ async def add_history(
         (patient_id, type, description, date_recorded or None, consultation_id),
     )
     await db.commit()
+    await log_audit(db, user, "antecedent_ajoute", entity_type="patient", entity_id=patient_id, patient_id=patient_id, ip=client_ip(request))
     redirect = f"/patients/{patient_id}?tab=info"
     if consultation_id:
         redirect += f"&consultation_id={consultation_id}"
-    return RedirectResponse(url=redirect, status_code=302)
+    resp = RedirectResponse(url=redirect, status_code=302)
+    set_flash(resp, "Antécédent ajouté")
+    return resp
 
 
-@router.get("/{patient_id}/brochure.pdf")
-async def patient_brochure_pdf(request: Request, patient_id: int, db: aiosqlite.Connection = Depends(get_db)):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
+@router.post("/{patient_id}/history/{history_id}/edit", response_class=HTMLResponse)
+async def edit_history(
+    request: Request,
+    patient_id: int,
+    history_id: int,
+    type: str = Form(...),
+    description: str = Form(...),
+    date_recorded: str = Form(""),
+    user: dict = Depends(require_login),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    # L'antécédent doit appartenir à un patient du praticien.
+    cursor = await db.execute(
+        """SELECT h.id FROM medical_history h JOIN patients p ON h.patient_id = p.id
+           WHERE h.id = ? AND h.patient_id = ? AND p.doctor_id = ?""",
+        (history_id, patient_id, user["sub"]),
+    )
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/patients", status_code=302)
+    if type not in ("medical", "surgical", "family", "allergy"):
+        type = "medical"
 
+    await db.execute(
+        "UPDATE medical_history SET type = ?, description = ?, date_recorded = ? WHERE id = ? AND patient_id = ?",
+        (type, description, date_recorded or None, history_id, patient_id),
+    )
+    await db.commit()
+    await log_audit(db, user, "antecedent_modifie", entity_type="patient", entity_id=patient_id, patient_id=patient_id, ip=client_ip(request))
+    resp = RedirectResponse(url=f"/patients/{patient_id}?tab=info", status_code=302)
+    set_flash(resp, "Antécédent modifié")
+    return resp
+
+
+@router.post("/{patient_id}/history/{history_id}/delete", response_class=HTMLResponse)
+async def delete_history(
+    request: Request,
+    patient_id: int,
+    history_id: int,
+    user: dict = Depends(require_login),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    cursor = await db.execute(
+        """SELECT h.id FROM medical_history h JOIN patients p ON h.patient_id = p.id
+           WHERE h.id = ? AND h.patient_id = ? AND p.doctor_id = ?""",
+        (history_id, patient_id, user["sub"]),
+    )
+    if not await cursor.fetchone():
+        return RedirectResponse(url="/patients", status_code=302)
+
+    await db.execute("DELETE FROM medical_history WHERE id = ? AND patient_id = ?", (history_id, patient_id))
+    await db.commit()
+    await log_audit(db, user, "antecedent_supprime", entity_type="patient", entity_id=patient_id, patient_id=patient_id, ip=client_ip(request))
+    resp = RedirectResponse(url=f"/patients/{patient_id}?tab=info", status_code=302)
+    set_flash(resp, "Antécédent supprimé")
+    return resp
+
+
+@router.get("/{patient_id}/brochure.pdf", dependencies=[Depends(deny_secretaire)])
+async def patient_brochure_pdf(request: Request, patient_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ? AND is_active = 1", (patient_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:

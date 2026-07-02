@@ -64,7 +64,14 @@ function copyReset() {
                 <tr>
                     <td><strong>{{ u.first_name }} {{ u.last_name }}</strong></td>
                     <td>{{ u.email }}</td>
-                    <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
+                    <td>
+                        <span class="badge badge-{{ u.role }}">{{ u.role }}</span>
+                        {% if u.role == 'secretaire' %}
+                        <div style="font-size:11px;color:var(--gray-500);margin-top:3px;">
+                            {% if u.linked_doctor_name %}liée à Dr {{ u.linked_doctor_name }}{% else %}⚠ aucun médecin lié{% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>{{ u.specialty or '—' }}</td>
                     <td>
                         {% if u.has_template %}

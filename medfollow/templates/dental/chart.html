@@ -763,6 +763,14 @@
     <div class="panel-body">
         <div>
             <div class="panel-section-label">Condition de la dent</div>
+            <div class="surface-picker" id="p-surface-picker">
+                <button type="button" class="surface-btn active" data-surface="" onclick="selectSurface('')" title="Dent entière">Dent entière</button>
+                <button type="button" class="surface-btn" data-surface="mesial" onclick="selectSurface('mesial')" title="Mésial">M</button>
+                <button type="button" class="surface-btn" data-surface="distal" onclick="selectSurface('distal')" title="Distal">D</button>
+                <button type="button" class="surface-btn" data-surface="occlusal" onclick="selectSurface('occlusal')" title="Occlusal">O</button>
+                <button type="button" class="surface-btn" data-surface="vestibulaire" onclick="selectSurface('vestibulaire')" title="Vestibulaire">V</button>
+                <button type="button" class="surface-btn" data-surface="lingual" onclick="selectSurface('lingual')" title="Lingual / Palatin">L</button>
+            </div>
             <select id="p-cond" class="panel-select">
                 <option value="sain">Sain</option>
                 <option value="carie">Carie</option>
@@ -778,44 +786,20 @@
             </select>
             <textarea id="p-notes" rows="3" placeholder="Notes cliniques..." class="panel-textarea"></textarea>
             <button onclick="saveCondition()" class="panel-btn-primary">Enregistrer la condition</button>
+            <div id="p-surface-summary" style="margin-top:10px;font-size:12px;color:#64748b;"></div>
             <div style="margin-top:10px;">
                 <button onclick="toggleConditionHistory()" id="btn-cond-hist" style="background:none;border:none;cursor:pointer;font-size:12px;color:#94a3b8;padding:0;">▶ Historique de la condition</button>
                 <div id="p-cond-history" style="display:none;margin-top:8px;"></div>
             </div>
         </div>
-        <div>
-            <div class="panel-section-label">Traitements</div>
-            <div id="p-treatments"></div>
-        </div>
-        <div class="panel-add-box">
-            <div class="panel-section-label">Ajouter un traitement</div>
-            <select id="new-t-type" class="panel-select">
-                <option value="Examen">Examen</option>
-                <option value="Détartrage">Détartrage</option>
-                <option value="Extraction">Extraction</option>
-                <option value="Obturation composite">Obturation composite</option>
-                <option value="Amalgame">Amalgame</option>
-                <option value="Traitement endodontique">Traitement endodontique</option>
-                <option value="Couronne">Couronne</option>
-                <option value="Couronne provisoire">Couronne provisoire</option>
-                <option value="Bridge">Bridge</option>
-                <option value="Implant">Implant</option>
-                <option value="Prothèse partielle">Prothèse partielle</option>
-                <option value="Prothèse totale">Prothèse totale</option>
-                <option value="Blanchiment">Blanchiment</option>
-                <option value="Orthodontie">Orthodontie</option>
-                <option value="Radiographie">Radiographie</option>
-                <option value="Autre">Autre</option>
-            </select>
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <input type="date" id="new-t-date" class="panel-select" style="flex:1;margin-bottom:0;">
-                <input type="time" id="new-t-time" class="panel-select" value="09:00" style="width:100px;margin-bottom:0;">
-            </div>
-            <textarea id="new-t-desc" rows="2" placeholder="Description (optionnel)..." class="panel-textarea"></textarea>
-            <button onclick="addTreatment()" class="panel-btn-dark">+ Ajouter le traitement</button>
-        </div>
     </div>
 </div>
+<style>
+.surface-picker { display:flex; gap:4px; margin-bottom:10px; flex-wrap:wrap; }
+.surface-btn { padding:5px 9px; border:1px solid #cbd5e1; background:#fff; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; color:#475569; }
+.surface-btn.active { background:#1c8cf8; color:#fff; border-color:#1c8cf8; }
+.surface-btn.has-cond { border-color:#f59e0b; }
+</style>
 
 <div id="toast"></div>
 
@@ -1169,27 +1153,57 @@ function buildChart() {
 }
 
 // ===== PANEL =====
+let currentSurface = '';       // '' = dent entière, sinon mesial/distal/...
+let surfaceData = {};          // { surface: {condition, notes} }
+const SURF_LABELS = { mesial:'M', distal:'D', occlusal:'O', vestibulaire:'V', lingual:'L' };
+
 function openPanel(toothNum) {
     currentTooth = toothNum;
     setSelectedTooth(toothNum);
     document.getElementById('p-num').textContent  = 'Dent ' + toothNum;
     document.getElementById('p-name').textContent = TOOTH_NAMES[toothNum] || '';
     const d = teethData[String(toothNum)] || {};
+    surfaceData = {};
+    currentSurface = '';
     document.getElementById('p-cond').value  = d.condition || 'sain';
     document.getElementById('p-notes').value = d.notes || '';
-    document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#94a3b8;font-size:13px;text-align:center;">Chargement...</div>';
     document.getElementById('panel').classList.add('open');
     document.getElementById('overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
     fetch(`/dental/${PATIENT_ID}/tooth/${toothNum}/data`)
         .then(r => r.json())
         .then(data => {
-            renderTreatments(data.treatments);
-            document.getElementById('new-t-date').value = new Date().toISOString().split('T')[0];
+            surfaceData = {};
+            (data.surfaces || []).forEach(s => { surfaceData[s.surface] = { condition: s.condition, notes: s.notes }; });
+            _renderSurfacePicker();
         })
-        .catch(() => {
-            document.getElementById('p-treatments').innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13px;">Erreur de chargement</div>';
-        });
+        .catch(() => {});
+}
+
+function _renderSurfacePicker() {
+    document.querySelectorAll('#p-surface-picker .surface-btn').forEach(btn => {
+        const s = btn.dataset.surface;
+        btn.classList.toggle('active', s === currentSurface);
+        btn.classList.toggle('has-cond', !!(s && surfaceData[s] && surfaceData[s].condition && surfaceData[s].condition !== 'sain'));
+    });
+    const parts = Object.keys(surfaceData)
+        .filter(s => surfaceData[s].condition && surfaceData[s].condition !== 'sain')
+        .map(s => `${SURF_LABELS[s] || s}: ${surfaceData[s].condition}`);
+    document.getElementById('p-surface-summary').textContent = parts.length ? ('Faces : ' + parts.join(' · ')) : '';
+}
+
+function selectSurface(surface) {
+    currentSurface = surface;
+    const d = teethData[String(currentTooth)] || {};
+    if (surface) {
+        const sd = surfaceData[surface] || {};
+        document.getElementById('p-cond').value = sd.condition || 'sain';
+        document.getElementById('p-notes').value = sd.notes || '';
+    } else {
+        document.getElementById('p-cond').value = d.condition || 'sain';
+        document.getElementById('p-notes').value = d.notes || '';
+    }
+    _renderSurfacePicker();
 }
 
 function closePanel() {
@@ -1243,44 +1257,6 @@ async function toggleConditionHistory() {
     }
 }
 
-const APPT_STATUS_LABELS = {
-    planifie: 'Planifié', confirme: 'Confirmé', en_cours: 'En cours',
-    termine: 'Terminé', annule: 'Annulé', absent: 'Absent'
-};
-
-function renderTreatments(list) {
-    const el = document.getElementById('p-treatments');
-    if (!list || list.length === 0) {
-        el.innerHTML = '<p style="padding:10px 0;color:#94a3b8;font-size:13px;text-align:center;">Aucun traitement enregistré</p>';
-        return;
-    }
-    const active = list.filter(t => !t.appt_status || t.appt_status !== 'termine');
-    const done   = list.filter(t => t.appt_status === 'termine');
-
-    const renderCard = t => {
-        const isDone = t.appt_status === 'termine';
-        const apptHtml = t.appt_status ? `<span class="appt-badge ${t.appt_status}">${APPT_STATUS_LABELS[t.appt_status] || t.appt_status}</span>` : '';
-        const dtLabel = t.appt_datetime ? t.appt_datetime.substring(0,16).replace('T',' ') : t.treatment_date;
-        return `
-        <div class="treatment-card${isDone ? ' is-done' : ''}">
-            <div style="flex:1;min-width:0;">
-                <div class="treatment-type">${escapeHtml(t.treatment_type)}</div>
-                ${t.description ? `<div class="treatment-desc">${escapeHtml(t.description)}</div>` : ''}
-                <div class="treatment-date">📅 ${escapeHtml(dtLabel)}</div>
-                ${apptHtml}
-            </div>
-            <button onclick="delTreatment(${t.id})" class="treatment-del">✕</button>
-        </div>`;
-    };
-
-    let html = active.map(renderCard).join('');
-    if (done.length > 0) {
-        html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-400);margin:12px 0 6px;padding-top:10px;border-top:1px solid var(--border);">Historique (${done.length})</div>`;
-        html += done.map(renderCard).join('');
-    }
-    el.innerHTML = html;
-}
-
 function escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1292,56 +1268,28 @@ async function saveCondition() {
     const notes     = document.getElementById('p-notes').value;
     const fd = new FormData();
     fd.append('condition', condition); fd.append('notes', notes);
+    if (currentSurface) fd.append('surface', currentSurface);
     try {
         const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/condition`, {method:'POST', body:fd});
         if (r.ok) {
-            teethData[String(currentTooth)] = {condition, notes};
-            const svg = document.getElementById('svg-chart');
-            const old = svg.querySelector(`[data-tooth="${currentTooth}"]`);
-            if (old) old.remove();
-            drawTooth(svg, currentTooth, getToothPos(currentTooth).x, getToothPos(currentTooth).y);
-            setSelectedTooth(currentTooth);
-            buildStats();
-            if (_setReactConditions) _setReactConditions(buildTeethConditions());
-            showToast('Condition enregistrée ✓');
+            if (currentSurface) {
+                // Condition par face : ne change pas la couleur « dent entière »
+                surfaceData[currentSurface] = {condition, notes};
+                _renderSurfacePicker();
+                showToast('Condition de face enregistrée ✓');
+            } else {
+                teethData[String(currentTooth)] = {condition, notes};
+                const svg = document.getElementById('svg-chart');
+                const old = svg.querySelector(`[data-tooth="${currentTooth}"]`);
+                if (old) old.remove();
+                drawTooth(svg, currentTooth, getToothPos(currentTooth).x, getToothPos(currentTooth).y);
+                setSelectedTooth(currentTooth);
+                buildStats();
+                if (_setReactConditions) _setReactConditions(buildTeethConditions());
+                showToast('Condition enregistrée ✓');
+            }
         } else { showToast('Erreur lors de l\'enregistrement'); }
     } catch (e) { showToast('Erreur réseau'); }
-}
-
-async function addTreatment() {
-    if (!currentTooth) return;
-    const fd = new FormData();
-    fd.append('treatment_type', document.getElementById('new-t-type').value);
-    fd.append('description',    document.getElementById('new-t-desc').value);
-    fd.append('treatment_date', document.getElementById('new-t-date').value);
-    fd.append('start_time',     document.getElementById('new-t-time').value || '09:00');
-    try {
-        const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment`, {method:'POST', body:fd});
-        if (r.ok) {
-            const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
-            renderTreatments(data.treatments);
-            document.getElementById('new-t-desc').value = '';
-            showToast('Traitement ajouté ✓');
-        } else { showToast('Erreur lors de l\'ajout'); }
-    } catch (e) { showToast('Erreur réseau'); }
-}
-
-function delTreatment(id) {
-    const doDelete = async () => {
-        try {
-            const r = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/treatment/${id}/delete`, {method:'POST', body:new FormData()});
-            if (r.ok) {
-                const data = await fetch(`/dental/${PATIENT_ID}/tooth/${currentTooth}/data`).then(x => x.json());
-                renderTreatments(data.treatments);
-                showToast('Traitement supprimé');
-            } else { showToast('Erreur lors de la suppression'); }
-        } catch (e) { showToast('Erreur réseau'); }
-    };
-    if (window.confirmAction) {
-        window.confirmAction('Supprimer ce traitement ?', doDelete);
-    } else {
-        if (confirm('Supprimer ce traitement ?')) doDelete();
-    }
 }
 
 function getToothPos(n) {

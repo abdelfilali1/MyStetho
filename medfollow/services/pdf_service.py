@@ -809,3 +809,178 @@ def generate_note_honoraires_pdf(
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
+
+
+def _amount_items_table(S, items):
+    """Tableau Désignation / Qté / Prix unit. / Total, avec ligne TOTAL. Renvoie (table, total)."""
+    cell = ParagraphStyle("_iCell", parent=S["_BodySm"], textColor=DARK, fontSize=9.5, leading=12)
+    head = [Paragraph(f"<b>{h}</b>", ParagraphStyle("_iH", parent=cell, textColor=WHITE))
+            for h in ("Désignation", "Qté", "Prix unit.", "Total")]
+    data = [head]
+    total = 0.0
+    for it in items:
+        try:
+            qty = float(it.get("quantity") or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        try:
+            unit = float(it.get("unit_price") or 0)
+        except (TypeError, ValueError):
+            unit = 0.0
+        line_total = float(it.get("total_price") or (qty * unit))
+        total += line_total
+        desc = str(it.get("description") or "")
+        teeth = it.get("tooth_numbers")
+        if teeth:
+            desc += f" <font color='#777777'>(dents {teeth})</font>"
+        data.append([
+            Paragraph(desc, cell),
+            Paragraph(f"{int(qty) if qty == int(qty) else qty}", ParagraphStyle("_iQ", parent=cell, alignment=TA_CENTER)),
+            Paragraph(f"{unit:.2f} DH", ParagraphStyle("_iU", parent=cell, alignment=TA_RIGHT)),
+            Paragraph(f"{line_total:.2f} DH", ParagraphStyle("_iT", parent=cell, alignment=TA_RIGHT)),
+        ])
+    data.append([
+        "", "", Paragraph("<b>TOTAL</b>", ParagraphStyle("_iTL", parent=cell, alignment=TA_RIGHT)),
+        Paragraph(f"<b>{total:.2f} DH</b>", ParagraphStyle("_iTV", parent=cell, alignment=TA_RIGHT)),
+    ])
+    tbl = Table(data, colWidths=[97 * mm, 18 * mm, 28 * mm, 28 * mm])
+    tstyle = [
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -2), 0.3, BORDER),
+        ("LINEABOVE", (0, -1), (-1, -1), 1.2, DARK),
+        ("SPAN", (0, -1), (1, -1)),
+    ]
+    for i in range(1, len(data) - 1):
+        if i % 2 == 0:
+            tstyle.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+    tbl.setStyle(TableStyle(tstyle))
+    return tbl, total
+
+
+def generate_invoice_pdf(
+    invoice: dict, items: list, payments: list,
+    doctor_name: str = "", specialty: str = "", template_path: Optional[str] = None,
+) -> bytes:
+    """Facture imprimable / téléchargeable (item 14)."""
+    use_tpl = _has_template(template_path)
+    buf = io.BytesIO()
+    doc = _doc_for(buf, template_path)
+    S = _styles()
+
+    def _page(canv, d):
+        return
+
+    els = []
+    if not use_tpl and doctor_name:
+        els.append(Paragraph(doctor_name, ParagraphStyle("_fDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
+        if specialty:
+            els.append(Paragraph(specialty, ParagraphStyle("_fSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
+        els.append(Spacer(1, 12))
+
+    els.append(Paragraph("FACTURE", ParagraphStyle("_fTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=16, textColor=DARK, leading=20)))
+    els.append(Paragraph(f"N° {invoice.get('invoice_number') or '—'}", ParagraphStyle("_fSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
+    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+
+    date_str = invoice.get("invoice_date") or ""
+    meta = Table([[f"Patient : {invoice.get('patient_name') or '—'}", f"Date : {date_str}"]], colWidths=[105 * mm, 66 * mm])
+    meta.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10), ("TEXTCOLOR", (0, 0), (-1, -1), GRAY),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    els.append(meta)
+    els.append(Spacer(1, 10))
+
+    tbl, total = _amount_items_table(S, items)
+    els.append(tbl)
+
+    try:
+        paid = float(invoice.get("paid_amount") or 0)
+    except (TypeError, ValueError):
+        paid = 0.0
+    due = max(0.0, total - paid)
+    els.append(Spacer(1, 10))
+    recap = Table([
+        [Paragraph("Payé", S["_BodySm"]), Paragraph(f"{paid:.2f} DH", ParagraphStyle("_rP", parent=S["_BodySm"], alignment=TA_RIGHT))],
+        [Paragraph("<b>Reste dû</b>", S["_BodySm"]), Paragraph(f"<b>{due:.2f} DH</b>", ParagraphStyle("_rD", parent=S["_BodySm"], alignment=TA_RIGHT))],
+    ], colWidths=[143 * mm, 28 * mm])
+    recap.setStyle(TableStyle([("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+    els.append(recap)
+
+    if invoice.get("notes"):
+        els.append(Spacer(1, 10))
+        els.append(Paragraph(f"<b>Notes :</b> {invoice.get('notes')}", S["_BodySm"]))
+
+    els.append(Spacer(1, 30))
+    sig = Table([[
+        Paragraph("Date", ParagraphStyle("_s1", parent=S["_BodySm"], alignment=TA_CENTER)),
+        Paragraph("Cachet et signature du praticien", ParagraphStyle("_s2", parent=S["_BodySm"], alignment=TA_CENTER)),
+    ]], colWidths=[85 * mm, 86 * mm])
+    sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY), ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY), ("TOPPADDING", (0, 0), (-1, -1), 6)]))
+    els.append(sig)
+
+    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out
+
+
+def generate_devis_pdf(
+    devis: dict, items: list,
+    doctor_name: str = "", specialty: str = "", template_path: Optional[str] = None,
+) -> bytes:
+    """Devis / plan de traitement chiffré imprimable (item 21)."""
+    use_tpl = _has_template(template_path)
+    buf = io.BytesIO()
+    doc = _doc_for(buf, template_path)
+    S = _styles()
+
+    def _page(canv, d):
+        return
+
+    els = []
+    if not use_tpl and doctor_name:
+        els.append(Paragraph(doctor_name, ParagraphStyle("_dDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
+        if specialty:
+            els.append(Paragraph(specialty, ParagraphStyle("_dSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
+        els.append(Spacer(1, 12))
+
+    els.append(Paragraph("DEVIS — PLAN DE TRAITEMENT", ParagraphStyle("_dTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=16, textColor=DARK, leading=20)))
+    els.append(Paragraph(f"N° {devis.get('devis_number') or '—'}", ParagraphStyle("_dSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
+    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+
+    date_str = devis.get("devis_date") or ""
+    meta = Table([[f"Patient : {devis.get('patient_name') or '—'}", f"Date : {date_str}"]], colWidths=[105 * mm, 66 * mm])
+    meta.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10), ("TEXTCOLOR", (0, 0), (-1, -1), GRAY),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    els.append(meta)
+    if devis.get("valid_until"):
+        els.append(Paragraph(f"Valable jusqu'au {devis.get('valid_until')}", ParagraphStyle("_dVal", parent=S["_BodySm"], textColor=GRAY, spaceBefore=2)))
+    els.append(Spacer(1, 10))
+
+    tbl, total = _amount_items_table(S, items)
+    els.append(tbl)
+
+    if devis.get("notes"):
+        els.append(Spacer(1, 10))
+        els.append(Paragraph(f"<b>Notes :</b> {devis.get('notes')}", S["_BodySm"]))
+
+    els.append(Spacer(1, 26))
+    els.append(Paragraph("Bon pour accord (le patient)", ParagraphStyle("_dBon", parent=S["_BodySm"], fontName="Helvetica-Bold")))
+    els.append(Spacer(1, 24))
+    sig = Table([[
+        Paragraph("Date et signature du patient", ParagraphStyle("_ds1", parent=S["_BodySm"], alignment=TA_CENTER)),
+        Paragraph("Cachet et signature du praticien", ParagraphStyle("_ds2", parent=S["_BodySm"], alignment=TA_CENTER)),
+    ]], colWidths=[85 * mm, 86 * mm])
+    sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY), ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY), ("TOPPADDING", (0, 0), (-1, -1), 6)]))
+    els.append(sig)
+
+    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Devis — Doctivo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Devis / plans de traitement</h2>
+        <p class="subtitle">Chiffrage prévisionnel — proposé, accepté, converti en facture.</p>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <a href="/invoices" class="btn btn-outline">Factures</a>
+        <a href="/invoices/devis/new" class="btn btn-primary">+ Nouveau devis</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header" style="padding-bottom:0;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% set tabs = [('', 'Tous'), ('propose','Proposés'), ('accepte','Acceptés'), ('refuse','Refusés'), ('converti','Convertis')] %}
+            {% for key, label in tabs %}
+            <a href="/invoices/devis{{ '?status=' ~ key if key }}" class="tab" style="padding:8px 14px;text-decoration:none;border-radius:8px 8px 0 0;{{ 'background:var(--primary-light);color:var(--primary-dark);font-weight:600;' if selected_status == key or (not selected_status and not key) else 'color:var(--gray-500);' }}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if devis %}
+        <table class="table">
+            <thead>
+                <tr><th>N°</th><th>Date</th><th>Patient</th><th>Montant</th><th>Validité</th><th>Statut</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for d in devis %}
+                <tr>
+                    <td><strong>{{ d.devis_number }}</strong></td>
+                    <td>{{ d.devis_date }}</td>
+                    <td><a href="/patients/{{ d.patient_id }}">{{ d.patient_name }}</a></td>
+                    <td><strong>{{ '%.2f' | format(d.total_amount) }} DH</strong></td>
+                    <td>{{ d.valid_until or '—' }}</td>
+                    <td>
+                        {% set badge = {'propose':'planifie','accepte':'confirme','refuse':'annule','converti':'en_cours'}.get(d.status, 'planifie') %}
+                        <span class="badge badge-{{ badge }}">{{ status_labels.get(d.status, d.status) }}</span>
+                    </td>
+                    <td><a href="/invoices/devis/{{ d.id }}" class="btn btn-outline btn-sm">Ouvrir</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state" style="padding:24px;text-align:center;color:var(--gray-500);">Aucun devis. <a href="/invoices/devis/new">Créer le premier devis</a>.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
