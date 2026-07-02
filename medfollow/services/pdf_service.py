@@ -830,6 +830,9 @@ def _amount_items_table(S, items):
         line_total = float(it.get("total_price") or (qty * unit))
         total += line_total
         desc = str(it.get("description") or "")
+        code = it.get("code")
+        if code:
+            desc = f"<b>{code}</b> — {desc}"
         teeth = it.get("tooth_numbers")
         if teeth:
             desc += f" <font color='#777777'>(dents {teeth})</font>"

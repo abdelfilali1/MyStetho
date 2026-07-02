@@ -767,4 +767,11 @@ async def init_db():
     except Exception:
         pass
 
+    # Migration: code NGAP sur les lignes de devis (devis calqué sur la mutuelle NGAP)
+    try:
+        await db.execute("ALTER TABLE devis_items ADD COLUMN code TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     await db.close()

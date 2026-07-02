@@ -1,6 +1,7 @@
 import io
+import json
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 from datetime import date, timedelta
@@ -42,6 +43,12 @@ async def _doctor_pdf_ctx(db, doctor_id: int):
 # Factures
 # ─────────────────────────────────────────────────────────────
 @router.get("/", response_class=HTMLResponse)
+async def facturation_home(request: Request, user: dict = Depends(require_login)):
+    # Le module Facturation s'ouvre directement sur les devis / plans de traitement.
+    return RedirectResponse(url="/invoices/devis", status_code=302)
+
+
+@router.get("/factures", response_class=HTMLResponse)
 async def list_invoices(
     request: Request,
     status: Optional[str] = None,
@@ -187,7 +194,7 @@ async def create_invoice(request: Request, user: dict = Depends(require_login), 
 
     cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
     if not await cursor.fetchone():
-        return RedirectResponse(url="/invoices", status_code=302)
+        return RedirectResponse(url="/invoices/factures", status_code=302)
     doctor_id = user["sub"]
     today = date.today()
 
@@ -269,18 +276,70 @@ async def list_devis(request: Request, status: Optional[str] = None, user: dict 
     )
 
 
+async def _ngap_acts(db) -> list:
+    """Catalogue NGAP (identique à la mutuelle) : code, libellé, montant calculé."""
+    cur = await db.execute(
+        "SELECT code, categorie, libelle, lettre, cotation, cotation_bis, valeure_lettre, remarques "
+        "FROM ngap_acts ORDER BY categorie, code"
+    )
+    return [
+        {
+            "code": r["code"], "categorie": r["categorie"], "libelle": r["libelle"],
+            "lettre": r["lettre"], "cotation": r["cotation"], "valeure_lettre": r["valeure_lettre"],
+            "montant": round((r["cotation"] or 0) * (r["valeure_lettre"] or 0), 2),
+        }
+        for r in await cur.fetchall()
+    ]
+
+
 @router.get("/devis/new", response_class=HTMLResponse)
 async def new_devis_form(request: Request, patient_id: Optional[int] = None, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     uid = user["sub"]
     cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,))
     patients = [dict(r) for r in await cursor.fetchall()]
-    cursor = await db.execute("SELECT * FROM medical_acts ORDER BY code")
-    acts = [dict(r) for r in await cursor.fetchall()]
+    acts = await _ngap_acts(db)
+    categories = sorted(set(a["categorie"] for a in acts if a["categorie"]))
     default_valid = (date.today() + timedelta(days=30)).isoformat()
     return templates.TemplateResponse(
         "invoices/devis_form.html",
-        {"request": request, "user": user, "active": "invoices", "patients": patients, "acts": acts, "selected_patient_id": patient_id, "default_valid": default_valid},
+        {
+            "request": request, "user": user, "active": "invoices", "patients": patients,
+            "acts_json": json.dumps(acts, ensure_ascii=False), "categories": categories,
+            "total_acts": len(acts), "selected_patient_id": patient_id, "default_valid": default_valid,
+        },
     )
+
+
+@router.post("/devis/acts/new")
+async def add_custom_act(request: Request, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+    """Ajoute un acte personnalisé au catalogue NGAP pour réutilisation ultérieure."""
+    data = await request.json()
+    code = (data.get("code") or "").strip().upper()
+    libelle = (data.get("libelle") or "").strip()
+    try:
+        montant = round(float(data.get("montant") or 0), 2)
+    except (TypeError, ValueError):
+        montant = 0.0
+    lettre = (data.get("lettre") or "D").strip()[:3] or "D"
+    if not code or not libelle:
+        return JSONResponse(status_code=400, content={"error": "Code et libellé obligatoires"})
+
+    cur = await db.execute("SELECT 1 FROM ngap_acts WHERE code = ?", (code,))
+    if await cur.fetchone():
+        return JSONResponse(status_code=409, content={"error": "Ce code existe déjà"})
+
+    # Stocké comme un acte NGAP : montant = cotation × 1 (valeure_lettre=1)
+    await db.execute(
+        "INSERT INTO ngap_acts (code, categorie, libelle, lettre, cotation, cotation_bis, valeure_lettre, remarques) "
+        "VALUES (?, 'Actes personnalisés', ?, ?, ?, 0, 1, 'Ajouté par le praticien')",
+        (code, libelle, lettre, montant),
+    )
+    await db.commit()
+    await log_audit(db, user, "acte_personnalise_ajoute", entity_type="ngap_act", ip=client_ip(request), details=f"{code} — {libelle}")
+    return JSONResponse(content={
+        "code": code, "categorie": "Actes personnalisés", "libelle": libelle,
+        "lettre": lettre, "cotation": montant, "valeure_lettre": 1, "montant": montant,
+    })
 
 
 @router.post("/devis/new")
@@ -304,11 +363,11 @@ async def create_devis(request: Request, user: dict = Depends(require_login), db
         if desc.strip():
             qty = int(form.get(f"item_qty_{idx}", "1") or "1")
             price = float(form.get(f"item_price_{idx}", "0") or "0")
-            act_id = form.get(f"item_act_id_{idx}")
+            code = (form.get(f"item_code_{idx}", "") or "").strip() or None
             teeth = form.get(f"item_teeth_{idx}", "") or None
             item_total = qty * price
             total += item_total
-            items.append((desc, qty, price, item_total, int(act_id) if act_id else None, teeth))
+            items.append((desc, qty, price, item_total, code, teeth))
         idx += 1
 
     from aiosqlite import IntegrityError
@@ -330,10 +389,10 @@ async def create_devis(request: Request, user: dict = Depends(require_login), db
     if devis_id is None:
         return HTMLResponse("Erreur: impossible de générer un numéro de devis unique.", status_code=500)
 
-    for desc, qty, price, item_total, act_id, teeth in items:
+    for desc, qty, price, item_total, code, teeth in items:
         await db.execute(
-            "INSERT INTO devis_items (devis_id, medical_act_id, description, quantity, unit_price, total_price, tooth_numbers) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (devis_id, act_id, desc, qty, price, item_total, teeth),
+            "INSERT INTO devis_items (devis_id, medical_act_id, description, quantity, unit_price, total_price, tooth_numbers, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (devis_id, None, desc, qty, price, item_total, teeth, code),
         )
     await db.commit()
     await log_audit(db, user, "devis_cree", entity_type="devis", entity_id=devis_id, patient_id=patient_id, ip=client_ip(request))
@@ -420,6 +479,8 @@ async def convert_devis(request: Request, devis_id: int, user: dict = Depends(re
 
     for it in ditems:
         desc = it["description"]
+        if it.get("code"):
+            desc = f"{it['code']} — {desc}"
         if it.get("tooth_numbers"):
             desc += f" (dents {it['tooth_numbers']})"
         await db.execute(
@@ -462,7 +523,7 @@ async def invoice_pdf(request: Request, invoice_id: int, user: dict = Depends(re
     )
     row = await cursor.fetchone()
     if not row:
-        return RedirectResponse(url="/invoices", status_code=302)
+        return RedirectResponse(url="/invoices/factures", status_code=302)
     invoice = dict(row)
     cursor = await db.execute("SELECT * FROM invoice_items WHERE invoice_id = ?", (invoice_id,))
     items = [dict(r) for r in await cursor.fetchall()]
@@ -483,7 +544,7 @@ async def view_invoice(request: Request, invoice_id: int, user: dict = Depends(r
     )
     row = await cursor.fetchone()
     if not row:
-        return RedirectResponse(url="/invoices", status_code=302)
+        return RedirectResponse(url="/invoices/factures", status_code=302)
     invoice = dict(row)
     cursor = await db.execute("SELECT * FROM invoice_items WHERE invoice_id = ? ", (invoice_id,))
     items = [dict(r) for r in await cursor.fetchall()]
@@ -501,7 +562,7 @@ async def cancel_invoice(request: Request, invoice_id: int, user: dict = Depends
     cursor = await db.execute("SELECT id, patient_id FROM invoices WHERE id = ? AND doctor_id = ?", (invoice_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
-        return RedirectResponse(url="/invoices", status_code=302)
+        return RedirectResponse(url="/invoices/factures", status_code=302)
     await db.execute("UPDATE invoices SET status = 'annulee', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (invoice_id,))
     await db.commit()
     await log_audit(db, user, "facture_annulee", entity_type="invoice", entity_id=invoice_id, patient_id=row[1], ip=client_ip(request))
@@ -523,7 +584,7 @@ async def add_payment(
     cursor = await db.execute("SELECT total_amount, patient_id FROM invoices WHERE id = ? AND doctor_id = ?", (invoice_id, user["sub"]))
     inv = await cursor.fetchone()
     if not inv:
-        return RedirectResponse(url="/invoices", status_code=302)
+        return RedirectResponse(url="/invoices/factures", status_code=302)
     total_amount = inv[0]
 
     await db.execute(

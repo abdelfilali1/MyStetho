@@ -62,11 +62,11 @@
 <div class="card" style="margin-bottom: 12px;">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <a href="/invoices" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline' }}">Toutes</a>
-            <a href="/invoices?status=brouillon" class="btn btn-sm {{ 'btn-primary' if selected_status == 'brouillon' else 'btn-outline' }}">Brouillons</a>
-            <a href="/invoices?status=emise" class="btn btn-sm {{ 'btn-primary' if selected_status == 'emise' else 'btn-outline' }}">Émises</a>
-            <a href="/invoices?status=payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'payee' else 'btn-outline' }}">Payées</a>
-            <a href="/invoices?status=partiellement_payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'partiellement_payee' else 'btn-outline' }}">Part. payées</a>
+            <a href="/invoices/factures" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline' }}">Toutes</a>
+            <a href="/invoices/factures?status=brouillon" class="btn btn-sm {{ 'btn-primary' if selected_status == 'brouillon' else 'btn-outline' }}">Brouillons</a>
+            <a href="/invoices/factures?status=emise" class="btn btn-sm {{ 'btn-primary' if selected_status == 'emise' else 'btn-outline' }}">Émises</a>
+            <a href="/invoices/factures?status=payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'payee' else 'btn-outline' }}">Payées</a>
+            <a href="/invoices/factures?status=partiellement_payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'partiellement_payee' else 'btn-outline' }}">Part. payées</a>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
             {% if (date_from is defined and date_from) or (date_to is defined and date_to) %}
@@ -107,17 +107,17 @@
 
         {% if total_pages is defined and total_pages > 1 %}
         <div class="pagination">
-            <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
+            <a href="/invoices/factures?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page - 1 }}" class="{{ 'disabled' if page <= 1 }}">← Préc.</a>
             {% for p_num in range(1, total_pages + 1) %}
                 {% if p_num == page %}
                 <span class="active">{{ p_num }}</span>
                 {% elif p_num <= 3 or p_num > total_pages - 2 or (p_num >= page - 1 and p_num <= page + 1) %}
-                <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ p_num }}">{{ p_num }}</a>
+                <a href="/invoices/factures?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ p_num }}">{{ p_num }}</a>
                 {% elif p_num == 4 or p_num == total_pages - 2 %}
                 <span>…</span>
                 {% endif %}
             {% endfor %}
-            <a href="/invoices?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
+            <a href="/invoices/factures?status={{ selected_status or '' }}&date_from={{ date_from if date_from is defined else '' }}&date_to={{ date_to if date_to is defined else '' }}&page={{ page + 1 }}" class="{{ 'disabled' if page >= total_pages }}">Suiv. →</a>
         </div>
         {% endif %}
         {% else %}
@@ -130,7 +130,7 @@
 <div id="date-filter-modal" style="display:none;position:fixed;inset:0;background:rgba(5,17,33,0.5);z-index:3000;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
     <div style="background:#fff;border-radius:16px;padding:24px;width:360px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,0.25);">
         <h3 style="margin:0 0 16px;font-size:16px;color:var(--gray-900);">Filtrer par date</h3>
-        <form method="GET" action="/invoices">
+        <form method="GET" action="/invoices/factures">
             {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
             <div class="form-group" style="margin-bottom:12px;">
                 <label style="font-size:13px;color:var(--gray-600);margin-bottom:4px;display:block;">Date début</label>

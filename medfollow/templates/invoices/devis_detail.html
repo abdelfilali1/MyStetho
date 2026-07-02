@@ -56,10 +56,11 @@
     <div class="card-header"><h3>Détail du devis</h3></div>
     <div class="card-body" style="padding:0;">
         <table class="table">
-            <thead><tr><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
+            <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
             <tbody>
                 {% for item in items %}
                 <tr>
+                    <td>{% if item.code %}<span style="font-family:monospace;font-weight:700;">{{ item.code }}</span>{% else %}—{% endif %}</td>
                     <td>{{ item.description }}</td>
                     <td>{{ item.tooth_numbers or '—' }}</td>
                     <td>{{ item.quantity }}</td>
@@ -70,7 +71,7 @@
             </tbody>
             <tfoot>
                 <tr style="border-top:2px solid var(--gray-300);">
-                    <td colspan="4" style="text-align:right;font-weight:700;">Total</td>
+                    <td colspan="5" style="text-align:right;font-weight:700;">Total</td>
                     <td style="font-weight:700;font-size:16px;">{{ '%.2f' | format(devis.total_amount) }} DH</td>
                 </tr>
             </tfoot>

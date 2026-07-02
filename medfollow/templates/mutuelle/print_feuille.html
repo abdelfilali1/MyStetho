@@ -73,7 +73,19 @@ function buildToothMap(soins) {
 function evalIdx(expr, idx) {
     const e = expr.replace(/idx/g, String(idx)).trim();
     if (!/^[0-9+\-*/().?:><=\s]+$/.test(e)) return null;
-    try { const v = Function('"use strict";return('+e+');')(); return typeof v === 'number' && isFinite(v) ? String(v) : null; } catch { return null; }
+    // Sans eval/Function (CSP sans 'unsafe-eval' bloque Function() → superposition des lignes)
+    try { const v = _evalArith(e); return (typeof v === 'number' && isFinite(v)) ? String(v) : null; } catch { return null; }
+}
+function _evalArith(str) {
+    let i = 0;
+    function ws() { while (i < str.length && str[i] === ' ') i++; }
+    function parseNumber() { ws(); const j = i; while (i < str.length && /[0-9.]/.test(str[i])) i++; return parseFloat(str.slice(j, i)); }
+    function primary() { ws(); if (str[i] === '(') { i++; const v = ternary(); ws(); if (str[i] === ')') i++; return v; } return parseNumber(); }
+    function mul() { let v = primary(); for (;;) { ws(); const c = str[i]; if (c === '*') { i++; v *= primary(); } else if (c === '/') { i++; v /= primary(); } else break; } return v; }
+    function add() { let v = mul(); for (;;) { ws(); const c = str[i]; if (c === '+') { i++; v += mul(); } else if (c === '-') { i++; v -= mul(); } else break; } return v; }
+    function cmp() { let v = add(); ws(); const c = str[i]; if (c === '>') { i++; if (str[i] === '=') { i++; return v >= add() ? 1 : 0; } return v > add() ? 1 : 0; } if (c === '<') { i++; if (str[i] === '=') { i++; return v <= add() ? 1 : 0; } return v < add() ? 1 : 0; } return v; }
+    function ternary() { const cond = cmp(); ws(); if (str[i] === '?') { i++; const a = ternary(); ws(); if (str[i] === ':') i++; const b = ternary(); return cond ? a : b; } return cond; }
+    return ternary();
 }
 function renderVerso(svgTmpl, soins) {
     let s = stripScript(svgTmpl);

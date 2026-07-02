@@ -1145,7 +1145,22 @@ function buildToothMap(soins) {
 function evalIdx(expr, idx) {
     const e = expr.replace(/idx/g, String(idx)).trim();
     if (!/^[0-9+\-*/().?:><=\s]+$/.test(e)) return null;
-    try { const v = Function('"use strict";return('+e+');')(); return typeof v==='number'&&isFinite(v)?String(v):null; } catch { return null; }
+    // Évaluateur arithmétique sûr (SANS eval/Function) : la CSP de l'app n'autorise
+    // pas 'unsafe-eval', donc Function() était bloqué en navigateur → toutes les
+    // lignes d'actes retombaient à translate(0,0) et se superposaient.
+    try { const v = _evalArith(e); return (typeof v === 'number' && isFinite(v)) ? String(v) : null; } catch { return null; }
+}
+// Parseur récursif : nombres, + - * /, parenthèses, comparaisons > < >= <=, ternaire ?:
+function _evalArith(str) {
+    let i = 0;
+    function ws() { while (i < str.length && str[i] === ' ') i++; }
+    function parseNumber() { ws(); const j = i; while (i < str.length && /[0-9.]/.test(str[i])) i++; return parseFloat(str.slice(j, i)); }
+    function primary() { ws(); if (str[i] === '(') { i++; const v = ternary(); ws(); if (str[i] === ')') i++; return v; } return parseNumber(); }
+    function mul() { let v = primary(); for (;;) { ws(); const c = str[i]; if (c === '*') { i++; v *= primary(); } else if (c === '/') { i++; v /= primary(); } else break; } return v; }
+    function add() { let v = mul(); for (;;) { ws(); const c = str[i]; if (c === '+') { i++; v += mul(); } else if (c === '-') { i++; v -= mul(); } else break; } return v; }
+    function cmp() { let v = add(); ws(); const c = str[i]; if (c === '>') { i++; if (str[i] === '=') { i++; return v >= add() ? 1 : 0; } return v > add() ? 1 : 0; } if (c === '<') { i++; if (str[i] === '=') { i++; return v <= add() ? 1 : 0; } return v < add() ? 1 : 0; } return v; }
+    function ternary() { const cond = cmp(); ws(); if (str[i] === '?') { i++; const a = ternary(); ws(); if (str[i] === ':') i++; const b = ternary(); return cond ? a : b; } return cond; }
+    return ternary();
 }
 function renderVerso(svgTmpl, soins) {
     let s = stripScript(svgTmpl);
@@ -1166,6 +1181,18 @@ function renderVerso(svgTmpl, soins) {
     const tm = buildToothMap(soins);
     s = s.replace(/display=\{showArray\[(\d+)\]\s*\?\s*'inline'\s*:\s*'none'\}/g,
         (_,t)=>`display="${tm.has(t)?'inline':'none'}"`);
+    // Codes par dent : un code par ligne (sinon superposition quand une dent porte plusieurs actes)
+    s = s.replace(/(<tspan\b[^>]*\bx="([0-9.]+)"[^>]*>)\s*(\d+)\s*:\s*\{showTextArray\[(\d+)\]\.join\(" "\)\}(<\/tspan>)/g,
+        (m, open, x, lbl, t, close) => {
+            const codes = tm.get(t) || [];
+            const head = escHtml(lbl) + ' : ';
+            if (codes.length <= 1) return open + head + escHtml(codes.join('')) + close;
+            const first = head + escHtml(codes[0]);
+            const cx = (parseFloat(x) + 6).toFixed(3); // aligné sous le 1er code
+            const rest = codes.slice(1).map(c => `<tspan x="${cx}" dy="2.3">${escHtml(c)}</tspan>`).join('');
+            return open + first + rest + close;
+        });
+    // Sécurité : tout placeholder showTextArray restant garde le comportement d'origine
     s = s.replace(/\{showTextArray\[(\d+)\]\.join\(" "\)\}/g,
         (_,t)=>escHtml((tm.get(t)||[]).join(' ')));
     return s;
