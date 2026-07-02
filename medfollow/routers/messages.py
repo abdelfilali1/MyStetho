@@ -1,16 +1,22 @@
-from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+"""Messagerie façon SMS/chat : liste de contacts à gauche, conversation à droite,
+envoi de messages en fil continu. Le cloisonnement reste strict (dentiste ↔ sa
+secrétaire ; les admins joignables). Notifications via le badge global + toasts."""
 from typing import Optional
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 import aiosqlite
 
 from config import TEMPLATES_DIR
 from database.connection import get_db
-from routers.deps import require_login, require_login_api, effective_doctor_id, set_flash
+from routers.deps import require_login, require_login_api
 from services.audit import log_audit, client_ip
 
 router = APIRouter(prefix="/messages")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+ROLE_LABELS = {"medecin": "Médecin", "secretaire": "Secrétaire", "admin": "Admin"}
 
 
 async def _allowed_recipients(db: aiosqlite.Connection, user: dict) -> list:
@@ -32,9 +38,7 @@ async def _allowed_recipients(db: aiosqlite.Connection, user: dict) -> list:
 
     if role == "secretaire":
         # Relire linked_doctor_id en base : le JWT peut être obsolète.
-        cursor = await db.execute(
-            "SELECT linked_doctor_id FROM users WHERE id = ?", (user["sub"],)
-        )
+        cursor = await db.execute("SELECT linked_doctor_id FROM users WHERE id = ?", (user["sub"],))
         row = await cursor.fetchone()
         linked_id = row["linked_doctor_id"] if row else None
         if not linked_id:
@@ -56,30 +60,74 @@ async def _allowed_recipients(db: aiosqlite.Connection, user: dict) -> list:
     return [dict(r) for r in await cursor.fetchall()]
 
 
+def _display_name(first: str, last: str, role: str) -> str:
+    name = f"{(first or '').strip()} {(last or '').strip()}".strip()
+    if role in ("medecin", "admin"):
+        return f"Dr {name}" if name else "Praticien"
+    return name or "Utilisateur"
+
+
+def _initials(first: str, last: str) -> str:
+    a = (first or " ").strip()[:1]
+    b = (last or " ").strip()[:1]
+    return (a + b).upper() or "?"
+
+
+async def _contacts_with_meta(db: aiosqlite.Connection, user: dict) -> list:
+    """Liste des contacts autorisés + dernier message et nombre de non-lus."""
+    uid = user["sub"]
+    contacts = await _allowed_recipients(db, user)
+    out = []
+    for c in contacts:
+        cid = c["id"]
+        cur = await db.execute(
+            """SELECT body, created_at, sender_id FROM messages
+               WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+               ORDER BY created_at DESC, id DESC LIMIT 1""",
+            (uid, cid, cid, uid),
+        )
+        last = await cur.fetchone()
+        cur = await db.execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE sender_id = ? AND recipient_id = ? AND is_read = 0",
+            (cid, uid),
+        )
+        unread = (await cur.fetchone())["n"]
+        out.append({
+            "id": cid,
+            "name": _display_name(c["first_name"], c["last_name"], c["role"]),
+            "role": c["role"],
+            "role_label": ROLE_LABELS.get(c["role"], c["role"]),
+            "initials": _initials(c["first_name"], c["last_name"]),
+            "last_body": last["body"] if last else "",
+            "last_at": last["created_at"] if last else None,
+            "last_mine": bool(last and last["sender_id"] == uid),
+            "unread": unread,
+        })
+    # Conversations les plus récentes en premier ; contacts sans échange à la fin.
+    out.sort(key=lambda x: (x["last_at"] or ""), reverse=True)
+    return out
+
+
 @router.get("/", response_class=HTMLResponse)
-async def inbox(
+async def chat_home(
     request: Request,
+    to: Optional[int] = None,
     user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    # Received messages
-    cursor = await db.execute(
-        """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name, p.first_name || ' ' || p.last_name AS patient_name FROM messages m JOIN users u ON m.sender_id = u.id LEFT JOIN patients p ON m.patient_id = p.id WHERE m.recipient_id = ? AND m.parent_message_id IS NULL ORDER BY m.created_at DESC""",
-        (user["sub"],),
-    )
-    received = [dict(r) for r in await cursor.fetchall()]
-
-    # Sent messages
-    cursor = await db.execute(
-        """SELECT m.*, u.first_name || ' ' || u.last_name AS recipient_name, p.first_name || ' ' || p.last_name AS patient_name FROM messages m JOIN users u ON m.recipient_id = u.id LEFT JOIN patients p ON m.patient_id = p.id WHERE m.sender_id = ? AND m.parent_message_id IS NULL ORDER BY m.created_at DESC""",
-        (user["sub"],),
-    )
-    sent = [dict(r) for r in await cursor.fetchall()]
-
+    contacts = await _contacts_with_meta(db, user)
     return templates.TemplateResponse(
-        "messages/inbox.html",
-        {"request": request, "user": user, "active": "messages", "received": received, "sent": sent},
+        "messages/chat.html",
+        {"request": request, "user": user, "active": "messages", "contacts": contacts, "open_to": to},
     )
+
+
+@router.get("/api/contacts")
+async def api_contacts(
+    user: dict = Depends(require_login_api),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    return {"contacts": await _contacts_with_meta(db, user)}
 
 
 @router.get("/api/unread-count")
@@ -95,141 +143,88 @@ async def unread_count(
     return {"count": row["c"] if row else 0}
 
 
-@router.get("/new", response_class=HTMLResponse)
-async def new_message_form(
+@router.get("/api/thread/{contact_id}")
+async def api_thread(
     request: Request,
-    reply_to: Optional[int] = None,
-    user: dict = Depends(require_login),
+    contact_id: int,
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    users_list = await _allowed_recipients(db, user)
-
-    cursor = await db.execute(
-        "SELECT id, first_name, last_name FROM patients WHERE is_active = 1 AND doctor_id = ? ORDER BY last_name",
-        (effective_doctor_id(user),),
-    )
-    patients = [dict(r) for r in await cursor.fetchall()]
-
-    original = None
-    if reply_to:
-        cursor = await db.execute(
-            """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?) """,
-            (reply_to, user["sub"], user["sub"]),
-        )
-        row = await cursor.fetchone()
-        if row:
-            original = dict(row)
-
-    return templates.TemplateResponse(
-        "messages/compose.html",
-        {
-            "request": request, "user": user, "active": "messages",
-            "users_list": users_list, "patients": patients, "original": original,
-        },
-    )
-
-
-@router.post("/new")
-async def send_message(
-    request: Request,
-    recipient_id: int = Form(...),
-    subject: str = Form(""),
-    body: str = Form(...),
-    patient_id: Optional[int] = Form(None),
-    parent_message_id: Optional[int] = Form(None),
-    user: dict = Depends(require_login),
-    db: aiosqlite.Connection = Depends(get_db),
-):
-    # Cloisonnement : vérifier côté serveur que le destinataire est autorisé.
-    if parent_message_id:
-        # Réponse : autorisée tant que l'utilisateur est expéditeur ou
-        # destinataire du message original, et que le destinataire de la
-        # réponse est l'autre partie de cet échange.
+    uid = user["sub"]
+    # Accès : contact autorisé, ou historique existant (on est partie prenante).
+    allowed = {c["id"] for c in await _allowed_recipients(db, user)}
+    if contact_id not in allowed:
         cur = await db.execute(
-            "SELECT sender_id, recipient_id FROM messages WHERE id = ? AND (sender_id = ? OR recipient_id = ?)",
-            (parent_message_id, user["sub"], user["sub"]),
-        )
-        orig = await cur.fetchone()
-        if not orig or recipient_id not in (orig["sender_id"], orig["recipient_id"]):
-            response = RedirectResponse(url="/messages/new", status_code=302)
-            set_flash(response, "Destinataire non autorisé", "error")
-            return response
-    else:
-        allowed_ids = {u["id"] for u in await _allowed_recipients(db, user)}
-        if recipient_id not in allowed_ids:
-            response = RedirectResponse(url="/messages/new", status_code=302)
-            set_flash(
-                response,
-                "Destinataire non autorisé : la messagerie est réservée aux échanges entre le médecin et sa secrétaire.",
-                "error",
-            )
-            return response
-
-    # Only allow attaching a patient the sender actually owns.
-    if patient_id:
-        cur = await db.execute(
-            "SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?",
-            (patient_id, effective_doctor_id(user)),
+            "SELECT 1 FROM messages WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?) LIMIT 1",
+            (uid, contact_id, contact_id, uid),
         )
         if not await cur.fetchone():
-            patient_id = None
+            return JSONResponse(status_code=403, content={"error": "Contact non autorisé"})
 
-    cursor = await db.execute(
-        """INSERT INTO messages (sender_id, recipient_id, patient_id, subject, body, parent_message_id) VALUES (?, ?, ?, ?, ?, ?)""",
-        (user["sub"], recipient_id, patient_id if patient_id else None,
-         subject or None, body, parent_message_id),
+    cur = await db.execute("SELECT id, first_name, last_name, role FROM users WHERE id = ?", (contact_id,))
+    crow = await cur.fetchone()
+    if not crow:
+        return JSONResponse(status_code=404, content={"error": "Introuvable"})
+
+    # Marquer comme lus les messages entrants de ce contact.
+    await db.execute(
+        "UPDATE messages SET is_read = 1 WHERE sender_id = ? AND recipient_id = ? AND is_read = 0",
+        (contact_id, uid),
     )
-    message_id = cursor.lastrowid
     await db.commit()
 
-    await log_audit(
-        db, user, "message_envoye",
-        entity_type="message", entity_id=message_id,
-        patient_id=patient_id if patient_id else None,
-        ip=client_ip(request),
+    cur = await db.execute(
+        """SELECT id, sender_id, body, created_at FROM messages
+           WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+           ORDER BY created_at ASC, id ASC""",
+        (uid, contact_id, contact_id, uid),
     )
+    messages = [
+        {"id": r["id"], "mine": r["sender_id"] == uid, "body": r["body"], "created_at": r["created_at"]}
+        for r in await cur.fetchall()
+    ]
+    await log_audit(db, user, "conversation_consultee", entity_type="message", entity_id=contact_id, ip=client_ip(request))
+    return {
+        "contact": {
+            "id": crow["id"],
+            "name": _display_name(crow["first_name"], crow["last_name"], crow["role"]),
+            "role": crow["role"],
+            "role_label": ROLE_LABELS.get(crow["role"], crow["role"]),
+            "initials": _initials(crow["first_name"], crow["last_name"]),
+        },
+        "messages": messages,
+    }
 
-    response = RedirectResponse(url="/messages", status_code=302)
-    set_flash(response, "Message envoyé")
-    return response
 
-
-@router.get("/{message_id}", response_class=HTMLResponse)
-async def view_message(
+@router.post("/api/send")
+async def api_send(
     request: Request,
-    message_id: int,
-    user: dict = Depends(require_login),
+    user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    cursor = await db.execute(
-        """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name, r.first_name || ' ' || r.last_name AS recipient_name, p.first_name || ' ' || p.last_name AS patient_name FROM messages m JOIN users u ON m.sender_id = u.id JOIN users r ON m.recipient_id = r.id LEFT JOIN patients p ON m.patient_id = p.id WHERE m.id = ? AND (m.sender_id = ? OR m.recipient_id = ?) """,
-        (message_id, user["sub"], user["sub"]),
-    )
-    row = await cursor.fetchone()
-    if not row:
-        return RedirectResponse(url="/messages", status_code=302)
-    message = dict(row)
+    data = await request.json()
+    try:
+        recipient_id = int(data.get("recipient_id"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "Destinataire invalide"})
+    body = (data.get("body") or "").strip()
+    if not body:
+        return JSONResponse(status_code=400, content={"error": "Message vide"})
+    if len(body) > 4000:
+        body = body[:4000]
 
-    # Mark as read if I'm the recipient
-    if message["recipient_id"] == user["sub"] and not message["is_read"]:
-        await db.execute("UPDATE messages SET is_read = 1 WHERE id = ? ", (message_id,))
-        await db.commit()
+    allowed = {c["id"] for c in await _allowed_recipients(db, user)}
+    if recipient_id not in allowed:
+        return JSONResponse(status_code=403, content={"error": "Destinataire non autorisé"})
 
-    await log_audit(
-        db, user, "message_consulte",
-        entity_type="message", entity_id=message_id,
-        patient_id=message.get("patient_id"),
-        ip=client_ip(request),
+    cur = await db.execute(
+        "INSERT INTO messages (sender_id, recipient_id, body) VALUES (?, ?, ?)",
+        (user["sub"], recipient_id, body),
     )
+    mid = cur.lastrowid
+    await db.commit()
+    await log_audit(db, user, "message_envoye", entity_type="message", entity_id=mid, ip=client_ip(request))
 
-    # Get replies
-    cursor = await db.execute(
-        """SELECT m.*, u.first_name || ' ' || u.last_name AS sender_name FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.parent_message_id = ? ORDER BY m.created_at""",
-        (message_id,),
-    )
-    replies = [dict(r) for r in await cursor.fetchall()]
-
-    return templates.TemplateResponse(
-        "messages/view.html",
-        {"request": request, "user": user, "active": "messages", "message": message, "replies": replies},
-    )
+    cur = await db.execute("SELECT created_at FROM messages WHERE id = ?", (mid,))
+    created = (await cur.fetchone())["created_at"]
+    return {"id": mid, "mine": True, "body": body, "created_at": created}
