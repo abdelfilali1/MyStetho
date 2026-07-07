@@ -209,10 +209,17 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
 
     numero_note = await _next_numero_note(db, user["sub"])
 
+    # Identifiants fiscaux du praticien + cases « Afficher sur la note »
+    # (cochées par défaut). Persistés avec la note pour que le PDF (regénéré
+    # côté serveur) puisse les inclure.
+    def _flag(key):
+        return 1 if data.get(key, True) else 0
+
     cursor = await db.execute(
         """INSERT INTO feuilles_soin
-           (patient_id, doctor_id, mutuelle, type_feuille, nom_beneficiaire, date_soin, total_montant, actes_json, numero_note)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+           (patient_id, doctor_id, mutuelle, type_feuille, nom_beneficiaire, date_soin, total_montant, actes_json, numero_note,
+            inpe, ice, if_number, cnss, show_inpe, show_ice, show_if)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             patient_id, user["sub"],
             "Note", "honoraires",
@@ -221,6 +228,11 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
             data.get("total_montant", 0),
             json.dumps(data.get("actes", []), ensure_ascii=False),
             numero_note,
+            (data.get("inpe") or "").strip() or None,
+            (data.get("ice") or "").strip() or None,
+            (data.get("if_number") or "").strip() or None,
+            (data.get("cnss") or "").strip() or None,
+            _flag("show_inpe"), _flag("show_ice"), _flag("show_if"),
         ),
     )
     await db.commit()
@@ -273,8 +285,21 @@ async def note_pdf(request: Request, note_id: int, dl: int = 0, db: aiosqlite.Co
     doc_address = (d["address"] if d else None)
     template_path = d["pdf_template_path"] if d else None
 
+    # Identifiants fiscaux : n'inclure que ceux marqués « Afficher sur la note »
+    # (défaut coché). CNSS praticien affiché s'il est renseigné.
+    def _shown(val_key, flag_key):
+        v = (note.get(val_key) or "").strip()
+        return v if (v and note.get(flag_key, 1)) else None
+
     from services.pdf_service import generate_note_honoraires_pdf
-    pdf_bytes = generate_note_honoraires_pdf(note, actes, doctor_name, specialty, template_path, address=doc_address, phone=doc_phone)
+    pdf_bytes = generate_note_honoraires_pdf(
+        note, actes, doctor_name, specialty, template_path,
+        address=doc_address, phone=doc_phone,
+        inpe=_shown("inpe", "show_inpe"),
+        ice=_shown("ice", "show_ice"),
+        if_number=_shown("if_number", "show_if"),
+        cnss=(note.get("cnss") or "").strip() or None,
+    )
     fname = f"note_honoraires_{note.get('numero_note') or note_id}.pdf"
     disp = "attachment" if dl else "inline"
     return StreamingResponse(

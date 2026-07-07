@@ -819,6 +819,8 @@ def generate_note_honoraires_pdf(
     note: dict, actes: list, doctor_name: str = "", specialty: str = "",
     template_path: Optional[str] = None,
     address: Optional[str] = None, phone: Optional[str] = None,
+    inpe: Optional[str] = None, ice: Optional[str] = None,
+    if_number: Optional[str] = None, cnss: Optional[str] = None,
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
@@ -836,6 +838,24 @@ def generate_note_honoraires_pdf(
         address=address, phone=phone, use_tpl=use_tpl,
         subtitle="CNOPS / CNSS",
     )
+
+    # Identifiants fiscaux du praticien (n'inclure que les valeurs fournies =
+    # cases « Afficher sur la note » cochées). Toujours affichés sur la note,
+    # même sur papier à en-tête (obligations fiscales de la note d'honoraires).
+    ident_bits = []
+    if inpe:
+        ident_bits.append(f"INPE : {_esc(inpe)}")
+    if ice:
+        ident_bits.append(f"ICE : {_esc(ice)}")
+    if if_number:
+        ident_bits.append(f"IF : {_esc(if_number)}")
+    if cnss:
+        ident_bits.append(f"CNSS : {_esc(cnss)}")
+    if ident_bits:
+        ident_st = ParagraphStyle("_nIdent", parent=S["_BodySm"], textColor=GRAY,
+                                  fontSize=9, leading=12)
+        els.append(Paragraph("&nbsp;&nbsp;·&nbsp;&nbsp;".join(ident_bits), ident_st))
+        els.append(Spacer(1, 8))
 
     # N° + date
     num = note.get("numero_note") or "—"

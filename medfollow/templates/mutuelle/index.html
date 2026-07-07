@@ -503,11 +503,11 @@
           </div>
           <div class="fg-row3">
             <div class="fg"><label>INPE</label><input type="text" id="n-inpe">
-              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-inpe" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-show-inpe" checked onchange="saveNoteDoctor()"> Afficher sur la note</label></div>
             <div class="fg"><label>ICE</label><input type="text" id="n-ice">
-              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-ice" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-show-ice" checked onchange="saveNoteDoctor()"> Afficher sur la note</label></div>
             <div class="fg"><label>IF</label><input type="text" id="n-if">
-              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-hide-if" onchange="saveNoteDoctor()"> Masquer sur le document</label></div>
+              <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="n-show-if" checked onchange="saveNoteDoctor()"> Afficher sur la note</label></div>
           </div>
           <div class="fg-row">
             <div class="fg"><label>CNSS praticien</label><input type="text" id="n-cnss"></div>
@@ -1026,9 +1026,13 @@ function loadNoteDoctor() {
             const el = document.getElementById('n-'+k);
             if (el && d[k]) el.value = d[k];
         });
-        document.getElementById('n-hide-inpe').checked = !!d.hide_inpe;
-        document.getElementById('n-hide-ice').checked = !!d.hide_ice;
-        document.getElementById('n-hide-if').checked = !!d.hide_if;
+        // « Afficher sur la note » : coché par défaut. Rétro-compat avec l'ancien
+        // stockage hide_* (affiché = non masqué) ; sinon défaut = affiché.
+        const shown = (showKey, hideKey) =>
+            d[showKey] !== undefined ? !!d[showKey] : (d[hideKey] !== undefined ? !d[hideKey] : true);
+        document.getElementById('n-show-inpe').checked = shown('show_inpe','hide_inpe');
+        document.getElementById('n-show-ice').checked = shown('show_ice','hide_ice');
+        document.getElementById('n-show-if').checked = shown('show_if','hide_if');
         document.getElementById('n-save').checked = true;
     } catch{}
 }
@@ -1038,9 +1042,9 @@ window.saveNoteDoctor = function() {
     ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
         d[k] = (document.getElementById('n-'+k)||{value:''}).value;
     });
-    d.hide_inpe = document.getElementById('n-hide-inpe').checked;
-    d.hide_ice = document.getElementById('n-hide-ice').checked;
-    d.hide_if = document.getElementById('n-hide-if').checked;
+    d.show_inpe = document.getElementById('n-show-inpe').checked;
+    d.show_ice = document.getElementById('n-show-ice').checked;
+    d.show_if = document.getElementById('n-show-if').checked;
     localStorage.setItem('ngap_note_doctor', JSON.stringify(d));
 };
 window.toggleNoteDoc = function() {
@@ -1402,9 +1406,9 @@ function buildNoteHtml(fields) {
     const ice = document.getElementById('n-ice').value.trim();
     const ifVal = document.getElementById('n-if').value.trim();
     const cnss = document.getElementById('n-cnss').value.trim();
-    const hideInpe = document.getElementById('n-hide-inpe').checked;
-    const hideIce = document.getElementById('n-hide-ice').checked;
-    const hideIf = document.getElementById('n-hide-if').checked;
+    const hideInpe = !document.getElementById('n-show-inpe').checked;
+    const hideIce = !document.getElementById('n-show-ice').checked;
+    const hideIf = !document.getElementById('n-show-if').checked;
     const hasDoc = !!(praticien || adresse);
     const total = treatments.reduce((s, t) => s + t.montant, 0);
     const dateStr = new Date(date+'T00:00:00').toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
@@ -1483,6 +1487,14 @@ window.saveNote = async function(doPrint) {
         mode_paiement: fields.paiement,
         total_montant: treatments.reduce((s, t) => s + t.montant, 0),
         actes:         treatments,
+        // Identifiants fiscaux + cases « Afficher sur la note » (cochées par défaut)
+        inpe:          document.getElementById('n-inpe').value.trim(),
+        ice:           document.getElementById('n-ice').value.trim(),
+        if_number:     document.getElementById('n-if').value.trim(),
+        cnss:          document.getElementById('n-cnss').value.trim(),
+        show_inpe:     document.getElementById('n-show-inpe').checked,
+        show_ice:      document.getElementById('n-show-ice').checked,
+        show_if:       document.getElementById('n-show-if').checked,
         html_content,
     };
     try {

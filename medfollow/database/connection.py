@@ -475,6 +475,19 @@ async def init_db():
     except Exception:
         pass
 
+    # Note d'honoraires : identifiants fiscaux du praticien (INPE existe déjà) +
+    # cases « Afficher sur la note » par note (cochées par défaut → 1). Idempotent :
+    # ADD COLUMN ... DEFAULT renseigne les lignes existantes avec la valeur par défaut.
+    for _fs_col in (
+        "ice TEXT", "if_number TEXT", "cnss TEXT",
+        "show_inpe INTEGER DEFAULT 1", "show_ice INTEGER DEFAULT 1", "show_if INTEGER DEFAULT 1",
+    ):
+        try:
+            await db.execute(f"ALTER TABLE feuilles_soin ADD COLUMN {_fs_col}")
+            await db.commit()
+        except Exception:
+            pass
+
     # Learning content cache
     await db.execute("""
         CREATE TABLE IF NOT EXISTS learning_content_cache (
