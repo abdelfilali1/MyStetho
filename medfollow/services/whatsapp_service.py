@@ -251,6 +251,9 @@ async def _open_db():
 
 async def notify_appointment_created(appointment_id: int) -> None:
     """Confirmation à la création (appelée en tâche de fond, best-effort)."""
+    # Dormant tant que WhatsApp n'est pas configuré (aucun effet sur les données).
+    if not config.whatsapp_configured():
+        return
     try:
         db = await _open_db()
     except Exception:
@@ -333,11 +336,14 @@ _RAPPEL_SELECT = """
 async def send_rappel_by_id(rappel_id: int) -> str:
     """Envoie un rappel de soin WhatsApp (module Rappels).
 
-    Renvoie le statut ('sent'|'dryrun'|'skipped'|'failed'). Stampe
-    rappels.whatsapp_sent_at uniquement quand un message part réellement ('sent')
-    ou en simulation ('dryrun') — jamais pour un 'skipped'/'failed', pour que le
-    badge « Envoyé par DoctivoAssist » reste fiable.
+    Renvoie le statut ('sent'|'unconfigured'|'skipped'|'failed'). Stampe
+    rappels.whatsapp_sent_at UNIQUEMENT quand un message part réellement ('sent'),
+    pour que le badge « Envoyé par DoctivoAssist » ne mente jamais.
     """
+    # Tant que WhatsApp n'est pas configuré, aucun envoi n'est possible : on ne
+    # stampe rien (sinon le badge afficherait « envoyé » sans rien envoyer).
+    if not config.whatsapp_configured():
+        return "unconfigured"
     try:
         db = await _open_db()
     except Exception:
@@ -360,7 +366,7 @@ async def send_rappel_by_id(rappel_id: int) -> str:
             variables=variables, readable=readable, opt_out=bool(r["opt_out"]),
             doctor_enabled=bool(r["wa_enabled"]),
         )
-        if status in ("sent", "dryrun"):
+        if status == "sent":
             await db.execute(
                 "UPDATE rappels SET whatsapp_sent_at = ?, status = 'contacte', "
                 "updated_at = CURRENT_TIMESTAMP WHERE id = ?",

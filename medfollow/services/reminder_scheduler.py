@@ -54,6 +54,10 @@ _DUE_QUERY = """
 
 async def run_due_reminders() -> int:
     """Envoie les rappels dus. Renvoie le nombre de rappels effectivement envoyés."""
+    # Dormant tant que WhatsApp n'est pas configuré : on ne scanne ni ne
+    # « tamponne » aucun rendez-vous réel avant que le service ne soit activé.
+    if not config.whatsapp_configured():
+        return 0
     try:
         db = await aiosqlite.connect(config.DATABASE_PATH)
     except Exception:

@@ -158,7 +158,7 @@ async def send_whatsapp(
     # (message, est_erreur)
     outcomes = {
         "sent": ("Rappel WhatsApp envoyé au patient", False),
-        "dryrun": ("WhatsApp non configuré — message simulé (aucun envoi réel)", True),
+        "unconfigured": ("WhatsApp n'est pas encore configuré sur le serveur — aucun message envoyé", True),
         "skipped": ("Envoi impossible : numéro manquant, patient désinscrit, ou service WhatsApp désactivé", True),
         "failed": ("Échec de l'envoi WhatsApp — réessayez plus tard", True),
     }
