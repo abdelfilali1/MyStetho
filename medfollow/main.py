@@ -24,16 +24,20 @@ def _calc_age(dob_str):
         return ""
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, learning, rappels
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, learning, rappels, whatsapp_webhook
+from services import reminder_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize DB on startup."""
+    """Initialize DB on startup, then run the WhatsApp reminder loop."""
     await init_db()
     await seed_db()
+    # Boucle de rappels WhatsApp 24h (mono-processus → pas de double déclenchement).
+    reminder_scheduler.start(app)
     print(f"\n  MyStetho démarré sur http://{HOST}:{PORT}\n")
     yield
+    await reminder_scheduler.stop(app)
 
 
 app = FastAPI(title="MyStetho", lifespan=lifespan)
@@ -158,7 +162,9 @@ def _same_origin(value: str, hosts: set) -> bool:
 
 @app.middleware("http")
 async def _csrf_protect(request, call_next):
-    if request.method in _UNSAFE_METHODS and not request.url.path.startswith("/static"):
+    # /webhooks/ : POST externes (Meta WhatsApp) qui ne peuvent pas porter de
+    # jeton CSRF ; ils sont authentifiés par signature HMAC dans le handler.
+    if request.method in _UNSAFE_METHODS and not request.url.path.startswith(("/static", "/webhooks/")):
         # Derrière un reverse proxy (VM en HTTP), le Host vu par uvicorn peut
         # différer du nom public : on accepte aussi X-Forwarded-Host.
         hosts = {h for h in (request.headers.get("host"), request.headers.get("x-forwarded-host")) if h}
@@ -335,6 +341,7 @@ app.include_router(dental.router)
 app.include_router(mutuelle.router)
 app.include_router(learning.router)
 app.include_router(rappels.router)
+app.include_router(whatsapp_webhook.router)
 
 
 if __name__ == "__main__":

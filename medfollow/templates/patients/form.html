@@ -74,6 +74,14 @@
                     <input type="email" id="email" name="email" value="{{ patient.email if patient and patient.email else '' }}">
                 </div>
             </div>
+            <div class="form-group" style="margin-top:-2px;">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+                    <input type="checkbox" name="whatsapp_opt_out" value="1" style="width:auto;margin:0;"
+                           {{ 'checked' if patient and patient.whatsapp_opt_out else '' }}>
+                    <span>Ne pas contacter ce patient par WhatsApp</span>
+                </label>
+                <small style="color:var(--gray-500);">Décochez pour envoyer les confirmations et rappels de rendez-vous par WhatsApp (nécessite un numéro de téléphone).</small>
+            </div>
             <div class="form-group">
                 <label for="address">Adresse</label>
                 <input type="text" id="address" name="address" value="{{ patient.address if patient and patient.address else '' }}">

@@ -97,9 +97,17 @@
                         {% else %}
                         <span class="badge" style="background:#fff7ed;color:#c2410c;">À contacter</span>
                         {% endif %}
+                        {% if r.whatsapp_sent_at %}
+                        <div style="margin-top:4px;font-size:11.5px;color:#128C7E;font-weight:600;" title="Envoyé le {{ r.whatsapp_sent_at }}">📲 Envoyé par DoctivoAssist</div>
+                        {% endif %}
                     </td>
                     <td>
                         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                            {% if whatsapp_enabled and r.patient_phone and not r.is_closed %}
+                            <form method="POST" action="/rappels/{{ r.id }}/whatsapp" style="margin:0;" onsubmit="return confirm('Envoyer un rappel WhatsApp à ce patient ?');">
+                                <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none;" title="Envoyer un rappel WhatsApp au patient">📲 {{ 'Relancer' if r.whatsapp_sent_at else 'WhatsApp' }}</button>
+                            </form>
+                            {% endif %}
                             {% if not r.is_closed %}
                                 {% if r.status == 'a_contacter' %}
                                 <form method="POST" action="/rappels/{{ r.id }}/status" style="margin:0;"><input type="hidden" name="status" value="contacte"><button class="btn btn-outline btn-sm" title="Marquer contacté">✓ Contacté</button></form>

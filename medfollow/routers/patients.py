@@ -166,6 +166,7 @@ async def create_patient(
     current_medications: str = Form(""),
     gdpr_consent: str = Form(""),
     notes: str = Form(""),
+    whatsapp_opt_out: str = Form(""),
     next_url: str = Form(""),
     user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
@@ -175,6 +176,7 @@ async def create_patient(
     pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
     breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
     gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
+    wa_opt_out_i = 1 if whatsapp_opt_out in ("1", "on", "true", "yes") else 0
 
     try:
         cur = await db.execute(
@@ -186,8 +188,8 @@ async def create_patient(
                 insurance_name, insurance_number, insurance_serial,
                 emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
                 profession, marital_status, height_cm, weight_kg, smoking, alcohol,
-                pregnant, breastfeeding, current_medications, gdpr_consent, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                pregnant, breastfeeding, current_medications, gdpr_consent, notes, whatsapp_opt_out
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 effective_doctor_id(user),
                 first_name, last_name, date_of_birth,
@@ -200,7 +202,7 @@ async def create_patient(
                 emergency_contact_name or None, emergency_contact_phone or None, emergency_contact_relation or None,
                 profession or None, marital_status or None, height_i, weight_f,
                 smoking or None, alcohol or None,
-                pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None,
+                pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None, wa_opt_out_i,
             ),
         )
         await db.commit()
@@ -424,6 +426,7 @@ async def update_patient(
     current_medications: str = Form(""),
     gdpr_consent: str = Form(""),
     notes: str = Form(""),
+    whatsapp_opt_out: str = Form(""),
     user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -432,6 +435,7 @@ async def update_patient(
     pregnant_i = 1 if pregnant in ("1", "on", "true", "yes") else 0
     breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
     gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
+    wa_opt_out_i = 1 if whatsapp_opt_out in ("1", "on", "true", "yes") else 0
 
     try:
         await db.execute(
@@ -444,6 +448,7 @@ async def update_patient(
                 emergency_contact_name=?, emergency_contact_phone=?, emergency_contact_relation=?,
                 profession=?, marital_status=?, height_cm=?, weight_kg=?, smoking=?, alcohol=?,
                 pregnant=?, breastfeeding=?, current_medications=?, gdpr_consent=?, notes=?,
+                whatsapp_opt_out=?,
                 updated_at=CURRENT_TIMESTAMP
                WHERE id=? AND doctor_id=?""",
             (
@@ -458,6 +463,7 @@ async def update_patient(
                 profession or None, marital_status or None, height_i, weight_f,
                 smoking or None, alcohol or None,
                 pregnant_i, breastfeeding_i, current_medications or None, gdpr_i, notes or None,
+                wa_opt_out_i,
                 patient_id, effective_doctor_id(user),
             ),
         )

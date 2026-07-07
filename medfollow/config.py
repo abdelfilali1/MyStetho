@@ -74,3 +74,28 @@ HTTPS_ENABLED = os.getenv("MEDFOLLOW_HTTPS", "0").lower() in ("1", "true", "yes"
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 MAX_UPLOAD_SIZE_MB = 50
+
+# --- WhatsApp (Meta Cloud API) : confirmations / rappels de rendez-vous ------
+# Tant que WHATSAPP_ENABLED est faux OU que le token/phone-id manquent, le
+# service tourne en « dry-run » : il journalise mais n'appelle jamais l'API.
+# L'app fonctionne donc en local et sur la VM AVANT d'avoir les identifiants,
+# sans jamais casser la création de rendez-vous.
+WHATSAPP_ENABLED = os.getenv("MEDFOLLOW_WHATSAPP_ENABLED", "0").lower() in ("1", "true", "yes")
+WHATSAPP_TOKEN = os.getenv("MEDFOLLOW_WHATSAPP_TOKEN", "")                 # token d'accès (temporaire 24h ou permanent)
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("MEDFOLLOW_WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_API_VERSION = os.getenv("MEDFOLLOW_WHATSAPP_API_VERSION", "v21.0")
+WHATSAPP_DEFAULT_CC = os.getenv("MEDFOLLOW_WHATSAPP_DEFAULT_CC", "212")    # indicatif par défaut (Maroc)
+WHATSAPP_TEMPLATE_LANG = os.getenv("MEDFOLLOW_WHATSAPP_TEMPLATE_LANG", "fr")
+WHATSAPP_TPL_CONFIRMATION = os.getenv("MEDFOLLOW_WHATSAPP_TPL_CONFIRMATION", "rdv_confirmation")
+WHATSAPP_TPL_RAPPEL = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL", "rdv_rappel_24h")
+WHATSAPP_TPL_RAPPEL_SOIN = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL_SOIN", "rappel_soin")
+# Intervalle du planificateur de rappels 24h (secondes). 600 = 10 min.
+REMINDER_POLL_SECONDS = int(os.getenv("MEDFOLLOW_REMINDER_POLL_SECONDS", "600"))
+# Lot 2 (webhook entrant, nécessite un HTTPS public) — déclarés dès maintenant.
+WHATSAPP_VERIFY_TOKEN = os.getenv("MEDFOLLOW_WHATSAPP_VERIFY_TOKEN", "")
+WHATSAPP_APP_SECRET = os.getenv("MEDFOLLOW_WHATSAPP_APP_SECRET", "")
+
+
+def whatsapp_configured() -> bool:
+    """Vrai si l'envoi réel est possible (sinon : mode dry-run/journal seul)."""
+    return bool(WHATSAPP_ENABLED and WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID)

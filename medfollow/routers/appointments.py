@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from datetime import date, datetime, timedelta
@@ -8,6 +8,7 @@ from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.deps import require_login, require_login_api, effective_doctor_id, set_flash
 from services.audit import log_audit, client_ip
+from services import whatsapp_service
 
 router = APIRouter(prefix="/appointments")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -83,6 +84,10 @@ async def get_events(
                 "type": r["appointment_type"],
                 "room": r["room"],
                 "notes": r["notes"],
+                "wa_confirmation_sent_at": r.get("whatsapp_confirmation_sent_at"),
+                "wa_reminder_sent_at": r.get("whatsapp_reminder_sent_at"),
+                "wa_response": r.get("whatsapp_response"),
+                "wa_responded_at": r.get("whatsapp_responded_at"),
             },
         })
 
@@ -136,6 +141,7 @@ async def get_free_slots(
 @router.post("/api/new")
 async def create_appointment_api(
     request: Request,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -208,12 +214,15 @@ async def create_appointment_api(
     await db.commit()
     await log_audit(db, user, "rdv_cree", entity_type="appointment", entity_id=cur.lastrowid,
                     patient_id=patient_id, ip=client_ip(request))
+    # Confirmation WhatsApp (best-effort, hors requête : ne bloque pas la création).
+    background_tasks.add_task(whatsapp_service.notify_appointment_created, cur.lastrowid)
     return JSONResponse(content={"ok": True})
 
 
 @router.post("/new")
 async def create_appointment(
     request: Request,
+    background_tasks: BackgroundTasks,
     patient_id: int = Form(...),
     doctor_id: int = Form(...),
     title: str = Form(...),
@@ -238,6 +247,7 @@ async def create_appointment(
     )
     await db.commit()
     await log_audit(db, user, "rdv_cree", entity_type="appointment", entity_id=cur.lastrowid, patient_id=patient_id, ip=client_ip(request))
+    background_tasks.add_task(whatsapp_service.notify_appointment_created, cur.lastrowid)
     resp = RedirectResponse(url="/appointments", status_code=302)
     set_flash(resp, "Rendez-vous créé")
     return resp

@@ -782,4 +782,61 @@ async def init_db():
     except Exception:
         pass
 
+    # --- WhatsApp : suivi des notifications de rendez-vous -------------------
+    # Colonnes de suivi sur les rendez-vous (envoi confirmation/rappel + réponse
+    # du patient qui remonte dans le RDV). Additives et idempotentes.
+    for _wa_col in (
+        "whatsapp_confirmation_sent_at DATETIME",   # horodatage de l'envoi de confirmation
+        "whatsapp_reminder_sent_at DATETIME",       # garde-fou d'idempotence du rappel 24h
+        "whatsapp_response TEXT",                    # 'confirme' / 'annule' (rempli au Lot 2)
+        "whatsapp_responded_at DATETIME",            # horodatage de la réponse patient
+    ):
+        try:
+            await db.execute(f"ALTER TABLE appointments ADD COLUMN {_wa_col}")
+            await db.commit()
+        except Exception:
+            pass
+
+    # Consentement : envoi WhatsApp par défaut, possibilité de désinscrire un patient.
+    try:
+        await db.execute("ALTER TABLE patients ADD COLUMN whatsapp_opt_out INTEGER DEFAULT 0")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Interrupteur du service WhatsApp par praticien (activé par défaut) : gate
+    # tous les envois (confirmation, rappel RDV, rappel de soin) de ce médecin.
+    try:
+        await db.execute("ALTER TABLE users ADD COLUMN whatsapp_enabled INTEGER DEFAULT 1")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Rappels de soin : horodatage de l'envoi WhatsApp (badge « Envoyé par DoctivoAssist »).
+    try:
+        await db.execute("ALTER TABLE rappels ADD COLUMN whatsapp_sent_at DATETIME")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Journal des messages WhatsApp (audit + anti-doublon + futur fil de discussion).
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS whatsapp_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            appointment_id INTEGER,
+            patient_id INTEGER,
+            doctor_id INTEGER,
+            direction TEXT,          -- 'out' | 'in'
+            kind TEXT,               -- 'confirmation' | 'rappel' | 'reponse'
+            to_msisdn TEXT,
+            template TEXT,
+            body TEXT,
+            wa_message_id TEXT,      -- identifiant renvoyé par Meta
+            status TEXT,             -- 'sent' | 'failed' | 'dryrun' | 'received' | 'skipped'
+            error TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     await db.close()

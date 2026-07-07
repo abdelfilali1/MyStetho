@@ -15,6 +15,7 @@ from config import TEMPLATES_DIR
 from database.connection import get_db
 from routers.deps import require_login, effective_doctor_id, set_flash
 from services.audit import log_audit, client_ip
+from services import whatsapp_service
 
 router = APIRouter(prefix="/rappels")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -76,12 +77,17 @@ async def list_rappels(request: Request, filtre: str = "a_contacter", user: dict
     )
     patients = [dict(r) for r in await cur.fetchall()]
 
+    # Le bouton « Envoyer WhatsApp » n'apparaît que si le praticien a activé le service.
+    cur = await db.execute("SELECT COALESCE(whatsapp_enabled, 1) FROM users WHERE id = ?", (did,))
+    row = await cur.fetchone()
+    wa_enabled = bool(row[0]) if row else True
+
     return templates.TemplateResponse(
         "rappels/index.html",
         {
             "request": request, "user": user, "active": "rappels",
             "rappels": rappels, "filtre": filtre, "patients": patients,
-            "today": today,
+            "today": today, "whatsapp_enabled": wa_enabled,
             "nb_a_contacter": nb_a_contacter, "nb_en_retard": nb_en_retard, "nb_ce_mois": nb_ce_mois,
         },
     )
@@ -134,6 +140,36 @@ async def set_status(
     await log_audit(db, user, "rappel_contacte", entity_type="rappel", entity_id=rappel_id, ip=client_ip(request), details=f"status={new_status}")
     resp = RedirectResponse(url="/rappels", status_code=302)
     set_flash(resp, "Marqué comme contacté" if new_status == "contacte" else "Marqué à contacter")
+    return resp
+
+
+@router.post("/{rappel_id}/whatsapp")
+async def send_whatsapp(
+    request: Request, rappel_id: int,
+    user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db),
+):
+    """Envoie un rappel de soin au patient par WhatsApp (via DoctivoAssist) et
+    marque le rappel comme contacté."""
+    did = effective_doctor_id(user)
+    if not await _owns_rappel(db, rappel_id, did):
+        return RedirectResponse(url="/rappels", status_code=302)
+
+    status = await whatsapp_service.send_rappel_by_id(rappel_id)
+    # (message, est_erreur)
+    outcomes = {
+        "sent": ("Rappel WhatsApp envoyé au patient", False),
+        "dryrun": ("WhatsApp non configuré — message simulé (aucun envoi réel)", True),
+        "skipped": ("Envoi impossible : numéro manquant, patient désinscrit, ou service WhatsApp désactivé", True),
+        "failed": ("Échec de l'envoi WhatsApp — réessayez plus tard", True),
+    }
+    msg, is_error = outcomes.get(status, ("Envoi WhatsApp effectué", False))
+    await log_audit(db, user, "rappel_whatsapp", entity_type="rappel", entity_id=rappel_id,
+                    ip=client_ip(request), details=f"status={status}")
+    resp = RedirectResponse(url="/rappels", status_code=302)
+    if is_error:
+        set_flash(resp, msg, "error")
+    else:
+        set_flash(resp, msg)
     return resp
 
 
