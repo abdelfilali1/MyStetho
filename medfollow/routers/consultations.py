@@ -708,9 +708,9 @@ async def view_consultation(request: Request, consultation_id: int, user: dict =
 
 
 @router.get("/{consultation_id}/pdf")
-async def consultation_pdf(request: Request, consultation_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def consultation_pdf(request: Request, consultation_id: int, dl: int = 0, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
-        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
+        """SELECT c.*, p.first_name || ' ' || p.last_name AS patient_name, p.date_of_birth, p.gender, u.first_name || ' ' || u.last_name AS doctor_name, u.specialty, u.phone, u.address, u.pdf_template_path FROM consultations c JOIN patients p ON c.patient_id = p.id JOIN users u ON c.doctor_id = u.id WHERE c.id = ? AND c.doctor_id = ? """,
         (consultation_id, user["sub"]),
     )
     row = await cursor.fetchone()
@@ -726,10 +726,11 @@ async def consultation_pdf(request: Request, consultation_id: int, user: dict = 
 
     await log_audit(db, user, "consultation_pdf_exportee", entity_type="consultation", entity_id=consultation_id, patient_id=consultation.get("patient_id"), ip=client_ip(request))
     pdf_bytes = generate_consultation_pdf(consultation, vitals, consultation.get("summary"), consultation.get("pdf_template_path"))
+    disp = "attachment" if dl else "inline"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=consultation_{consultation_id}.pdf"},
+        headers={"Content-Disposition": f'{disp}; filename="consultation_{consultation_id}.pdf"'},
     )
 
 

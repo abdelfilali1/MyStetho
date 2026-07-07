@@ -239,7 +239,7 @@ async def save_note(request: Request, db: aiosqlite.Connection = Depends(get_db)
 
 
 @router.get("/note/{note_id}/pdf")
-async def note_pdf(request: Request, note_id: int, db: aiosqlite.Connection = Depends(get_db)):
+async def note_pdf(request: Request, note_id: int, dl: int = 0, db: aiosqlite.Connection = Depends(get_db)):
     """Génère la note d'honoraires en PDF, posée sur le papier à en-tête du praticien."""
     from fastapi.responses import RedirectResponse
     user = get_current_user(request)
@@ -263,21 +263,24 @@ async def note_pdf(request: Request, note_id: int, db: aiosqlite.Connection = De
         actes = []
 
     cursor = await db.execute(
-        "SELECT first_name, last_name, specialty, pdf_template_path FROM users WHERE id = ?",
+        "SELECT first_name, last_name, specialty, phone, address, pdf_template_path FROM users WHERE id = ?",
         (user["sub"],),
     )
     d = await cursor.fetchone()
     doctor_name = f"Dr. {d['first_name']} {d['last_name']}" if d else ""
     specialty = (d["specialty"] if d else "") or ""
+    doc_phone = (d["phone"] if d else None)
+    doc_address = (d["address"] if d else None)
     template_path = d["pdf_template_path"] if d else None
 
     from services.pdf_service import generate_note_honoraires_pdf
-    pdf_bytes = generate_note_honoraires_pdf(note, actes, doctor_name, specialty, template_path)
+    pdf_bytes = generate_note_honoraires_pdf(note, actes, doctor_name, specialty, template_path, address=doc_address, phone=doc_phone)
     fname = f"note_honoraires_{note.get('numero_note') or note_id}.pdf"
+    disp = "attachment" if dl else "inline"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{fname}"'},
+        headers={"Content-Disposition": f'{disp}; filename="{fname}"'},
     )
 
 

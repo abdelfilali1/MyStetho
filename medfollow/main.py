@@ -87,6 +87,9 @@ _CSP = (
     "base-uri 'self'; "
     "object-src 'none'; "
     "frame-ancestors 'none'; "
+    # Impression directe des PDF : l'iframe caché charge le PDF depuis un blob
+    # same-origin (voir window.printPdf dans base.html).
+    "frame-src 'self' blob:; "
     "img-src 'self' data: blob:; "
     "font-src 'self' https://fonts.gstatic.com data:; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
@@ -99,10 +102,19 @@ _CSP = (
 @app.middleware("http")
 async def _security_headers(request, call_next):
     response = await call_next(request)
-    response.headers.setdefault("X-Frame-Options", "DENY")
+    # Les PDF générés (ordonnance, devis, note…) doivent pouvoir être chargés
+    # dans un iframe same-origin pour les boutons « Imprimer » (impression
+    # directe). Un PDF est un contenu inerte : on autorise donc son cadrage
+    # UNIQUEMENT par l'application elle-même ('self'), pas le cadrage général.
+    is_pdf = "application/pdf" in response.headers.get("content-type", "")
+    if is_pdf:
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+    else:
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Content-Security-Policy", _CSP)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
-    response.headers.setdefault("Content-Security-Policy", _CSP)
     if _HTTPS_ENABLED:
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=63072000; includeSubDomains"

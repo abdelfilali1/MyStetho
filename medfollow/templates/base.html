@@ -385,6 +385,45 @@
             try { data = JSON.parse(raw); } catch (err) { data = { m: raw, t: 'success' }; }
             if (data && data.m && window.showToast) window.showToast(data.m, data.t || 'success');
         });
+
+        // === Impression directe d'un PDF (boutons « Imprimer ») ===
+        // Un clic sur « Imprimer » ouvre DIRECTEMENT la boîte d'impression du
+        // document — comme si on avait ouvert le PDF et cliqué sur son bouton
+        // imprimer — sans quitter la page Doctivo ni ouvrir de nouvel onglet.
+        // On récupère le PDF en mémoire (blob) puis on l'imprime via un iframe
+        // caché (le blob garantit un affichage inline, jamais un téléchargement).
+        window.printPdf = function(url) {
+            fetch(url, { credentials: 'same-origin' })
+                .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+                .then(function(blob) {
+                    var blobUrl = URL.createObjectURL(blob);
+                    var old = document.getElementById('__pdfPrintFrame');
+                    if (old && old.parentNode) old.parentNode.removeChild(old);
+                    var frame = document.createElement('iframe');
+                    frame.id = '__pdfPrintFrame';
+                    frame.setAttribute('aria-hidden', 'true');
+                    // IMPORTANT : un iframe de taille nulle / display:none /
+                    // visibility:hidden n'est PAS imprimable dans Chrome/Edge —
+                    // print() s'exécute mais AUCUNE boîte de dialogue n'apparaît.
+                    // On le rend donc à taille réelle (A4) mais HORS ÉCRAN :
+                    // invisible pour l'utilisateur et pourtant imprimable.
+                    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;';
+                    var done = false;
+                    function go() {
+                        if (done) return; done = true;
+                        try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+                        catch (e) { window.open(blobUrl, '_blank'); }
+                        setTimeout(function() { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 120000);
+                    }
+                    frame.onload = function() { setTimeout(go, 300); };
+                    frame.src = blobUrl;
+                    document.body.appendChild(frame);
+                    // Filet de sécurité si l'événement load ne se déclenche pas
+                    // (les iframes PDF ne le déclenchent pas toujours).
+                    setTimeout(go, 2500);
+                })
+                .catch(function(e) { console.error('Impression impossible', e); window.open(url, '_blank'); });
+        };
     })();
     </script>
 

@@ -32,11 +32,13 @@ async def _next_devis_number(db, doctor_id: int, year: int) -> str:
 
 
 async def _doctor_pdf_ctx(db, doctor_id: int):
-    cur = await db.execute("SELECT first_name, last_name, specialty, pdf_template_path FROM users WHERE id = ?", (doctor_id,))
+    """Renvoie (nom « Dr. Prénom Nom », spécialité, téléphone, adresse, chemin du
+    papier à en-tête) pour l'en-tête standard des PDF de facturation."""
+    cur = await db.execute("SELECT first_name, last_name, specialty, phone, address, pdf_template_path FROM users WHERE id = ?", (doctor_id,))
     r = await cur.fetchone()
     if not r:
-        return "", "", None
-    return f"Dr {r[0]} {r[1]}".strip(), (r[2] or ""), r[3]
+        return "", "", None, None, None
+    return f"Dr. {r[0]} {r[1]}".strip(), (r[2] or ""), r[3], r[4], r[5]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -497,24 +499,25 @@ async def convert_devis(request: Request, devis_id: int, user: dict = Depends(re
 
 
 @router.get("/devis/{devis_id}/pdf")
-async def devis_pdf(request: Request, devis_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def devis_pdf(request: Request, devis_id: int, dl: int = 0, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     devis = await _load_devis(db, devis_id, user["sub"])
     if not devis:
         return RedirectResponse(url="/invoices/devis", status_code=302)
     cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ?", (devis_id,))
     items = [dict(r) for r in await cursor.fetchall()]
-    doctor_name, specialty, template_path = await _doctor_pdf_ctx(db, user["sub"])
+    doctor_name, specialty, doc_phone, doc_address, template_path = await _doctor_pdf_ctx(db, user["sub"])
     from services.pdf_service import generate_devis_pdf
     await log_audit(db, user, "devis_pdf_exporte", entity_type="devis", entity_id=devis_id, patient_id=devis["patient_id"], ip=client_ip(request))
-    pdf_bytes = generate_devis_pdf(devis, items, doctor_name, specialty, template_path)
-    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="devis_{devis["devis_number"]}.pdf"'})
+    pdf_bytes = generate_devis_pdf(devis, items, doctor_name, specialty, template_path, address=doc_address, phone=doc_phone)
+    disp = "attachment" if dl else "inline"
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f'{disp}; filename="devis_{devis["devis_number"]}.pdf"'})
 
 
 # ─────────────────────────────────────────────────────────────
 # Facture : PDF (suffixe → sûr) + détail + actions
 # ─────────────────────────────────────────────────────────────
 @router.get("/{invoice_id}/pdf")
-async def invoice_pdf(request: Request, invoice_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def invoice_pdf(request: Request, invoice_id: int, dl: int = 0, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute(
         """SELECT i.*, p.first_name || ' ' || p.last_name AS patient_name
            FROM invoices i JOIN patients p ON i.patient_id = p.id
@@ -529,11 +532,12 @@ async def invoice_pdf(request: Request, invoice_id: int, user: dict = Depends(re
     items = [dict(r) for r in await cursor.fetchall()]
     cursor = await db.execute("SELECT * FROM payments WHERE invoice_id = ? ORDER BY payment_date", (invoice_id,))
     payments = [dict(r) for r in await cursor.fetchall()]
-    doctor_name, specialty, template_path = await _doctor_pdf_ctx(db, user["sub"])
+    doctor_name, specialty, doc_phone, doc_address, template_path = await _doctor_pdf_ctx(db, user["sub"])
     from services.pdf_service import generate_invoice_pdf
     await log_audit(db, user, "facture_pdf_exportee", entity_type="invoice", entity_id=invoice_id, patient_id=invoice["patient_id"], ip=client_ip(request))
-    pdf_bytes = generate_invoice_pdf(invoice, items, payments, doctor_name, specialty, template_path)
-    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="facture_{invoice["invoice_number"]}.pdf"'})
+    pdf_bytes = generate_invoice_pdf(invoice, items, payments, doctor_name, specialty, template_path, address=doc_address, phone=doc_phone)
+    disp = "attachment" if dl else "inline"
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f'{disp}; filename="facture_{invoice["invoice_number"]}.pdf"'})
 
 
 @router.get("/{invoice_id}", response_class=HTMLResponse)

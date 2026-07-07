@@ -1088,6 +1088,13 @@ window.openNote = function() {
     if (_contextPatientIdx >= 0) { sel.value = String(_contextPatientIdx); noteSelectPatient(String(_contextPatientIdx)); }
     loadNoteDoctor();
     renderNoteActes();
+    // Réinitialiser le bouton Enregistrer (il peut rester désactivé après un
+    // enregistrement/impression précédent qui a fermé la fenêtre).
+    const _sb = document.getElementById('btn-save-note');
+    if (_sb) {
+        _sb.disabled = false;
+        _sb.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
+    }
     document.getElementById('modal-note').style.display = 'flex';
     // Fetch the next auto-generated note number for display
     fetch('/mutuelle/note/next-number')
@@ -1453,17 +1460,11 @@ ${hasDoc && footerParts.length ? `<div class="page-footer">${footerParts.join(' 
 </body></html>`;
 }
 
-window.printNote = function() {
-    const fields = validateNote();
-    if (!fields) return;
-    const html = buildNoteHtml(fields);
-    const w = window.open('', '_blank');
-    if (!w) { alert('Autorisez les pop-ups pour imprimer.'); return; }
-    w.document.write(html); w.document.close();
-    w.onload = () => { w.focus(); w.print(); };
-};
+// « Imprimer la note » = enregistrer PUIS lancer directement l'impression de la
+// note d'honoraires standardisée (PDF sur papier à en-tête).
+window.printNote = function() { return window.saveNote(true); };
 
-window.saveNote = async function() {
+window.saveNote = async function(doPrint) {
     const fields = validateNote();
     if (!fields) return;
     if (!_selectedPatientIdNote) {
@@ -1494,7 +1495,12 @@ window.saveNote = async function() {
         if (result.ok) {
             if (result.numero_note) document.getElementById('n-num').value = result.numero_note;
             closeNote();
-            window.open('/mutuelle/feuille/' + result.id + '/view', '_blank');
+            // Note d'honoraires standardisée (PDF sur papier à en-tête, ou en-tête
+            // simple avec nom / adresse / téléphone). « Imprimer » lance directement
+            // l'impression ; « Enregistrer » ouvre le PDF dans un onglet.
+            const url = '/mutuelle/note/' + result.id + '/pdf';
+            if (doPrint && window.printPdf) { window.printPdf(url, "Note d'honoraires"); }
+            else { window.open(url, '_blank'); }
         } else {
             alert('Erreur lors de l\'enregistrement.');
             btn.disabled = false;

@@ -6,11 +6,18 @@ from reportlab.platypus import (
     HRFlowable, KeepTogether,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from xml.sax.saxutils import escape as _xml_escape
 import io
 import os
 from typing import Optional
 from datetime import date as _date
+
+
+def _esc(s) -> str:
+    """Échappe le texte pour l'insérer sans risque dans un Paragraph reportlab
+    (le `&` d'une adresse ou d'un nom casserait sinon le mini-XML)."""
+    return _xml_escape(str(s)) if s not in (None, "") else ""
 
 
 # ─────────────────────────────────────────────────────────────
@@ -70,37 +77,21 @@ TPL_BOTTOM_MM = 30   # repli : ~3 cm réservés en bas
 # Canvas callbacks — header band + footer on every page
 # ─────────────────────────────────────────────────────────────
 
-def _draw_page(canvas, doc, title, subtitle):
-    """En-tête sobre N&B (utilisé uniquement SANS papier à en-tête).
-    Pas de bande de couleur : titre noir + filet fin, style document officiel."""
+def _draw_footer(canvas, doc):
+    """Pied de page sobre (séparateur + date de génération + n° de page).
+    Utilisé uniquement SANS papier à en-tête — avec un en-tête, le fond
+    pré-imprimé porte déjà son propre pied de page. L'EN-TÊTE (titre du
+    document + identité du praticien) est désormais rendu dans le flux du
+    contenu via `_masthead`, jamais sur le canvas, pour ne jamais chevaucher
+    un éventuel papier à en-tête."""
     canvas.saveState()
-
-    # Title (black bold, left)
-    canvas.setFillColor(PRIMARY)
-    canvas.setFont("Helvetica-Bold", 15)
-    canvas.drawString(22 * mm, _PH - 16 * mm, title)
-
-    # Subtitle (gray, right)
-    canvas.setFillColor(GRAY)
-    canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(_PW - 22 * mm, _PH - 16 * mm, subtitle)
-
-    # Thin rule under the header
-    canvas.setStrokeColor(PRIMARY)
-    canvas.setLineWidth(1)
-    canvas.line(22 * mm, _PH - 20 * mm, _PW - 22 * mm, _PH - 20 * mm)
-
-    # Footer separator
     canvas.setStrokeColor(BORDER)
     canvas.setLineWidth(0.5)
     canvas.line(22 * mm, 18 * mm, _PW - 22 * mm, 18 * mm)
-
-    # Footer text
     canvas.setFillColor(GRAY)
     canvas.setFont("Helvetica", 7.5)
     canvas.drawString(22 * mm, 11 * mm, f"Généré le {_date.today().strftime('%d/%m/%Y')}")
     canvas.drawRightString(_PW - 22 * mm, 11 * mm, f"Page {doc.page}")
-
     canvas.restoreState()
 
 
@@ -226,6 +217,56 @@ def _section(title, S):
     ]
 
 
+def _practitioner_html(doctor_name=None, specialty=None, address=None, phone=None) -> str:
+    """Bloc identité praticien (nom, spécialité, adresse, téléphone) en mini-HTML
+    reportlab, une info par ligne. Sert d'en-tête de repli quand le médecin n'a
+    pas de papier à en-tête : « à côté du nom, l'adresse et le téléphone »."""
+    lines = []
+    if doctor_name:
+        lines.append(f"<b>{_esc(doctor_name)}</b>")
+    if specialty:
+        lines.append(_esc(specialty))
+    if address:
+        lines.append(_esc(address).replace("\n", "<br/>"))
+    if phone:
+        lines.append(f"Tél. {_esc(phone)}")
+    return "<br/>".join(lines)
+
+
+def _masthead(S, title, *, doctor_name=None, specialty=None, address=None,
+              phone=None, use_tpl=False, subtitle=None):
+    """En-tête standard commun à TOUS les PDF de l'application.
+
+    - Le TITRE du document (ordonnance, devis, note…) est toujours affiché à
+      gauche, y compris avec un papier à en-tête : comme c'est un flowable, il
+      s'inscrit sous la zone d'en-tête réservée (marge haute détectée) et ne
+      chevauche donc jamais le fond pré-imprimé.
+    - À droite, l'identité du praticien (nom + spécialité + adresse + téléphone)
+      n'est ajoutée QUE sans papier à en-tête (sinon le fond la porte déjà).
+    Renvoie la liste de flowables [table titre/praticien, filet]."""
+    title_st = ParagraphStyle("_mhTitle", parent=S["_Body"], fontName="Helvetica-Bold",
+                              fontSize=16, textColor=DARK, leading=19, alignment=TA_LEFT)
+    left = [Paragraph(_esc(title).upper(), title_st)]
+    if subtitle:
+        left.append(Paragraph(_esc(subtitle), ParagraphStyle(
+            "_mhSub", parent=S["_BodySm"], textColor=GRAY, spaceBefore=2)))
+
+    right_html = "" if use_tpl else _practitioner_html(doctor_name, specialty, address, phone)
+    right_st = ParagraphStyle("_mhDoc", parent=S["_BodySm"], alignment=TA_RIGHT,
+                              textColor=GRAY, leading=12.5, fontSize=9)
+    right = [Paragraph(right_html or "", right_st)]
+
+    t = Table([[left, right]], colWidths=[95 * mm, 76 * mm])
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return [t, HRFlowable(width="100%", thickness=1.1, color=PRIMARY, spaceBefore=6, spaceAfter=12)]
+
+
 def _patient_box(S, name, sub=None):
     inner = [Paragraph(name, S["_PatName"])]
     if sub:
@@ -322,6 +363,7 @@ def generate_prescription_pdf(prescription: dict, items: list,
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
     doc = _doc_for(buf, template_path)
+    S = _styles()
 
     base = getSampleStyleSheet()["Normal"]
     name_st = ParagraphStyle("_oName", parent=base, fontName="Helvetica-Bold",
@@ -344,16 +386,22 @@ def generate_prescription_pdf(prescription: dict, items: list,
                              fontSize=8.5, textColor=GRAY, alignment=TA_RIGHT, leading=12)
 
     doctor_name = f"{prescription['d_first']} {prescription['d_last']}"
-    doctor_hdr = f"Dr. {doctor_name}"
-    if prescription.get("specialty"):
-        doctor_hdr += f"  •  {prescription['specialty']}"
 
     def _page(canv, d):
         if use_tpl:
             return  # le papier à en-tête fournit l'en-tête / pied de page
-        _draw_page(canv, d, "ORDONNANCE", doctor_hdr)
+        _draw_footer(canv, d)
 
-    els = []
+    # En-tête standard : titre « ORDONNANCE » (toujours) + identité praticien
+    # (nom / spécialité / adresse / téléphone) si pas de papier à en-tête.
+    els = _masthead(
+        S, "Ordonnance",
+        doctor_name=f"Dr. {doctor_name}",
+        specialty=prescription.get("specialty"),
+        address=prescription.get("address"),
+        phone=prescription.get("phone"),
+        use_tpl=use_tpl,
+    )
 
     # ── Date (en haut à droite) ──
     els.append(Paragraph(_fr_long_date(prescription.get("prescription_date")), date_st))
@@ -411,9 +459,36 @@ def generate_prescription_pdf(prescription: dict, items: list,
 # FICHE PATIENT
 # ═════════════════════════════════════════════════════════════
 
+# Libellés lisibles des états dentaires (odontogramme). Repli : Capitalize.
+_DENTAL_LABELS = {
+    "sain": "Sain",
+    "carie": "Carie",
+    "obturation": "Obturation (plombage)",
+    "plombage": "Obturation (plombage)",
+    "couronne": "Couronne",
+    "bridge": "Bridge",
+    "implant": "Implant",
+    "absente": "Absente / extraite",
+    "manquante": "Absente / extraite",
+    "extraction": "À extraire",
+    "a_extraire": "À extraire",
+    "fracture": "Fracture",
+    "descellement": "Descellement",
+    "endodontie": "Traitement radiculaire",
+    "traitement_canal": "Traitement radiculaire",
+    "prothese": "Prothèse",
+    "facette": "Facette",
+    "scellement": "Scellement de sillon",
+    "fele": "Fêlure",
+}
+
+
 def generate_patient_brochure_pdf(
     patient: dict, history: list, appointments: list, prescriptions: list,
     template_path: Optional[str] = None,
+    doctor_name: str = "", specialty: str = "",
+    address: Optional[str] = None, phone: Optional[str] = None,
+    dental: Optional[list] = None,
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
@@ -425,9 +500,14 @@ def generate_patient_brochure_pdf(
     def _page(canv, d):
         if use_tpl:
             return
-        _draw_page(canv, d, "FICHE PATIENT", full_name)
+        _draw_footer(canv, d)
 
-    els = []
+    els = _masthead(
+        S, "Fiche patient",
+        doctor_name=doctor_name or None,
+        specialty=specialty or None,
+        address=address, phone=phone, use_tpl=use_tpl,
+    )
 
     # Patient banner
     sub_parts = []
@@ -545,6 +625,37 @@ def generate_patient_brochure_pdf(
                 ))
             els.append(Spacer(1, 6))
 
+    # État bucco-dentaire (odontogramme) — résumé imprimable : on ne liste que
+    # les dents non saines (les seules cliniquement pertinentes à consigner).
+    if dental:
+        cell = ParagraphStyle("_dCell", parent=S["_BodySm"], textColor=DARK, fontSize=9.5, leading=12)
+        head_st = ParagraphStyle("_dH", parent=cell, textColor=WHITE, fontName="Helvetica-Bold")
+        drows = [[Paragraph("Dent", head_st), Paragraph("État", head_st), Paragraph("Observations", head_st)]]
+        for tth in dental:
+            cond = str(tth.get("condition") or "").strip()
+            drows.append([
+                Paragraph(_esc(tth.get("tooth_number") or "—"), cell),
+                Paragraph(_esc(_DENTAL_LABELS.get(cond.lower(), cond.capitalize() or "—")), cell),
+                Paragraph(_esc(tth.get("notes") or ""), cell),
+            ])
+        if len(drows) > 1:
+            els.extend(_section("État bucco-dentaire (odontogramme)", S))
+            dt = Table(drows, colWidths=[22 * mm, 47 * mm, 102 * mm])
+            dstyle = [
+                ("BACKGROUND",    (0, 0), (-1, 0), PRIMARY),
+                ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID",          (0, 0), (-1, -1), 0.3, BORDER),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+                ("TOPPADDING",    (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+            for i in range(1, len(drows)):
+                if i % 2 == 0:
+                    dstyle.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+            dt.setStyle(TableStyle(dstyle))
+            els.append(dt)
+            els.append(Spacer(1, 10))
+
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
@@ -569,10 +680,17 @@ def generate_consultation_pdf(
     def _page(canv, d):
         if use_tpl:
             return
-        _draw_page(canv, d, "COMPTE RENDU DE CONSULTATION",
-                   f"Dr. {doctor_name}  •  {doc_date}")
+        _draw_footer(canv, d)
 
-    els = []
+    els = _masthead(
+        S, "Compte rendu de consultation",
+        doctor_name=f"Dr. {doctor_name}" if doctor_name else None,
+        specialty=consultation.get("specialty"),
+        address=consultation.get("address"),
+        phone=consultation.get("phone"),
+        use_tpl=use_tpl,
+        subtitle=f"Consultation du {_fr_short_date(doc_date)}" if doc_date else None,
+    )
 
     # Patient box
     pname = consultation.get("patient_name", "Patient inconnu")
@@ -700,6 +818,7 @@ def generate_consultation_pdf(
 def generate_note_honoraires_pdf(
     note: dict, actes: list, doctor_name: str = "", specialty: str = "",
     template_path: Optional[str] = None,
+    address: Optional[str] = None, phone: Optional[str] = None,
 ) -> bytes:
     use_tpl = _has_template(template_path)
     buf = io.BytesIO()
@@ -707,27 +826,16 @@ def generate_note_honoraires_pdf(
     S = _styles()
 
     def _page(canv, d):
-        # Titre rendu dans le contenu → pas de bande d'en-tête de l'app.
-        return
+        if use_tpl:
+            return
+        _draw_footer(canv, d)
 
-    els = []
-
-    # En-tête praticien (uniquement sans papier à en-tête — sinon fourni par le fond)
-    if not use_tpl and doctor_name:
-        els.append(Paragraph(doctor_name, ParagraphStyle(
-            "_nDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
-        if specialty:
-            els.append(Paragraph(specialty, ParagraphStyle(
-                "_nSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
-        els.append(Spacer(1, 12))
-
-    # Titre + sous-titre (toujours visibles, y compris sur l'en-tête)
-    els.append(Paragraph("NOTE D'HONORAIRES", ParagraphStyle(
-        "_nTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold",
-        fontSize=16, textColor=DARK, leading=20)))
-    els.append(Paragraph("CNOPS / CNSS — Note d'honoraires", ParagraphStyle(
-        "_nSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
-    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+    els = _masthead(
+        S, "Note d'honoraires",
+        doctor_name=doctor_name or None, specialty=specialty or None,
+        address=address, phone=phone, use_tpl=use_tpl,
+        subtitle="CNOPS / CNSS",
+    )
 
     # N° + date
     num = note.get("numero_note") or "—"
@@ -869,6 +977,7 @@ def _amount_items_table(S, items):
 def generate_invoice_pdf(
     invoice: dict, items: list, payments: list,
     doctor_name: str = "", specialty: str = "", template_path: Optional[str] = None,
+    address: Optional[str] = None, phone: Optional[str] = None,
 ) -> bytes:
     """Facture imprimable / téléchargeable (item 14)."""
     use_tpl = _has_template(template_path)
@@ -877,18 +986,16 @@ def generate_invoice_pdf(
     S = _styles()
 
     def _page(canv, d):
-        return
+        if use_tpl:
+            return
+        _draw_footer(canv, d)
 
-    els = []
-    if not use_tpl and doctor_name:
-        els.append(Paragraph(doctor_name, ParagraphStyle("_fDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
-        if specialty:
-            els.append(Paragraph(specialty, ParagraphStyle("_fSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
-        els.append(Spacer(1, 12))
-
-    els.append(Paragraph("FACTURE", ParagraphStyle("_fTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=16, textColor=DARK, leading=20)))
-    els.append(Paragraph(f"N° {invoice.get('invoice_number') or '—'}", ParagraphStyle("_fSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
-    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+    els = _masthead(
+        S, "Facture",
+        doctor_name=doctor_name or None, specialty=specialty or None,
+        address=address, phone=phone, use_tpl=use_tpl,
+        subtitle=f"N° {invoice.get('invoice_number') or '—'}",
+    )
 
     date_str = invoice.get("invoice_date") or ""
     meta = Table([[f"Patient : {invoice.get('patient_name') or '—'}", f"Date : {date_str}"]], colWidths=[105 * mm, 66 * mm])
@@ -935,6 +1042,7 @@ def generate_invoice_pdf(
 def generate_devis_pdf(
     devis: dict, items: list,
     doctor_name: str = "", specialty: str = "", template_path: Optional[str] = None,
+    address: Optional[str] = None, phone: Optional[str] = None,
 ) -> bytes:
     """Devis / plan de traitement chiffré imprimable (item 21)."""
     use_tpl = _has_template(template_path)
@@ -943,18 +1051,16 @@ def generate_devis_pdf(
     S = _styles()
 
     def _page(canv, d):
-        return
+        if use_tpl:
+            return
+        _draw_footer(canv, d)
 
-    els = []
-    if not use_tpl and doctor_name:
-        els.append(Paragraph(doctor_name, ParagraphStyle("_dDoc", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=13)))
-        if specialty:
-            els.append(Paragraph(specialty, ParagraphStyle("_dSpec", parent=S["_BodySm"], alignment=TA_CENTER)))
-        els.append(Spacer(1, 12))
-
-    els.append(Paragraph("DEVIS — PLAN DE TRAITEMENT", ParagraphStyle("_dTitle", parent=S["_Body"], alignment=TA_CENTER, fontName="Helvetica-Bold", fontSize=16, textColor=DARK, leading=20)))
-    els.append(Paragraph(f"N° {devis.get('devis_number') or '—'}", ParagraphStyle("_dSub", parent=S["_BodySm"], alignment=TA_CENTER, spaceAfter=4)))
-    els.append(HRFlowable(width="100%", thickness=1, color=BORDER, spaceBefore=4, spaceAfter=10))
+    els = _masthead(
+        S, "Devis — plan de traitement",
+        doctor_name=doctor_name or None, specialty=specialty or None,
+        address=address, phone=phone, use_tpl=use_tpl,
+        subtitle=f"N° {devis.get('devis_number') or '—'}",
+    )
 
     date_str = devis.get("devis_date") or ""
     meta = Table([[f"Patient : {devis.get('patient_name') or '—'}", f"Date : {date_str}"]], colWidths=[105 * mm, 66 * mm])

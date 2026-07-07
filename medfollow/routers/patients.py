@@ -603,7 +603,7 @@ async def delete_history(
 
 
 @router.get("/{patient_id}/brochure.pdf", dependencies=[Depends(deny_secretaire)])
-async def patient_brochure_pdf(request: Request, patient_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def patient_brochure_pdf(request: Request, patient_id: int, dl: int = 0, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     cursor = await db.execute("SELECT * FROM patients WHERE id = ? AND doctor_id = ? AND is_active = 1", (patient_id, user["sub"]))
     row = await cursor.fetchone()
     if not row:
@@ -632,15 +632,34 @@ async def patient_brochure_pdf(request: Request, patient_id: int, user: dict = D
         )
         rx["items"] = [dict(i) for i in await cursor2.fetchall()]
 
-    cursor = await db.execute("SELECT pdf_template_path FROM users WHERE id = ?", (patient.get("doctor_id"),))
+    cursor = await db.execute(
+        "SELECT first_name, last_name, specialty, phone, address, pdf_template_path FROM users WHERE id = ?",
+        (patient.get("doctor_id"),),
+    )
     trow = await cursor.fetchone()
     template_path = trow["pdf_template_path"] if trow else None
+    doctor_name = f"Dr. {trow['first_name']} {trow['last_name']}" if trow else ""
+    specialty = (trow["specialty"] if trow else "") or ""
+    doc_phone = (trow["phone"] if trow else None)
+    doc_address = (trow["address"] if trow else None)
+
+    # État dentaire (odontogramme) — dents non saines uniquement.
+    cursor = await db.execute(
+        "SELECT tooth_number, condition, notes FROM dental_teeth WHERE patient_id = ? AND condition IS NOT NULL AND condition != 'sain' ORDER BY tooth_number",
+        (patient_id,),
+    )
+    dental = [dict(r) for r in await cursor.fetchall()]
 
     from services.pdf_service import generate_patient_brochure_pdf
-    pdf_bytes = generate_patient_brochure_pdf(patient, history, appointments, rx_rows, template_path)
+    pdf_bytes = generate_patient_brochure_pdf(
+        patient, history, appointments, rx_rows, template_path,
+        doctor_name=doctor_name, specialty=specialty,
+        address=doc_address, phone=doc_phone, dental=dental,
+    )
     filename = f"fiche_{patient['last_name'].lower()}_{patient['first_name'].lower()}.pdf"
+    disp = "attachment" if dl else "inline"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f'{disp}; filename="{filename}"'},
     )

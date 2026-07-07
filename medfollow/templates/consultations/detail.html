@@ -16,8 +16,8 @@
         <p class="subtitle">Patient : <a href="/patients/{{ consultation.pid }}" class="patient-link">{{ consultation.patient_name }}</a> — Dr. {{ consultation.doctor_name }}</p>
     </div>
     <div style="display: flex; gap: 8px;" class="no-print">
-        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
-        <a href="/consultations/{{ consultation.id }}/pdf" class="btn btn-primary">Télécharger PDF</a>
+        <button type="button" class="btn btn-outline" onclick="printPdf('/consultations/{{ consultation.id }}/pdf', 'Compte rendu de consultation')">Imprimer</button>
+        <a href="/consultations/{{ consultation.id }}/pdf?dl=1" class="btn btn-primary">Télécharger PDF</a>
         <a href="/consultations/{{ consultation.id }}/edit" class="btn btn-outline">Modifier</a>
         <a href="/prescriptions/new?consultation_id={{ consultation.id }}&patient_id={{ consultation.pid }}" class="btn btn-outline">Prescrire</a>
     </div>

@@ -222,11 +222,11 @@ async def view_prescription(request: Request, prescription_id: int, user: dict =
 
 
 @router.get("/{prescription_id}/pdf")
-async def prescription_pdf(request: Request, prescription_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def prescription_pdf(request: Request, prescription_id: int, dl: int = 0, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     from services.pdf_service import generate_prescription_pdf
 
     cursor = await db.execute(
-        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty, u.pdf_template_path FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? AND pr.doctor_id = ? """,
+        """SELECT pr.*, p.first_name AS p_first, p.last_name AS p_last, p.date_of_birth, p.social_security_number, u.first_name AS d_first, u.last_name AS d_last, u.specialty, u.phone, u.address, u.pdf_template_path FROM prescriptions pr JOIN patients p ON pr.patient_id = p.id JOIN users u ON pr.doctor_id = u.id WHERE pr.id = ? AND pr.doctor_id = ? """,
         (prescription_id, user["sub"]),
     )
     row = await cursor.fetchone()
@@ -259,10 +259,11 @@ async def prescription_pdf(request: Request, prescription_id: int, user: dict = 
     import io
     pdf_bytes = generate_prescription_pdf(prescription, items, prescription.get("pdf_template_path"), allergies)
     await log_audit(db, user, "ordonnance_pdf_exportee", entity_type="prescription", entity_id=prescription_id, patient_id=prescription["patient_id"], ip=client_ip(request))
+    disp = "attachment" if dl else "inline"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=ordonnance_{prescription_id}.pdf"},
+        headers={"Content-Disposition": f'{disp}; filename="ordonnance_{prescription_id}.pdf"'},
     )
 
 

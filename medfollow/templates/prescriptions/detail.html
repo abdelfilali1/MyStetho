@@ -16,8 +16,8 @@
         <p class="subtitle">{{ prescription.prescription_date }} — {{ prescription.patient_name }} — Dr. {{ prescription.doctor_name }}</p>
     </div>
     <div style="display:flex;gap:8px;" class="no-print">
-        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
-        <a href="/prescriptions/{{ prescription.id }}/pdf" class="btn btn-primary">Télécharger PDF</a>
+        <button type="button" class="btn btn-outline" onclick="printPdf('/prescriptions/{{ prescription.id }}/pdf', 'Ordonnance')">Imprimer</button>
+        <a href="/prescriptions/{{ prescription.id }}/pdf?dl=1" class="btn btn-primary">Télécharger PDF</a>
         {% if prescription.status == 'active' %}
         <a href="/prescriptions/{{ prescription.id }}/edit" class="btn btn-outline">Modifier</a>
         {% endif %}

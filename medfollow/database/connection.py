@@ -664,6 +664,14 @@ async def init_db():
     except Exception:
         pass
 
+    # Migration: adresse du praticien (affichée dans l'en-tête des PDF générés
+    # lorsqu'aucun papier à en-tête n'est fourni ; le téléphone existe déjà).
+    try:
+        await db.execute("ALTER TABLE users ADD COLUMN address TEXT")
+        await db.commit()
+    except Exception:
+        pass
+
     # Migration: prescriptions.updated_at (l'UPDATE d'édition écrivait une colonne inexistante)
     try:
         await db.execute("ALTER TABLE prescriptions ADD COLUMN updated_at DATETIME")

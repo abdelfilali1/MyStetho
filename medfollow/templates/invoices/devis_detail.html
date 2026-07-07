@@ -8,8 +8,8 @@
         <p class="subtitle">{{ devis.devis_date }} — {{ devis.patient_name }}{% if devis.valid_until %} — valable jusqu'au {{ devis.valid_until }}{% endif %}</p>
     </div>
     <div class="no-print" style="display:flex;gap:8px;align-items:center;">
-        <button onclick="window.print()" class="btn btn-outline">Imprimer</button>
-        <a href="/invoices/devis/{{ devis.id }}/pdf" class="btn btn-primary" target="_blank">Télécharger PDF</a>
+        <button type="button" class="btn btn-outline" onclick="printPdf('/invoices/devis/{{ devis.id }}/pdf', 'Devis')">Imprimer</button>
+        <a href="/invoices/devis/{{ devis.id }}/pdf?dl=1" class="btn btn-primary">Télécharger PDF</a>
     </div>
 </div>
 

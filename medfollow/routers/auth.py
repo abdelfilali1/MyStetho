@@ -183,6 +183,7 @@ async def create_user(
     role: str = Form(...),
     specialty: str = Form(""),
     phone: str = Form(""),
+    address: str = Form(""),
     linked_doctor_id: str = Form(""),
     pdf_template: UploadFile = File(None),
     db: aiosqlite.Connection = Depends(get_db),
@@ -190,7 +191,7 @@ async def create_user(
     async def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg,
-            "form": {"email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "linked_doctor_id": linked_doctor_id},
+            "form": {"email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "address": address, "linked_doctor_id": linked_doctor_id},
             "doctors": await _get_doctors(db),
         })
 
@@ -221,8 +222,8 @@ async def create_user(
 
     pw_hash = hash_password(password)
     cursor = await db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role, specialty, phone, linked_doctor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (email, pw_hash, first_name, last_name, role, specialty or None, phone or None, ldi),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role, specialty, phone, address, linked_doctor_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (email, pw_hash, first_name, last_name, role, specialty or None, phone or None, address or None, ldi),
     )
     new_user_id = cursor.lastrowid
 
@@ -298,11 +299,11 @@ async def setup(
 
 @router.get("/admin/users/{user_id}/edit", response_class=HTMLResponse)
 async def edit_user_page(request: Request, user_id: int, user: dict = Depends(require_admin), db: aiosqlite.Connection = Depends(get_db)):
-    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active, pdf_template_path, linked_doctor_id FROM users WHERE id = ?", (user_id,))
+    cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, phone, is_active, pdf_template_path, linked_doctor_id, address FROM users WHERE id = ?", (user_id,))
     row = await cursor.fetchone()
     if not row:
         return RedirectResponse(url="/admin/users", status_code=302)
-    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7], "has_template": bool(row[8]), "linked_doctor_id": row[9]}
+    edit_user = {"id": row[0], "email": row[1], "first_name": row[2], "last_name": row[3], "role": row[4], "specialty": row[5], "phone": row[6], "is_active": row[7], "has_template": bool(row[8]), "linked_doctor_id": row[9], "address": row[10]}
     return templates.TemplateResponse("admin/user_form.html", {"request": request, "user": user, "active": "admin_users", "error": None, "form": edit_user, "editing": True, "doctors": await _get_doctors(db)})
 
 @router.post("/admin/users/{user_id}/edit", response_class=HTMLResponse)
@@ -311,12 +312,13 @@ async def update_user(
     current_user: dict = Depends(require_admin),
     email: str = Form(...), first_name: str = Form(...), last_name: str = Form(...),
     role: str = Form(...), specialty: str = Form(""), phone: str = Form(""),
+    address: str = Form(""),
     linked_doctor_id: str = Form(""),
     password: str = Form(""), password_confirm: str = Form(""),
     pdf_template: UploadFile = File(None), remove_pdf_template: str = Form(""),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "has_template": True, "linked_doctor_id": linked_doctor_id}
+    form_data = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name, "role": role, "specialty": specialty, "phone": phone, "address": address, "has_template": True, "linked_doctor_id": linked_doctor_id}
     async def error(msg):
         return templates.TemplateResponse("admin/user_form.html", {
             "request": request, "user": current_user, "active": "admin_users", "error": msg, "form": form_data, "editing": True,
@@ -362,8 +364,8 @@ async def update_user(
             await db.execute("UPDATE users SET pdf_template_path = ? WHERE id = ?", (new_tpl, user_id))
 
     await db.execute(
-        "UPDATE users SET email=?, first_name=?, last_name=?, role=?, specialty=?, phone=?, linked_doctor_id=? WHERE id=?",
-        (email, first_name, last_name, role, specialty or None, phone or None, ldi, user_id)
+        "UPDATE users SET email=?, first_name=?, last_name=?, role=?, specialty=?, phone=?, address=?, linked_doctor_id=? WHERE id=?",
+        (email, first_name, last_name, role, specialty or None, phone or None, address or None, ldi, user_id)
     )
     await db.commit()
     return RedirectResponse(url="/admin/users", status_code=302)
