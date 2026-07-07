@@ -89,6 +89,10 @@ WHATSAPP_TEMPLATE_LANG = os.getenv("MEDFOLLOW_WHATSAPP_TEMPLATE_LANG", "fr")
 WHATSAPP_TPL_CONFIRMATION = os.getenv("MEDFOLLOW_WHATSAPP_TPL_CONFIRMATION", "rdv_confirmation")
 WHATSAPP_TPL_RAPPEL = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL", "rdv_rappel_24h")
 WHATSAPP_TPL_RAPPEL_SOIN = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL_SOIN", "rappel_soin")
+# Mode test : ignore les modèles réels et envoie « hello_world » (pré-approuvé
+# par Meta, sans variable) pour valider tout le tuyau AVANT l'approbation des
+# modèles Doctivo. À remettre à 0 dès que les vrais modèles sont approuvés.
+WHATSAPP_TEST_MODE = os.getenv("MEDFOLLOW_WHATSAPP_TEST_MODE", "0").lower() in ("1", "true", "yes")
 # Intervalle du planificateur de rappels 24h (secondes). 600 = 10 min.
 REMINDER_POLL_SECONDS = int(os.getenv("MEDFOLLOW_REMINDER_POLL_SECONDS", "600"))
 # Lot 2 (webhook entrant, nécessite un HTTPS public) — déclarés dès maintenant.

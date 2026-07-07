@@ -129,11 +129,12 @@ async def _send_template_api(to_msisdn: str, template: str, variables):
         f"https://graph.facebook.com/{config.WHATSAPP_API_VERSION}"
         f"/{config.WHATSAPP_PHONE_NUMBER_ID}/messages"
     )
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_msisdn,
-        "type": "template",
-        "template": {
+    if config.WHATSAPP_TEST_MODE:
+        # Mode test : « hello_world » est pré-approuvé et sans variable — permet
+        # de valider le flux de bout en bout avant l'approbation des vrais modèles.
+        tpl = {"name": "hello_world", "language": {"code": "en_US"}}
+    else:
+        tpl = {
             "name": template,
             "language": {"code": config.WHATSAPP_TEMPLATE_LANG},
             "components": [
@@ -142,7 +143,12 @@ async def _send_template_api(to_msisdn: str, template: str, variables):
                     "parameters": [{"type": "text", "text": str(v)} for v in variables],
                 }
             ],
-        },
+        }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to_msisdn,
+        "type": "template",
+        "template": tpl,
     }
     headers = {
         "Authorization": f"Bearer {config.WHATSAPP_TOKEN}",
