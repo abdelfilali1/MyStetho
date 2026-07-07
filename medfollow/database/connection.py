@@ -804,10 +804,12 @@ async def init_db():
     except Exception:
         pass
 
-    # Interrupteur du service WhatsApp par praticien (activé par défaut) : gate
-    # tous les envois (confirmation, rappel RDV, rappel de soin) de ce médecin.
+    # Interrupteur du service WhatsApp par praticien (OPT-IN : désactivé par
+    # défaut) : gate tous les envois (confirmation, rappel RDV, rappel de soin)
+    # de ce médecin. Le choix est enregistré et n'est JAMAIS réinitialisé par un
+    # déploiement (migration idempotente ; ne jamais forcer un UPDATE global).
     try:
-        await db.execute("ALTER TABLE users ADD COLUMN whatsapp_enabled INTEGER DEFAULT 1")
+        await db.execute("ALTER TABLE users ADD COLUMN whatsapp_enabled INTEGER DEFAULT 0")
         await db.commit()
     except Exception:
         pass
