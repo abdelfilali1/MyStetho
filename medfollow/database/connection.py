@@ -733,6 +733,30 @@ async def init_db():
     """)
     await db.commit()
 
+    # Céphalométrie : un cas = un cliché de profil + son tracé (points, calibration,
+    # tracés anatomiques). Les points sont stockés en pixels de l'image naturelle ;
+    # mm_per_px est dupliqué hors du JSON pour afficher « calibré » dans la liste.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS ceph_cases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            consultation_id INTEGER REFERENCES consultations(id),
+            taken_on DATE,
+            image_path TEXT,
+            analysis_id TEXT DEFAULT 'steiner',
+            mm_per_px REAL,
+            landmarks_json TEXT DEFAULT '{}',
+            traces_json TEXT DEFAULT '[]',
+            calibration_json TEXT DEFAULT '{}',
+            adjust_json TEXT DEFAULT '{}',
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     # Devis / plans de traitement chiffrés (workflow proposé → accepté/refusé → converti en facture)
     await db.execute("""
         CREATE TABLE IF NOT EXISTS devis (

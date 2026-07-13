@@ -1,0 +1,472 @@
+/* ===========================================================================
+   Module Céphalométrie — charte Doctivo
+   Le poste de travail reprend les tokens de style.css (couleurs, rayons,
+   ombres) ; seule la visionneuse est sombre, comme un négatoscope.
+   ========================================================================= */
+
+/* Empilement vertical : la radiographie occupe toute la largeur (c'est elle qui a
+   besoin de place), puis l'analyse, puis les résultats. */
+.ceph-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Les listes des volets du bas se déploient en colonnes plutôt qu'en un long
+   ruban vertical : la largeur est disponible, autant s'en servir. */
+.ceph-col .ceph-col-scroll {
+    max-height: 460px;
+}
+
+#ceph-landmark-list,
+#ceph-planes,
+#ceph-results,
+#ceph-summary {
+    column-width: 260px;
+    column-gap: 26px;
+}
+
+.ceph-lm-group,
+.ceph-lm,
+.ceph-check,
+.ceph-res,
+.ceph-sum {
+    break-inside: avoid;
+}
+
+.ceph-col {
+    background: var(--panel-strong);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ceph-col-scroll {
+    overflow-y: auto;
+    padding: 12px 14px 16px;
+    flex: 1;
+}
+
+.ceph-panel-head {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.ceph-panel-head h3 {
+    font-family: "Sora", "Manrope", sans-serif;
+    font-size: 14px;
+    color: var(--gray-900);
+}
+
+.ceph-panel-head .ceph-sub {
+    font-size: 11.5px;
+    color: var(--gray-500);
+    margin-top: 2px;
+    line-height: 1.35;
+}
+
+/* ---------- Visionneuse ---------- */
+
+.ceph-viewer {
+    position: relative;
+    background: #0d1520;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.ceph-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    background: rgba(15, 23, 42, .94);
+    border-bottom: 1px solid rgba(255, 255, 255, .1);
+}
+
+.ceph-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .14);
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 6px 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+
+.ceph-tool:hover { background: rgba(255, 255, 255, .16); }
+
+.ceph-tool.is-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.ceph-tool-sep {
+    width: 1px;
+    height: 22px;
+    background: rgba(255, 255, 255, .14);
+    margin: 0 4px;
+}
+
+.ceph-toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+/* La radio prend la hauteur utile de l'écran : c'est le volet qui a besoin d'espace. */
+.ceph-viewer { height: calc(100vh - 200px); min-height: 520px; }
+
+.ceph-stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+}
+
+.ceph-stage.is-panning { cursor: grabbing; }
+
+.ceph-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.ceph-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 560px;
+    background: rgba(15, 23, 42, .93);
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 10px;
+    padding: 8px 13px;
+    color: #cbd5e1;
+    font-size: 12px;
+    line-height: 1.4;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+}
+
+.ceph-hint-name { font-weight: 700; font-size: 13px; color: #fff; }
+.ceph-hint-abbr { color: #94a3b8; font-size: 11.5px; margin-left: 6px; }
+.ceph-hint-def { display: block; margin-top: 2px; }
+
+.ceph-hud {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, .9);
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 8px;
+    padding: 5px 10px;
+    color: #cbd5e1;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+.ceph-hud-sep { color: rgba(255, 255, 255, .25); }
+.ceph-hud-ruler { color: #fbbf24; }
+.ceph-ok { color: #34d399; font-weight: 600; }
+.ceph-warn { color: #fbbf24; font-weight: 600; }
+
+/* Panneaux flottants de la visionneuse (calibration / tracé) */
+.ceph-float {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 250px;
+    background: rgba(15, 23, 42, .95);
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 10px;
+    padding: 12px;
+    color: #e2e8f0;
+    font-size: 12.5px;
+    backdrop-filter: blur(4px);
+}
+
+.ceph-float h4 { font-size: 12.5px; margin-bottom: 8px; color: #fff; }
+.ceph-float label { display: block; font-size: 11.5px; color: #94a3b8; margin-bottom: 4px; }
+
+.ceph-float input[type="number"],
+.ceph-float select {
+    width: 100%;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 7px;
+    color: #fff;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    font-family: inherit;
+    margin-bottom: 8px;
+}
+
+.ceph-float-actions { display: flex; gap: 6px; }
+.ceph-float-actions .ceph-tool { flex: 1; justify-content: center; }
+
+.ceph-calib-state { margin-top: 8px; font-size: 11.5px; }
+
+/* ---------- Panneau des points ---------- */
+
+.ceph-progress {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--gray-500);
+    margin-bottom: 6px;
+}
+
+.ceph-progress-track {
+    height: 5px;
+    background: var(--gray-200);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.ceph-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width .2s;
+}
+
+.ceph-lm-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin: 12px 0 5px;
+}
+
+.ceph-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.ceph-lm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--gray-700);
+    cursor: pointer;
+}
+
+.ceph-lm:hover { background: var(--gray-50); }
+
+.ceph-lm.is-active {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+.ceph-lm.is-done .ceph-lm-name { color: var(--gray-500); }
+.ceph-lm-abbr { font-weight: 700; min-width: 44px; font-size: 11.5px; }
+.ceph-lm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ceph-lm-state { color: var(--gray-400); font-size: 12px; }
+.ceph-lm.is-done .ceph-lm-state { color: var(--success); }
+
+.ceph-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--gray-700);
+    padding: 4px 2px;
+    cursor: pointer;
+}
+
+.ceph-plane-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+/* ---------- Résultats ---------- */
+
+.ceph-res {
+    border-bottom: 1px solid var(--gray-100);
+    padding: 8px 0;
+}
+
+.ceph-res:last-child { border-bottom: none; }
+
+.ceph-res-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ceph-res-name { font-size: 12.5px; font-weight: 600; color: var(--gray-800); }
+
+.ceph-res-value {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ceph-res-missing { font-size: 11px; color: var(--gray-400); font-style: italic; white-space: nowrap; }
+
+.ceph-res-sub {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 1px;
+}
+
+.ceph-res-norm { font-size: 11px; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+.ceph-res-z { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ceph-res-note { font-size: 11.5px; margin-top: 3px; line-height: 1.35; }
+.ceph-res-caveat { font-size: 11px; color: var(--warning); margin-top: 3px; line-height: 1.35; }
+
+.ceph-sev-normal { color: var(--success); }
+.ceph-sev-mild { color: var(--warning); }
+.ceph-sev-moderate { color: #ea580c; }
+.ceph-sev-severe { color: var(--danger); }
+
+/* ---------- Synthèse ---------- */
+
+.ceph-sum {
+    border-left: 3px solid var(--gray-300);
+    padding: 7px 0 7px 10px;
+    margin-bottom: 9px;
+}
+
+.ceph-sum.ceph-sev-normal { border-left-color: var(--success); }
+.ceph-sum.ceph-sev-mild { border-left-color: var(--warning); }
+.ceph-sum.ceph-sev-moderate { border-left-color: #ea580c; }
+.ceph-sum.ceph-sev-severe { border-left-color: var(--danger); }
+
+.ceph-sum-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--gray-500);
+    font-weight: 700;
+}
+
+.ceph-sum-finding { font-size: 13px; font-weight: 700; color: var(--gray-900); margin-top: 1px; }
+.ceph-sum-detail { font-size: 11.5px; color: var(--gray-600); line-height: 1.4; margin-top: 2px; }
+
+.ceph-empty { font-size: 12px; color: var(--gray-400); font-style: italic; }
+
+.ceph-section-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin: 14px 0 6px;
+}
+
+.ceph-notes {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 12.5px;
+    resize: vertical;
+    color: var(--gray-800);
+}
+
+.ceph-save-state { font-size: 11.5px; font-weight: 600; }
+.ceph-save-state.is-pending { color: var(--warning); }
+.ceph-save-state.is-saving { color: var(--gray-500); }
+.ceph-save-state.is-saved { color: var(--success); }
+.ceph-save-state.is-error { color: var(--danger); }
+
+.ceph-slider {
+    width: 100%;
+    margin: 2px 0 8px;
+    accent-color: var(--primary);
+}
+
+.ceph-slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--gray-600);
+}
+
+.ceph-footnote {
+    font-size: 10.5px;
+    color: var(--gray-400);
+    line-height: 1.4;
+    margin-top: 12px;
+    border-top: 1px solid var(--gray-100);
+    padding-top: 8px;
+}
+
+/* ---------- Liste des analyses ---------- */
+
+.ceph-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 14px;
+}
+
+.ceph-case {
+    display: block;
+    text-decoration: none;
+    background: var(--panel-strong);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+}
+
+.ceph-case:hover { transform: translateY(-2px); box-shadow: var(--shadow-medium); }
+
+.ceph-case-thumb {
+    height: 148px;
+    background: #0d1520 center / contain no-repeat;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.ceph-case-body { padding: 11px 13px 13px; }
+.ceph-case-name { font-size: 13.5px; font-weight: 700; color: var(--gray-900); }
+.ceph-case-meta { font-size: 11.5px; color: var(--gray-500); margin-top: 2px; }
+
+.ceph-badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-top: 7px;
+}
+
+.ceph-badge.is-ok { background: var(--success-light); color: #0b7d5d; }
+.ceph-badge.is-todo { background: var(--warning-light); color: #a1650a; }
+
+/* Le sélecteur d'analyse ne doit pas s'étirer sur toute la largeur du volet. */
+#ceph-analysis { max-width: 340px; }
+
+@media (max-width: 860px) {
+    .ceph-viewer { height: 70vh; min-height: 420px; }
+}

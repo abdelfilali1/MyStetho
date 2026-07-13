@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Céphalométrie - Doctivo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/cephalo.css?v=20260713-1">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Céphalométrie</h2>
+        <p class="subtitle">Analyse de téléradiographie de profil : calibration, digitalisation des points, 10 analyses de référence et rapport imprimable.</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('new-ceph-card').style.display='block';this.style.display='none';">+ Nouvelle analyse</button>
+</div>
+
+<div class="card" id="new-ceph-card" style="display:{% if not cases %}block{% else %}none{% endif %};margin-bottom:16px;">
+    <div class="card-header"><h3>Nouvelle analyse céphalométrique</h3></div>
+    <div class="card-body">
+        <form method="POST" action="/cephalometrie/nouvelle" enctype="multipart/form-data">
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label>Patient <span class="required-star">*</span></label>
+                    <select name="patient_id" required>
+                        <option value="">-- Choisir --</option>
+                        {% for p in patients %}
+                        <option value="{{ p.id }}" {% if preselect_patient == p.id %}selected{% endif %}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Date du cliché</label>
+                    <input type="date" name="taken_on" value="{{ today }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Téléradiographie de profil (JPEG / PNG) <span class="required-star">*</span></label>
+                <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required>
+                <small style="color:var(--gray-500);font-size:11.5px;">Le cliché reste sur votre serveur Doctivo, comme tout document patient.</small>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Ouvrir le poste de travail</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('new-ceph-card').style.display='none';">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if cases %}
+<div class="ceph-card-grid">
+    {% for c in cases %}
+    <a class="ceph-case" href="/cephalometrie/{{ c.id }}">
+        <div class="ceph-case-thumb" style="background-image:url('/cephalometrie/{{ c.id }}/image');"></div>
+        <div class="ceph-case-body">
+            <div class="ceph-case-name">{{ c.last_name | upper }} {{ c.first_name }}</div>
+            <div class="ceph-case-meta">
+                {{ c.analysis_label }} · {{ c.taken_on_fr or 'sans date' }}
+            </div>
+            <div class="ceph-case-meta">{{ c.n_points }} point{{ 's' if c.n_points > 1 else '' }} posé{{ 's' if c.n_points > 1 else '' }}</div>
+            {% if c.mm_per_px %}
+            <span class="ceph-badge is-ok">Calibré</span>
+            {% else %}
+            <span class="ceph-badge is-todo">Non calibré</span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 20px;">
+        <p style="color:var(--gray-500);">Aucune analyse céphalométrique pour l'instant. Importez une téléradiographie de profil pour commencer.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

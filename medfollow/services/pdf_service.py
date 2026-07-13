@@ -271,7 +271,10 @@ def _patient_box(S, name, sub=None):
     inner = [Paragraph(name, S["_PatName"])]
     if sub:
         inner.append(Paragraph(sub, S["_PatSub"]))
-    t = Table([inner], colWidths=[171 * mm])
+    # [[inner]] et non [inner] : les deux paragraphes doivent être EMPILÉS dans UNE
+    # cellule. En ligne de deux cellules, la seconde colonne (non dimensionnée)
+    # débordait de la page et le nom du patient disparaissait.
+    t = Table([[inner]], colWidths=[171 * mm])
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), PRIMARY_BG),
         ("LEFTPADDING",   (0, 0), (-1, -1), 14),
@@ -1109,6 +1112,196 @@ def generate_devis_pdf(
     ]], colWidths=[85 * mm, 86 * mm])
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY), ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY), ("TOPPADDING", (0, 0), (-1, -1), 6)]))
     els.append(sig)
+
+    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out
+
+
+# ═════════════════════════════════════════════════════════════
+# RAPPORT CÉPHALOMÉTRIQUE
+# ═════════════════════════════════════════════════════════════
+
+def generate_cephalo_pdf(
+    patient: dict,
+    analysis_name: str,
+    analysis_subtitle: str = "",
+    citation: str = "",
+    rows: Optional[list] = None,
+    summary: Optional[list] = None,
+    notes: str = "",
+    calibrated: bool = False,
+    tracing_png: Optional[bytes] = None,
+    doctor_name: str = "",
+    specialty: str = "",
+    address: Optional[str] = None,
+    phone: Optional[str] = None,
+    template_path: Optional[str] = None,
+) -> bytes:
+    """Rapport d'analyse céphalométrique, posé sur le papier à en-tête du praticien.
+
+    Le tracé (radiographie + plans + points) est composé par le navigateur et
+    transmis en PNG : le rapport montre exactement ce que le praticien a vu à
+    l'écran. Les mesures, elles, arrivent déjà calculées et formatées — le moteur
+    d'analyse ne vit qu'à un seul endroit (le module JS), jamais en double.
+    """
+    from reportlab.platypus import Image as RLImage
+
+    rows = rows or []
+    summary = summary or []
+    use_tpl = _has_template(template_path)
+    buf = io.BytesIO()
+    doc = _doc_for(buf, template_path)
+    S = _styles()
+
+    def _page(canv, d):
+        if use_tpl:
+            return
+        _draw_footer(canv, d)
+
+    subtitle = analysis_subtitle
+    if citation:
+        subtitle = f"{subtitle} · {citation}" if subtitle else citation
+
+    els = _masthead(
+        S, f"Analyse céphalométrique — {analysis_name}",
+        doctor_name=doctor_name or None,
+        specialty=specialty or None,
+        address=address, phone=phone,
+        use_tpl=use_tpl,
+        subtitle=subtitle or None,
+    )
+
+    # Patient
+    pdetails = []
+    if patient.get("dob"):
+        pdetails.append(f"Né(e) le {_fr_short_date(patient['dob'])}")
+    if patient.get("age") is not None:
+        pdetails.append(f"{patient['age']} ans")
+    if patient.get("sex_label"):
+        pdetails.append(patient["sex_label"])
+    if patient.get("taken_on"):
+        pdetails.append(f"Cliché du {patient['taken_on']}")
+    els.append(_patient_box(S, _esc(patient.get("name", "Patient")),
+                            "  •  ".join(pdetails) if pdetails else None))
+    els.append(Spacer(1, 10))
+
+    # Tracé céphalométrique
+    if tracing_png:
+        try:
+            img = RLImage(io.BytesIO(tracing_png))
+            max_w = 171 * mm
+            max_h = 118 * mm
+            ratio = min(max_w / img.imageWidth, max_h / img.imageHeight)
+            img.drawWidth = img.imageWidth * ratio
+            img.drawHeight = img.imageHeight * ratio
+            img.hAlign = "CENTER"
+            els.extend(_section("Tracé", S))
+            els.append(img)
+            els.append(Spacer(1, 8))
+        except Exception:
+            pass  # un tracé illisible ne doit jamais empêcher l'édition du rapport
+
+    # Mesures
+    els.extend(_section("Mesures", S))
+    if not calibrated:
+        els.append(Paragraph(
+            "Cliché non calibré : les mesures en millimètres sont retenues plutôt qu'estimées. "
+            "Les mesures angulaires restent valides.", S["_Italic"]))
+        els.append(Spacer(1, 4))
+
+    head_st = ParagraphStyle("_cHead", parent=S["_BodySm"], fontName="Helvetica-Bold",
+                             textColor=white, fontSize=8.5, leading=11)
+    cell_st = ParagraphStyle("_cCell", parent=S["_BodySm"], fontSize=8.5, leading=11, textColor=DARK)
+    cell_gray = ParagraphStyle("_cCellG", parent=cell_st, textColor=GRAY)
+    cell_bold = ParagraphStyle("_cCellB", parent=cell_st, fontName="Helvetica-Bold")
+
+    data = [[
+        Paragraph("Mesure", head_st),
+        Paragraph("Valeur", head_st),
+        Paragraph("Norme", head_st),
+        Paragraph("Écart", head_st),
+        Paragraph("Interprétation", head_st),
+    ]]
+    for r in rows:
+        value = r.get("value")
+        if value:
+            v_cell = Paragraph(_esc(value), cell_bold)
+            z = r.get("z") or ""
+            sev = r.get("severity_label") or ""
+            ecart = f"{z} ET" if z else ""
+            if sev and sev != "Normal":
+                ecart = f"{ecart}<br/><font size=7>{_esc(sev)}</font>" if ecart else _esc(sev)
+            e_cell = Paragraph(ecart, cell_st)
+            note = _esc(r.get("note") or "")
+        else:
+            v_cell = Paragraph("—", cell_gray)
+            e_cell = Paragraph("", cell_st)
+            note = f"<i>{_esc(r.get('missing') or 'Non calculable')}</i>"
+        data.append([
+            Paragraph(_esc(r.get("name", "")), cell_st),
+            v_cell,
+            Paragraph(_esc(r.get("norm", "")), cell_gray),
+            e_cell,
+            Paragraph(note, cell_gray),
+        ])
+
+    t = Table(data, colWidths=[46 * mm, 22 * mm, 26 * mm, 20 * mm, 57 * mm], repeatRows=1)
+    style = [
+        ("BACKGROUND",    (0, 0), (-1, 0), PRIMARY),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("GRID",          (0, 0), (-1, -1), 0.3, BORDER),
+    ]
+    for i in range(1, len(data)):
+        if i % 2 == 0:
+            style.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+    t.setStyle(TableStyle(style))
+    els.append(t)
+
+    # Synthèse diagnostique
+    if summary:
+        els.append(Spacer(1, 6))
+        els.extend(_section("Synthèse diagnostique", S))
+        sdata = []
+        for line in summary:
+            sdata.append([
+                Paragraph(_esc(line.get("label", "")), cell_gray),
+                Paragraph(f"<b>{_esc(line.get('finding', ''))}</b><br/>{_esc(line.get('detail', ''))}", cell_st),
+            ])
+        st = Table(sdata, colWidths=[38 * mm, 133 * mm])
+        sstyle = [
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("BOX",           (0, 0), (-1, -1), 0.5, BORDER),
+            ("LINEBELOW",     (0, 0), (-1, -2), 0.3, BORDER),
+        ]
+        for i in range(len(sdata)):
+            if i % 2 == 0:
+                sstyle.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+        st.setStyle(TableStyle(sstyle))
+        els.append(st)
+
+    # Notes du praticien
+    if notes:
+        els.append(Spacer(1, 6))
+        els.extend(_section("Notes cliniques", S))
+        els.append(Paragraph(_esc(notes).replace("\n", "<br/>"), S["_Body"]))
+
+    els.append(Spacer(1, 10))
+    els.append(Paragraph(
+        "Les normes citées sont des valeurs de référence adultes de population caucasienne ; "
+        "elles ne se transposent pas d'une population à l'autre. Un écart est exprimé en écarts-types (ET) "
+        "par rapport à la moyenne de la norme retenue par l'analyse affichée.",
+        S["_BodySm"]))
+
+    els.append(Spacer(1, 26))
+    els.append(_sig_block(doctor_name.replace("Dr. ", "")))
 
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
     out = buf.getvalue()

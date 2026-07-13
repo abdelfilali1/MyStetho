@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Céphalométrie — {{ case.last_name }} {{ case.first_name }} - Doctivo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/cephalo.css?v=20260713-1">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>{{ case.last_name | upper }} {{ case.first_name }}</h2>
+        <p class="subtitle">
+            Analyse céphalométrique{% if case.taken_on_fr %} · cliché du {{ case.taken_on_fr }}{% endif %}
+            {% if patient.age is not none %} · {{ patient.age }} ans{% endif %}
+            {% if patient.sex_label %} · {{ patient.sex_label }}{% endif %}
+        </p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <span id="ceph-save-state" class="ceph-save-state is-saved">Enregistré</span>
+        <button type="button" id="ceph-save" class="btn btn-outline">Enregistrer</button>
+        <button type="button" id="ceph-pdf-print" class="btn btn-outline">Imprimer</button>
+        <button type="button" id="ceph-pdf-dl" class="btn btn-primary">Rapport PDF</button>
+        <a href="/cephalometrie" class="btn btn-outline">Retour</a>
+    </div>
+</div>
+
+<div class="ceph-workspace">
+
+    <!-- ============ Colonne 1 : la radiographie ============ -->
+    <div class="ceph-viewer">
+        <div class="ceph-toolbar">
+            <button type="button" class="ceph-tool" data-mode="landmark">Points</button>
+            <button type="button" class="ceph-tool" data-mode="calibrate">Calibrer</button>
+            <button type="button" class="ceph-tool" data-mode="trace">Tracé</button>
+            <button type="button" class="ceph-tool" data-mode="measure">Règle</button>
+            <span class="ceph-tool-sep"></span>
+            <button type="button" class="ceph-tool" id="ceph-invert-btn">Négatif</button>
+            <button type="button" class="ceph-tool" id="ceph-flip-btn">Miroir</button>
+            <div class="ceph-toolbar-right">
+                <button type="button" class="ceph-tool" id="ceph-zoom-out">−</button>
+                <button type="button" class="ceph-tool" id="ceph-zoom-in">+</button>
+                <button type="button" class="ceph-tool" id="ceph-fit">Ajuster</button>
+            </div>
+        </div>
+
+        <div class="ceph-stage" id="ceph-stage">
+            <svg id="ceph-svg" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <filter id="ceph-adj" color-interpolation-filters="sRGB">
+                        <feComponentTransfer>
+                            <feFuncR id="ceph-gammaR" type="gamma" exponent="1" amplitude="1" offset="0"/>
+                            <feFuncG id="ceph-gammaG" type="gamma" exponent="1" amplitude="1" offset="0"/>
+                            <feFuncB id="ceph-gammaB" type="gamma" exponent="1" amplitude="1" offset="0"/>
+                        </feComponentTransfer>
+                        <feComponentTransfer>
+                            <feFuncR id="ceph-linR" type="linear" slope="1" intercept="0"/>
+                            <feFuncG id="ceph-linG" type="linear" slope="1" intercept="0"/>
+                            <feFuncB id="ceph-linB" type="linear" slope="1" intercept="0"/>
+                        </feComponentTransfer>
+                        <feComponentTransfer id="ceph-invert">
+                            <feFuncR id="ceph-invR" type="table" tableValues="0 1"/>
+                            <feFuncG id="ceph-invG" type="table" tableValues="0 1"/>
+                            <feFuncB id="ceph-invB" type="table" tableValues="0 1"/>
+                        </feComponentTransfer>
+                    </filter>
+                    <clipPath id="ceph-loupe-clip"><circle cx="0" cy="0" r="78"/></clipPath>
+                </defs>
+
+                <g id="ceph-g-image">
+                    <image id="ceph-img" filter="url(#ceph-adj)" x="0" y="0"/>
+                </g>
+                <g id="ceph-g-overlay"></g>
+
+                <!-- Loupe (espace écran : elle ne se met jamais à l'échelle) -->
+                <g id="ceph-g-loupe" style="display:none;pointer-events:none;">
+                    <g id="ceph-loupe-clipped" clip-path="url(#ceph-loupe-clip)">
+                        <g id="ceph-loupe-scale">
+                            <g id="ceph-loupe-flip">
+                                <image id="ceph-loupe-img" filter="url(#ceph-adj)" x="0" y="0" style="image-rendering:pixelated;"/>
+                            </g>
+                            <g id="ceph-loupe-points"></g>
+                        </g>
+                        <line x1="-14" y1="0" x2="-4" y2="0" stroke="#f43f5e" stroke-width="1"/>
+                        <line x1="4" y1="0" x2="14" y2="0" stroke="#f43f5e" stroke-width="1"/>
+                        <line x1="0" y1="-14" x2="0" y2="-4" stroke="#f43f5e" stroke-width="1"/>
+                        <line x1="0" y1="4" x2="0" y2="14" stroke="#f43f5e" stroke-width="1"/>
+                    </g>
+                    <circle id="ceph-loupe-ring" r="78" fill="none" stroke="#94a3b8" stroke-width="2"/>
+                </g>
+            </svg>
+
+            <div class="ceph-hint" id="ceph-hint" style="display:none;"></div>
+            <div class="ceph-hud" id="ceph-hud"></div>
+
+            <!-- Panneau flottant : calibration -->
+            <div class="ceph-float" id="ceph-calib-panel" style="display:none;">
+                <h4>Calibration de l'échelle</h4>
+                <p style="font-size:11.5px;color:#94a3b8;line-height:1.4;margin-bottom:8px;">
+                    Cliquez les deux extrémités d'une distance connue sur le cliché (réglette radio-opaque, bille repère), puis saisissez sa longueur réelle.
+                </p>
+                <label for="ceph-calib-mm">Distance réelle (mm)</label>
+                <input type="number" id="ceph-calib-mm" min="1" step="0.1" value="100">
+                <div class="ceph-float-actions">
+                    <button type="button" class="ceph-tool is-active" id="ceph-calib-apply">Valider</button>
+                    <button type="button" class="ceph-tool" id="ceph-calib-clear">Réinitialiser</button>
+                </div>
+                <div class="ceph-calib-state" id="ceph-calib-state"></div>
+            </div>
+
+            <!-- Panneau flottant : tracé anatomique -->
+            <div class="ceph-float" id="ceph-trace-panel" style="display:none;">
+                <h4>Tracé anatomique</h4>
+                <label for="ceph-trace-structure">Structure</label>
+                <select id="ceph-trace-structure"></select>
+                <div class="ceph-float-actions">
+                    <button type="button" class="ceph-tool" id="ceph-trace-clear">Effacer la structure</button>
+                </div>
+                <div class="ceph-float-actions" style="margin-top:6px;">
+                    <button type="button" class="ceph-tool" id="ceph-trace-clear-all">Tout effacer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Colonne 2 : analyse et points à digitaliser ============ -->
+    <div class="ceph-col">
+        <div class="ceph-panel-head">
+            <h3>Analyse</h3>
+            <select id="ceph-analysis" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit;font-size:13px;"></select>
+            <div class="ceph-sub" id="ceph-analysis-sub"></div>
+        </div>
+        <div class="ceph-col-scroll">
+            <div class="ceph-progress">
+                <span>Points posés</span>
+                <span id="ceph-progress-count">0 / 0</span>
+            </div>
+            <div class="ceph-progress-track"><div class="ceph-progress-fill" id="ceph-progress-bar" style="width:0"></div></div>
+            <p style="font-size:11px;color:var(--gray-400);line-height:1.4;">
+                Sélectionnez un point, cliquez sur le cliché : le point suivant s'active automatiquement.
+                Flèches = 1 px, Maj+flèches = 0,2 px, Suppr = effacer.
+            </p>
+            <div id="ceph-landmark-list"></div>
+        </div>
+    </div>
+
+    <!-- ============ Colonne 3 : résultats ============ -->
+    <div class="ceph-col ceph-col-results">
+        <div class="ceph-panel-head">
+            <h3>Résultats</h3>
+            <div class="ceph-sub">Valeur, norme, écart en écarts-types (ET) et interprétation.</div>
+        </div>
+        <div class="ceph-col-scroll">
+            <div id="ceph-results"></div>
+
+            <div class="ceph-section-title">Synthèse diagnostique</div>
+            <div id="ceph-summary"></div>
+
+            <div class="ceph-section-title">Plans de référence</div>
+            <div id="ceph-planes"></div>
+
+            <div class="ceph-section-title">Affichage</div>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-landmarks" checked> Points</label>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-labels" checked> Étiquettes</label>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-traces" checked> Tracés</label>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-loupe" checked> Loupe (×4)</label>
+
+            <div class="ceph-section-title">Image</div>
+            <div class="ceph-slider-label"><span>Luminosité</span></div>
+            <input type="range" class="ceph-slider" id="ceph-brightness" min="30" max="200" step="1" value="100">
+            <div class="ceph-slider-label"><span>Contraste</span></div>
+            <input type="range" class="ceph-slider" id="ceph-contrast" min="30" max="250" step="1" value="100">
+            <div class="ceph-slider-label"><span>Gamma</span></div>
+            <input type="range" class="ceph-slider" id="ceph-gamma" min="0.4" max="2.5" step="0.05" value="1">
+            <button type="button" class="btn btn-outline" id="ceph-reset-adjust" style="width:100%;font-size:12px;padding:6px;">Réinitialiser l'image</button>
+
+            <div class="ceph-section-title">Notes cliniques</div>
+            <textarea class="ceph-notes" id="ceph-notes" rows="3" placeholder="Observations, plan de traitement envisagé…">{{ case.notes or '' }}</textarea>
+
+            <p class="ceph-footnote">
+                Les normes sont des valeurs de référence adultes de population caucasienne : elles ne se transposent pas
+                d'une population à l'autre. Tant que le cliché n'est pas calibré, les mesures en millimètres sont retenues
+                plutôt qu'estimées ; les mesures angulaires, elles, restent valides.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="ceph-data">{{ ceph_json | safe }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/ceph/workstation.js?v=20260713-1"></script>
+{% endblock %}
