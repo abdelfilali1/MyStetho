@@ -89,6 +89,14 @@ WHATSAPP_TEMPLATE_LANG = os.getenv("MEDFOLLOW_WHATSAPP_TEMPLATE_LANG", "fr")
 WHATSAPP_TPL_CONFIRMATION = os.getenv("MEDFOLLOW_WHATSAPP_TPL_CONFIRMATION", "rdv_confirmation")
 WHATSAPP_TPL_RAPPEL = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL", "rdv_rappel_24h")
 WHATSAPP_TPL_RAPPEL_SOIN = os.getenv("MEDFOLLOW_WHATSAPP_TPL_RAPPEL_SOIN", "rappel_soin")
+# En-tête IMAGE : les 3 modèles Doctivo (rdv_confirmation, rdv_rappel_24h,
+# rappel_soin) ont un header de type IMAGE, OBLIGATOIRE à chaque envoi. On fournit
+# une URL HTTPS publique que les serveurs de Meta téléchargent. Mettre à vide (« »)
+# pour un template SANS header image (sinon Meta rejette l'envoi).
+WHATSAPP_HEADER_IMAGE_URL = os.getenv(
+    "MEDFOLLOW_WHATSAPP_HEADER_IMAGE_URL",
+    "https://www.doctivo.org/static/img/logo4.png",
+)
 # Mode test : ignore les modèles réels et envoie « hello_world » (pré-approuvé
 # par Meta, sans variable) pour valider tout le tuyau AVANT l'approbation des
 # modèles Doctivo. À remettre à 0 dès que les vrais modèles sont approuvés.

@@ -15,6 +15,15 @@ ENV/
 .claude/
 .codex_tmp/
 
+# Secrets & environnement (NE JAMAIS COMMITER — token WhatsApp, etc.)
+.env
+.env.local
+medfollow/.env
+run_whatsapp_local.ps1
+*.local.ps1
+Token Whatsapp
+Token*Whatsapp*
+
 # Node
 node_modules/
 

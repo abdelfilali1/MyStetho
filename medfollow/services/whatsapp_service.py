@@ -16,9 +16,12 @@ Règles importantes :
   requête n'est plus disponible — même motif que le middleware
   `_inject_active_consultation` de `main.py`.
 
-Convention des templates (à créer côté Meta avec ces variables, dans cet ordre) :
-- `rdv_confirmation` : {{1}} prénom, {{2}} Dr Nom, {{3}} date (JJ/MM/AAAA), {{4}} heure (HH:MM)
-- `rdv_rappel_24h`   : {{1}} prénom, {{2}} Dr Nom, {{3}} date (JJ/MM/AAAA), {{4}} heure (HH:MM)
+Convention des templates (créés côté Meta, catégorie Utility, langue fr) :
+- `rdv_confirmation` : header IMAGE + {{1}} prénom, {{2}} Dr Nom, {{3}} date (JJ/MM/AAAA), {{4}} heure (HH:MM)
+- `rdv_rappel_24h`   : header IMAGE + {{1}} prénom, {{2}} Dr Nom, {{3}} date (JJ/MM/AAAA), {{4}} heure (HH:MM)
+- `rappel_soin`      : header IMAGE + {{1}} prénom, {{2}} motif, {{3}} Dr Nom
+Les 3 modèles ont un header IMAGE OBLIGATOIRE : on joint `WHATSAPP_HEADER_IMAGE_URL`
+à chaque envoi (cf. `_send_template_api`).
 """
 import re
 import traceback
@@ -134,15 +137,25 @@ async def _send_template_api(to_msisdn: str, template: str, variables):
         # de valider le flux de bout en bout avant l'approbation des vrais modèles.
         tpl = {"name": "hello_world", "language": {"code": "en_US"}}
     else:
+        components = []
+        # Header IMAGE obligatoire pour les 3 modèles Doctivo : on joint l'image à
+        # chaque envoi (l'image d'exemple du modèle ne sert qu'à l'approbation Meta).
+        if config.WHATSAPP_HEADER_IMAGE_URL:
+            components.append({
+                "type": "header",
+                "parameters": [
+                    {"type": "image",
+                     "image": {"link": config.WHATSAPP_HEADER_IMAGE_URL}},
+                ],
+            })
+        components.append({
+            "type": "body",
+            "parameters": [{"type": "text", "text": str(v)} for v in variables],
+        })
         tpl = {
             "name": template,
             "language": {"code": config.WHATSAPP_TEMPLATE_LANG},
-            "components": [
-                {
-                    "type": "body",
-                    "parameters": [{"type": "text", "text": str(v)} for v in variables],
-                }
-            ],
+            "components": components,
         }
     payload = {
         "messaging_product": "whatsapp",
