@@ -10,6 +10,7 @@
 import { ANALYSES, ANALYSIS_BY_ID, evaluate, fmt, fmtNorm, requiredLandmarks } from './analysis.js';
 import { GROUP_COLOR, LANDMARK_BY_ID, LANDMARK_GROUPS, orderLandmarks } from './landmarks.js';
 import { drawablePlanes, diagnosticSummary, PLANES, PLANE_GROUP_LABEL, TRACE_COLOR, TRACE_STRUCTURES } from './tracing.js';
+import { detectLandmarks, modelAvailable } from './autodetect.js';
 
 const LOUPE_FACTOR = 4;
 const LOUPE_R = 78;
@@ -38,6 +39,7 @@ const SEVERITY_LABEL = {
 const S = {
     analysisId: CFG.case.analysis_id || 'steiner',
     landmarks: CFG.case.landmarks || {},
+    aiSuggested: new Set(),     // points posés par l'IA, non encore validés par le praticien
     traces: CFG.case.traces || [],
     calibration: Object.assign({ mmPerPx: null, p1: null, p2: null, knownMm: 100 }, CFG.case.calibration || {}),
     adjust: Object.assign({ brightness: 100, contrast: 100, gamma: 1, invert: false, flipH: false }, CFG.case.adjust || {}),
@@ -155,11 +157,13 @@ function touch() {
 
 function placeLandmark(id, p) {
     S.landmarks[id] = p;
+    S.aiSuggested.delete(id);   // posé/déplacé à la main = validé par le praticien
     touch();
 }
 
 function removeLandmark(id) {
     delete S.landmarks[id];
+    S.aiSuggested.delete(id);
     touch();
     renderAll();
 }
@@ -321,14 +325,23 @@ function renderOverlay() {
             if (!def) continue;
             const p = S.landmarks[id];
             const color = GROUP_COLOR[def.group];
+            const suggested = S.aiSuggested.has(id);
             if (id === S.activeLandmark) {
                 el('circle', { cx: p.x, cy: p.y, r: r * 2.6, fill: color, opacity: 0.18 }, gOverlay);
             }
+            // Point suggéré par l'IA (non validé) : halo pointillé ambre autour du marqueur.
+            if (suggested) {
+                el('circle', {
+                    cx: p.x, cy: p.y, r: r * 2, fill: 'none', stroke: '#f59e0b',
+                    'stroke-width': lw * 1.1, 'stroke-dasharray': `${lw * 2.4} ${lw * 2}`, opacity: 0.95,
+                }, gOverlay);
+            }
             el('circle', {
-                cx: p.x, cy: p.y, r, fill: color, stroke: '#fff',
-                'stroke-width': lw * 0.8, opacity: 0.98,
+                cx: p.x, cy: p.y, r, fill: suggested ? '#fff' : color,
+                stroke: suggested ? '#f59e0b' : '#fff',
+                'stroke-width': lw * (suggested ? 1.2 : 0.8), opacity: 0.98,
             }, gOverlay);
-            el('circle', { cx: p.x, cy: p.y, r: r * 0.28, fill: '#fff', opacity: 0.9 }, gOverlay);
+            el('circle', { cx: p.x, cy: p.y, r: r * 0.28, fill: suggested ? '#f59e0b' : '#fff', opacity: 0.9 }, gOverlay);
             if (S.showLabels) {
                 // Un halo blanc garde l'étiquette lisible aussi bien sur l'émail
                 // clair que sur l'air sombre du cliché.
@@ -457,14 +470,17 @@ function renderLandmarkPanel() {
         for (const id of ids) {
             const def = LANDMARK_BY_ID[id];
             const done = !!S.landmarks[id];
+            const suggested = S.aiSuggested.has(id);
             const row = document.createElement('button');
             row.type = 'button';
-            row.className = 'ceph-lm' + (done ? ' is-done' : '') + (id === S.activeLandmark ? ' is-active' : '');
-            row.title = def.definition;
+            row.className = 'ceph-lm' + (done ? ' is-done' : '') + (suggested ? ' is-ai' : '')
+                + (id === S.activeLandmark ? ' is-active' : '');
+            row.title = suggested ? 'Suggéré par l’IA — à vérifier' : def.definition;
+            const state = suggested ? '<span class="ceph-lm-ai">IA</span>' : (done ? '✓' : '○');
             row.innerHTML = `
                 <span class="ceph-lm-abbr" style="color:${g.color}">${def.abbr}</span>
                 <span class="ceph-lm-name">${def.name}</span>
-                <span class="ceph-lm-state">${done ? '✓' : '○'}</span>`;
+                <span class="ceph-lm-state">${state}</span>`;
             row.addEventListener('click', () => {
                 S.activeLandmark = id;
                 S.mode = 'landmark';
@@ -707,6 +723,7 @@ stage.addEventListener('pointermove', (e) => {
     }
     if (S.dragging) {
         S.landmarks[S.dragging] = p;
+        S.aiSuggested.delete(S.dragging);   // déplacé à la main = validé
         touch();
         renderViewer();
         return;
@@ -777,6 +794,7 @@ window.addEventListener('keydown', (e) => {
             const flip = S.adjust.flipH ? -1 : 1;
             const p = S.landmarks[sel];
             S.landmarks[sel] = { x: p.x + d[0] * flip, y: p.y + d[1] };
+            S.aiSuggested.delete(sel);   // ajusté au clavier = validé
             touch();
             renderAll();
             return;
@@ -1116,6 +1134,67 @@ function printBlobUrl(blobUrl) {
 
 $('ceph-pdf-print').addEventListener('click', () => buildReport(false));
 $('ceph-pdf-dl').addEventListener('click', () => buildReport(true));
+
+// ---------------------------------------------------------------------------
+// Détection automatique (brouillon IA)
+// ---------------------------------------------------------------------------
+
+const aiBtn = $('ceph-ai-btn');
+const aiLabel = $('ceph-ai-label');
+let aiBusy = false;
+
+async function runAutodetect() {
+    if (aiBusy || !S.image) return;
+    // Ne pas écraser un travail déjà entamé sans prévenir.
+    const already = Object.keys(S.landmarks).length;
+    if (already && !confirm(
+        `La détection automatique va pré-positionner 19 points (brouillon à valider).\n`
+        + `${already} point(s) sont déjà posés et pourraient être remplacés. Continuer ?`)) {
+        return;
+    }
+
+    aiBusy = true;
+    aiBtn.classList.add('is-active');
+    aiBtn.disabled = true;
+    const setLbl = (t) => { aiLabel.textContent = t; };
+
+    try {
+        const { landmarks, unreliable, lowConf } = await detectLandmarks(
+            bitmap, S.image.width, S.image.height, setLbl);
+
+        for (const id in landmarks) {
+            S.landmarks[id] = landmarks[id];
+            S.aiSuggested.add(id);
+        }
+        S.mode = 'landmark';
+        S.activeLandmark = null;
+        touch();
+        renderAll();
+
+        const flag = [...new Set([...unreliable, ...lowConf])]
+            .filter((id) => LANDMARK_BY_ID[id])
+            .map((id) => LANDMARK_BY_ID[id].abbr);
+        const msg = '19 points pré-positionnés (brouillon). Vérifiez chaque point'
+            + (flag.length ? `, notamment : ${flag.join(', ')}.` : '.');
+        window.showToast && window.showToast(msg, 'info');
+    } catch (err) {
+        console.error(err);
+        window.showToast && window.showToast(
+            'Détection automatique impossible : ' + (err.message || 'erreur inconnue'), 'error');
+    } finally {
+        aiBusy = false;
+        aiBtn.classList.remove('is-active');
+        aiBtn.disabled = false;
+        setLbl('Détection auto');
+    }
+}
+
+// Le bouton n'apparaît que si l'asset modèle est présent sur le serveur — sinon
+// le module reste 100 % manuel, sans rien casser.
+modelAvailable().then((ok) => {
+    if (ok) aiBtn.style.display = '';
+});
+aiBtn.addEventListener('click', runAutodetect);
 
 // ---------------------------------------------------------------------------
 // Démarrage

@@ -39,3 +39,8 @@ medfollow/data/feuilles/
 medfollow/uploads/
 medfollow/server.out.log
 medfollow/server.err.log
+
+# Céphalométrie IA : gros binaires servis en statique (modèle ONNX + runtime WASM).
+# Trop volumineux pour le dépôt ; livrés/déployés séparément. Le code JS reste suivi.
+medfollow/static/js/ceph/model/
+medfollow/static/js/ceph/ort/*.wasm

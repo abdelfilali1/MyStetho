@@ -97,7 +97,9 @@ _CSP = (
     "img-src 'self' data: blob:; "
     "font-src 'self' https://fonts.gstatic.com data:; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    # 'wasm-unsafe-eval' autorise la COMPILATION WebAssembly (moteur IA du module
+    # Céphalométrie, onnxruntime-web) sans rouvrir eval()/new Function() en JS.
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; "
     "connect-src 'self'; "
     "form-action 'self'"
 )

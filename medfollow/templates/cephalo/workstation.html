@@ -34,6 +34,12 @@
             <button type="button" class="ceph-tool" data-mode="trace">Tracé</button>
             <button type="button" class="ceph-tool" data-mode="measure">Règle</button>
             <span class="ceph-tool-sep"></span>
+            <button type="button" class="ceph-tool ceph-tool-ai" id="ceph-ai-btn" style="display:none;"
+                    title="Pré-positionne 19 points par IA (brouillon à valider). Le calcul se fait sur votre poste ; la radiographie ne quitte pas l'ordinateur.">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.3L18 9l-4.1 1.7L12 15l-1.9-4.3L6 9l4.1-1.7z"/><path d="M18 14l.8 1.9L21 17l-2.2.9L18 20l-.8-2.1L15 17l2.2-1.1z"/></svg>
+                <span id="ceph-ai-label">Détection auto</span>
+            </button>
+            <span class="ceph-tool-sep"></span>
             <button type="button" class="ceph-tool" id="ceph-invert-btn">Négatif</button>
             <button type="button" class="ceph-tool" id="ceph-flip-btn">Miroir</button>
             <div class="ceph-toolbar-right">
@@ -180,6 +186,14 @@
                 Les normes sont des valeurs de référence adultes de population caucasienne : elles ne se transposent pas
                 d'une population à l'autre. Tant que le cliché n'est pas calibré, les mesures en millimètres sont retenues
                 plutôt qu'estimées ; les mesures angulaires, elles, restent valides.
+            </p>
+            <p class="ceph-footnote">
+                <b>Détection automatique (IA)</b> : le bouton « Détection auto » pré-positionne 19 points au moyen d'un
+                modèle exécuté <b>sur votre poste</b> (la radiographie ne quitte pas l'ordinateur). C'est un
+                <b>brouillon</b> — repérés par un liseré orange et le badge « IA » — que le praticien doit
+                <b>vérifier et corriger</b> ; déplacer un point le valide. La précision est modeste et certains repères
+                (Porion, Orbitale, Gonion, Articulare, ENA, ENP) sont peu fiables. Cet outil n'est pas un dispositif
+                médical et ne remplace pas le jugement clinique.
             </p>
         </div>
     </div>

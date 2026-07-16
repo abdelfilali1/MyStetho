@@ -116,6 +116,23 @@
     color: #fff;
 }
 
+/* Bouton « Détection auto » (IA) : accentué en violet pour le distinguer des outils. */
+.ceph-tool-ai {
+    background: rgba(124, 58, 237, .16);
+    border-color: rgba(124, 58, 237, .5);
+    color: #ddd6fe;
+}
+.ceph-tool-ai:hover { background: rgba(124, 58, 237, .3); }
+.ceph-tool-ai.is-active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.ceph-tool-ai:disabled { opacity: .8; cursor: progress; }
+
+/* Étiquette « IA » dans la liste des points (état suggéré, non validé). */
+.ceph-lm.is-ai { background: #fffbeb; }
+.ceph-lm-ai {
+    font-size: 9.5px; font-weight: 800; letter-spacing: .03em;
+    color: #b45309; background: #fde68a; border-radius: 4px; padding: 1px 5px;
+}
+
 .ceph-tool-sep {
     width: 1px;
     height: 22px;
