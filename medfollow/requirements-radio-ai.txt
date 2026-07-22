@@ -1,0 +1,12 @@
+# --- Outils LOCAUX pour (re)générer le modèle du module « Radio IA » ----------
+# L'inférence tourne DANS LE NAVIGATEUR (onnxruntime-web) : le SERVEUR n'a besoin
+# d'AUCUNE de ces dépendances (ni en local, ni sur la VM). Elles ne servent qu'à
+# EXPORTER les poids PyTorch (best.pt) au format ONNX servi au navigateur :
+#
+#     py -m pip install -r requirements-radio-ai.txt
+#     py scripts/download_dentalxray.py     # récupère best.pt
+#     py scripts/export_onnx.py             # produit static/js/radio/model/dentalxray.onnx
+#
+# Ultralytics tire PyTorch, numpy, opencv, etc. (lourd) — à n'installer que sur la
+# machine de build/dev, jamais sur la VM de production.
+ultralytics>=8.2.0

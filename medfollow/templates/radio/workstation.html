@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Radio IA — {{ patient.name }} - Doctivo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/radio.css?v=20260722-3">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Radio IA — {{ patient.name }}</h2>
+        <p class="subtitle">
+            {% if patient.age is not none %}{{ patient.age }} ans{% endif %}
+            {% if patient.sex_label %} · {{ patient.sex_label }}{% endif %}
+            {% if case.taken_on_fr %} · Cliché du {{ case.taken_on_fr }}{% endif %}
+        </p>
+    </div>
+    <a href="/radio-ia" class="btn btn-outline">← Toutes les analyses</a>
+</div>
+
+<div class="radio-workspace">
+    <div class="radio-viewer-col">
+        <div class="radio-toolbar">
+            <button type="button" id="radio-analyse-btn" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px;"><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="8"/></svg>
+                <span id="radio-analyse-label">Lancer la détection IA</span>
+            </button>
+            <label class="radio-toggle">
+                <input type="checkbox" id="radio-show-boxes" checked> Afficher les repères
+            </label>
+            <button type="button" id="radio-add-btn" class="btn btn-outline">+ Ajouter une détection</button>
+            <select id="radio-add-class" class="radio-add-class" title="Type de la détection à ajouter">
+                <option value="Caries">Carie</option>
+                <option value="Deep Caries">Carie profonde</option>
+                <option value="Impacted">Dent incluse</option>
+                <option value="Periapical Lesion">Lésion périapicale</option>
+            </select>
+            <span class="radio-toolbar-spacer"></span>
+            <button type="button" id="radio-save-btn" class="btn btn-outline">Enregistrer</button>
+            <button type="button" id="radio-pdf-btn" class="btn btn-outline">Rapport PDF</button>
+        </div>
+
+        <div class="radio-stage" id="radio-stage">
+            <img id="radio-image" src="/radio-ia/{{ case.id }}/image" alt="Radiographie de {{ patient.name }}">
+            <div id="radio-overlay" class="radio-overlay"></div>
+        </div>
+        <p class="radio-hint">L'IA est une aide au dépistage : cochez « écarter » pour retirer un faux positif. Rien n'est retenu sans votre validation.</p>
+    </div>
+
+    <div class="radio-side-col">
+        <div class="radio-panel">
+            <div class="radio-panel-head"><h3>Détections</h3></div>
+            <div class="radio-panel-body" id="radio-findings">
+                <p class="radio-empty" id="radio-empty">Aucune analyse pour l'instant. Lancez la détection IA.</p>
+                <ul class="radio-findings-list" id="radio-findings-list" style="display:none;"></ul>
+            </div>
+        </div>
+
+        <div class="radio-panel">
+            <div class="radio-panel-head"><h3>Notes cliniques</h3></div>
+            <div class="radio-panel-body">
+                <textarea id="radio-notes" class="radio-notes" rows="6" placeholder="Observations, corrélation avec l'examen clinique…">{{ case.notes or '' }}</textarea>
+            </div>
+        </div>
+
+        <form method="POST" action="/radio-ia/{{ case.id }}/supprimer" onsubmit="return confirm('Supprimer définitivement ce cliché et son analyse ?');">
+            <button type="submit" class="btn btn-danger btn-block">Supprimer ce cliché</button>
+        </form>
+    </div>
+</div>
+
+<script id="radio-data" type="application/json">{{ radio_json | safe }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/radio/workstation.js?v=20260722-4"></script>
+{% endblock %}

@@ -44,3 +44,9 @@ medfollow/server.err.log
 # Trop volumineux pour le dépôt ; livrés/déployés séparément. Le code JS reste suivi.
 medfollow/static/js/ceph/model/
 medfollow/static/js/ceph/ort/*.wasm
+
+# Radio IA : modèle ONNX servi au navigateur (généré par scripts/export_onnx.py),
+# et poids PyTorch d'origine. Hors dépôt (comme la céphalo) ; livrés par le tarball
+# de déploiement. Le runtime ORT est réutilisé depuis static/js/ceph/ort/.
+medfollow/static/js/radio/model/
+medfollow/models/dentalxray/

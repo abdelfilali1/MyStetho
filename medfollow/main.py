@@ -24,7 +24,7 @@ def _calc_age(dob_str):
         return ""
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, learning, rappels, whatsapp_webhook
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, whatsapp_webhook
 from services import reminder_scheduler
 
 
@@ -318,7 +318,7 @@ _global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _global_templates.env.globals["now_year"] = date.today().year
 
 # Patch all router template envs to include now_year and calc_age/fromjson filters
-for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, learning, rappels]:
+for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels]:
     if hasattr(mod, 'templates'):
         mod.templates.env.globals["now_year"] = date.today().year
         mod.templates.env.filters["calc_age"] = _calc_age
@@ -342,6 +342,7 @@ app.include_router(invoices.router)
 app.include_router(dental.router)
 app.include_router(mutuelle.router)
 app.include_router(cephalo.router)
+app.include_router(radio.router)
 app.include_router(learning.router)
 app.include_router(rappels.router)
 app.include_router(whatsapp_webhook.router)

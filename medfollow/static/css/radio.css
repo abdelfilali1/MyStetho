@@ -1,0 +1,290 @@
+/* ===========================================================================
+   Module Radio IA — charte Doctivo
+   Détection de pathologies sur radiographie (modèle DentalXrayAI / DENTEX).
+   Reprend les tokens de style.css ; seule la visionneuse est sombre, comme un
+   négatoscope.
+   ========================================================================= */
+
+.btn-block { width: 100%; justify-content: center; }
+
+/* --- Bandeau « moteur indisponible » -------------------------------------- */
+.radio-ai-banner {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 13.5px;
+    line-height: 1.5;
+}
+.radio-ai-banner svg { flex-shrink: 0; margin-top: 2px; color: #d97706; }
+.radio-ai-banner code {
+    background: rgba(146, 64, 14, .1);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* --- Grille des cas (liste) ----------------------------------------------- */
+.radio-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+.radio-case {
+    position: relative;
+    background: var(--panel-strong, #fff);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.radio-case:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.12)); }
+.radio-case-link {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+}
+/* Bouton supprimer flottant, hors du lien (un <form> dans un <a> serait invalide). */
+.radio-case-del { position: absolute; top: 8px; right: 8px; z-index: 2; margin: 0; }
+.radio-del-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, .55);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .12s ease, background .12s ease;
+}
+.radio-case:hover .radio-del-btn { opacity: 1; }
+.radio-del-btn:hover { background: #dc2626; }
+.radio-del-btn:focus-visible { opacity: 1; outline: 2px solid #fff; }
+.radio-case-thumb {
+    height: 130px;
+    background-color: #0b1220;
+    background-size: cover;
+    background-position: center;
+}
+.radio-case-body { padding: 11px 13px 13px; }
+.radio-case-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+.radio-case-meta { color: var(--gray-500); font-size: 12px; margin-bottom: 8px; }
+.radio-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+}
+.radio-badge.is-todo  { background: #eef2ff; color: #4338ca; }
+.radio-badge.is-ok    { background: #ecfdf5; color: #047857; }
+.radio-badge.is-alert { background: #fef2f2; color: #b91c1c; }
+
+/* --- Poste de travail ------------------------------------------------------ */
+.radio-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .radio-workspace { grid-template-columns: 1fr; }
+}
+
+.radio-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.radio-toolbar-spacer { flex: 1; }
+.radio-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--gray-600, #475569);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* La scène : le cliché sur fond sombre, l'overlay des boîtes par-dessus.
+   `display:block` + `img { width:100% }` garantit que la scène a EXACTEMENT la
+   taille rendue de l'image : l'overlay (100% × 100%) et les boîtes en % restent
+   donc parfaitement alignés quelle que soit la largeur d'affichage. */
+.radio-stage {
+    position: relative;
+    display: block;
+    width: 100%;
+    background: #0b1220;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    line-height: 0;
+}
+.radio-stage img { display: block; width: 100%; height: auto; }
+.radio-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+}
+.radio-overlay.hidden { display: none; }
+
+.radio-box {
+    position: absolute;
+    border: 2px solid var(--box-color, #0ea5e9);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35);
+    transition: opacity .12s ease;
+}
+.radio-box.dismissed { opacity: .25; border-style: dashed; }
+.radio-box-tag {
+    position: absolute;
+    top: -19px;
+    left: -2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--box-color, #0ea5e9);
+    padding: 1px 6px;
+    border-radius: 4px 4px 4px 0;
+    white-space: nowrap;
+    line-height: 1.5;
+}
+.radio-box.dismissed .radio-box-tag { text-decoration: line-through; }
+/* Une détection ajoutée à la main : cadre en pointillés pour la distinguer de l'IA. */
+.radio-box.manual { border-style: dashed; }
+
+/* Mode « ajouter » : le curseur devient une croix et on trace un cadre. */
+.radio-stage.is-drawing { cursor: crosshair; }
+.radio-stage.is-drawing .radio-overlay { pointer-events: none; }
+.radio-draw-box {
+    position: absolute;
+    border: 2px dashed var(--box-color, #0ea5e9);
+    background: color-mix(in srgb, var(--box-color, #0ea5e9) 18%, transparent);
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.radio-hint { color: var(--gray-500); font-size: 12px; margin-top: 8px; }
+
+/* Sélecteur du type de détection à ajouter. */
+.radio-add-class {
+    border: 1px solid var(--gray-300, #cbd5e1);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font: inherit;
+    font-size: 13px;
+    background: #fff;
+}
+
+.radio-manual-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--gray-600, #475569);
+    background: var(--gray-100, #f1f5f9);
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 5px;
+    padding: 1px 5px;
+    vertical-align: 1px;
+}
+
+/* --- Panneau latéral ------------------------------------------------------- */
+.radio-side-col { display: flex; flex-direction: column; gap: 14px; }
+.radio-panel {
+    background: var(--panel-strong, #fff);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+}
+.radio-panel-head {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50, #f8fafc);
+}
+.radio-panel-head h3 { margin: 0; font-size: 14px; font-family: "Sora", "Manrope", sans-serif; }
+.radio-panel-body { padding: 12px 14px; }
+.radio-empty { color: var(--gray-500); font-size: 13px; margin: 4px 0; }
+
+.radio-findings-list { list-style: none; margin: 0; padding: 0; }
+.radio-finding {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--gray-100, #f1f5f9);
+}
+.radio-finding:last-child { border-bottom: 0; }
+.radio-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.radio-finding-main { flex: 1; min-width: 0; }
+.radio-finding-label { font-weight: 600; font-size: 13.5px; }
+.radio-finding-conf { color: var(--gray-500); font-size: 12px; }
+.radio-finding.is-dismissed .radio-finding-label { text-decoration: line-through; color: var(--gray-400, #94a3b8); }
+.radio-dismiss {
+    font-size: 12px;
+    background: none;
+    border: 1px solid var(--gray-300, #cbd5e1);
+    border-radius: 6px;
+    padding: 3px 9px;
+    cursor: pointer;
+    color: var(--gray-600, #475569);
+    white-space: nowrap;
+}
+.radio-dismiss:hover { background: var(--gray-50, #f8fafc); }
+
+/* Champ « Dent » (n° FDI) : estimé par le serveur, corrigeable par le praticien. */
+.radio-tooth {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+.radio-tooth input {
+    width: 46px;
+    border: 1px solid var(--gray-300, #cbd5e1);
+    border-radius: 6px;
+    padding: 3px 5px;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: center;
+}
+/* Une valeur encore estimée est signalée en pointillés jusqu'à confirmation. */
+.radio-tooth input.is-estimated {
+    border-style: dashed;
+    color: var(--gray-500);
+    background: #fffdf5;
+}
+
+.radio-notes {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font: inherit;
+    font-size: 13.5px;
+    resize: vertical;
+}
+
+.radio-summary {
+    font-size: 12.5px;
+    color: var(--gray-600, #475569);
+    margin: 0 0 8px;
+}

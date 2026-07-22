@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Radio IA - Doctivo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/radio.css?v=20260722-3">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Radio IA — Détection de pathologies</h2>
+        <p class="subtitle">Dépistage assisté par IA sur radiographie dentaire (modèle DentalXrayAI / DENTEX) : carie, carie profonde, dent incluse, lésion périapicale. Aide au dépistage — jamais un diagnostic automatique.</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('new-radio-card').style.display='block';this.style.display='none';">+ Nouveau cliché</button>
+</div>
+
+{% if not ai.ready %}
+<div class="radio-ai-banner">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+    <div>
+        <strong>Le modèle IA n'est pas déployé sur ce serveur.</strong>
+        Vous pouvez importer des clichés et ajouter des détections à la main, mais la
+        détection automatique restera indisponible tant que le fichier du modèle
+        (<code>static/js/radio/model/dentalxray.onnx</code>) n'est pas présent —
+        générez-le avec <code>py scripts/export_onnx.py</code> puis déployez-le.
+    </div>
+</div>
+{% endif %}
+
+<div class="card" id="new-radio-card" style="display:{% if not cases %}block{% else %}none{% endif %};margin-bottom:16px;">
+    <div class="card-header"><h3>Nouveau cliché à analyser</h3></div>
+    <div class="card-body">
+        <form method="POST" action="/radio-ia/nouvelle" enctype="multipart/form-data">
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label>Patient <span class="required-star">*</span></label>
+                    <select name="patient_id" required>
+                        <option value="">-- Choisir --</option>
+                        {% for p in patients %}
+                        <option value="{{ p.id }}" {% if preselect_patient == p.id %}selected{% endif %}>{{ p.last_name | upper }} {{ p.first_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Date du cliché</label>
+                    <input type="date" name="taken_on" value="{{ today }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Radiographie (panoramique, rétro-alvéolaire… — JPEG / PNG) <span class="required-star">*</span></label>
+                <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/bmp" required>
+                <small style="color:var(--gray-500);font-size:11.5px;">Le cliché reste sur votre serveur Doctivo, comme tout document patient.</small>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Importer et ouvrir</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('new-radio-card').style.display='none';">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if cases %}
+<div class="radio-card-grid">
+    {% for c in cases %}
+    <div class="radio-case">
+        <form method="POST" action="/radio-ia/{{ c.id }}/supprimer" class="radio-case-del"
+              onsubmit="return confirm('Supprimer définitivement cette analyse et son cliché ?');">
+            <button type="submit" class="radio-del-btn" title="Supprimer cette analyse" aria-label="Supprimer">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            </button>
+        </form>
+        <a class="radio-case-link" href="/radio-ia/{{ c.id }}">
+            <div class="radio-case-thumb" style="background-image:url('/radio-ia/{{ c.id }}/image');"></div>
+            <div class="radio-case-body">
+                <div class="radio-case-name">{{ c.last_name | upper }} {{ c.first_name }}</div>
+                <div class="radio-case-meta">{{ c.taken_on_fr or 'sans date' }}</div>
+                {% if c.status == 'analyse' %}
+                    {% if c.n_findings %}
+                    <span class="radio-badge is-alert">{{ c.n_findings }} détection{{ 's' if c.n_findings > 1 else '' }}</span>
+                    {% else %}
+                    <span class="radio-badge is-ok">Rien à signaler</span>
+                    {% endif %}
+                {% else %}
+                <span class="radio-badge is-todo">À analyser</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 20px;">
+        <p style="color:var(--gray-500);">Aucun cliché pour l'instant. Importez une radiographie pour lancer une détection IA.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

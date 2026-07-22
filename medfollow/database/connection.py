@@ -878,4 +878,26 @@ async def init_db():
     """)
     await db.commit()
 
+    # Radio IA : un cas = une radiographie + les pathologies détectées par le
+    # modèle YOLOv8 DentalXrayAI (carie, carie profonde, dent incluse, lésion
+    # périapicale). Les détections sont stockées en JSON ; le praticien peut en
+    # écarter certaines (l'IA reste une aide, jamais un diagnostic automatique).
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS radio_cases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            consultation_id INTEGER REFERENCES consultations(id),
+            taken_on DATE,
+            image_path TEXT,
+            model_name TEXT,
+            status TEXT DEFAULT 'importe',   -- 'importe' | 'analyse'
+            detections_json TEXT DEFAULT '{}',
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     await db.close()

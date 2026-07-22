@@ -1306,3 +1306,154 @@ def generate_cephalo_pdf(
     doc.build(els, onFirstPage=_page, onLaterPages=_page)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
+
+
+def generate_radio_ai_pdf(
+    patient: dict,
+    model_name: str,
+    findings: Optional[list] = None,
+    analysed: bool = False,
+    notes: str = "",
+    annotated_png: Optional[bytes] = None,
+    doctor_name: str = "",
+    specialty: str = "",
+    address: Optional[str] = None,
+    phone: Optional[str] = None,
+    template_path: Optional[str] = None,
+) -> bytes:
+    """Rapport de détection IA de pathologies, posé sur le papier à en-tête.
+
+    Le cliché annoté (boîtes des détections retenues) est composé côté serveur
+    puis inséré tel quel : le rapport montre exactement les anomalies validées
+    par le praticien. `findings` = liste de {label, conf, color}.
+    """
+    from reportlab.platypus import Image as RLImage
+
+    findings = findings or []
+    use_tpl = _has_template(template_path)
+    buf = io.BytesIO()
+    doc = _doc_for(buf, template_path)
+    S = _styles()
+
+    def _page(canv, d):
+        if use_tpl:
+            return
+        _draw_footer(canv, d)
+
+    els = _masthead(
+        S, "Détection IA de pathologies",
+        doctor_name=doctor_name or None,
+        specialty=specialty or None,
+        address=address, phone=phone,
+        use_tpl=use_tpl,
+        subtitle=f"Dépistage assisté par intelligence artificielle · modèle {model_name}",
+    )
+
+    # Patient
+    pdetails = []
+    if patient.get("dob"):
+        pdetails.append(f"Né(e) le {_fr_short_date(patient['dob'])}")
+    if patient.get("age") is not None:
+        pdetails.append(f"{patient['age']} ans")
+    if patient.get("sex_label"):
+        pdetails.append(patient["sex_label"])
+    if patient.get("taken_on"):
+        pdetails.append(f"Cliché du {patient['taken_on']}")
+    els.append(_patient_box(S, _esc(patient.get("name", "Patient")),
+                            "  •  ".join(pdetails) if pdetails else None))
+    els.append(Spacer(1, 10))
+
+    # Cliché annoté
+    if annotated_png:
+        try:
+            img = RLImage(io.BytesIO(annotated_png))
+            max_w = 171 * mm
+            max_h = 120 * mm
+            ratio = min(max_w / img.imageWidth, max_h / img.imageHeight)
+            img.drawWidth = img.imageWidth * ratio
+            img.drawHeight = img.imageHeight * ratio
+            img.hAlign = "CENTER"
+            els.extend(_section("Cliché analysé", S))
+            els.append(img)
+            els.append(Spacer(1, 8))
+        except Exception:
+            pass  # une image illisible ne doit jamais bloquer l'édition du rapport
+
+    # Détections retenues
+    els.extend(_section("Pathologies détectées", S))
+
+    head_st = ParagraphStyle("_rHead", parent=S["_BodySm"], fontName="Helvetica-Bold",
+                             textColor=white, fontSize=8.5, leading=11)
+    cell_st = ParagraphStyle("_rCell", parent=S["_BodySm"], fontSize=9, leading=12, textColor=DARK)
+    cell_gray = ParagraphStyle("_rCellG", parent=cell_st, textColor=GRAY)
+
+    if not analysed:
+        els.append(Paragraph(
+            "Ce cliché n'a pas encore été analysé par le modèle.", S["_Italic"]))
+    elif not findings:
+        els.append(Paragraph(
+            "Aucune pathologie détectée par le modèle au seuil de confiance retenu. "
+            "L'absence de détection ne vaut pas absence de pathologie.", S["_Body"]))
+    else:
+        data = [[
+            Paragraph("", head_st),
+            Paragraph("Pathologie", head_st),
+            Paragraph("Dent (FDI)", head_st),
+            Paragraph("Confiance", head_st),
+        ]]
+        for f in findings:
+            conf = f.get("conf")
+            conf_txt = f"{round(conf * 100)} %" if isinstance(conf, (int, float)) else "—"
+            tooth = f.get("tooth")
+            if tooth:
+                tooth_txt = f"{tooth}{' (est.)' if f.get('tooth_estimated', True) else ''}"
+            else:
+                tooth_txt = "—"
+            swatch = Table([[""]], colWidths=[6 * mm], rowHeights=[6 * mm])
+            swatch.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), HexColor(f.get("color") or "#0ea5e9")),
+                ("BOX", (0, 0), (-1, -1), 0.3, BORDER),
+            ]))
+            data.append([
+                swatch,
+                Paragraph(_esc(f.get("label", "Anomalie")), cell_st),
+                Paragraph(tooth_txt, cell_gray),
+                Paragraph(conf_txt, cell_gray),
+            ])
+        t = Table(data, colWidths=[12 * mm, 89 * mm, 32 * mm, 38 * mm], repeatRows=1)
+        style = [
+            ("BACKGROUND",    (0, 0), (-1, 0), PRIMARY),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+            ("GRID",          (0, 0), (-1, -1), 0.3, BORDER),
+        ]
+        for i in range(1, len(data)):
+            if i % 2 == 0:
+                style.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
+        t.setStyle(TableStyle(style))
+        els.append(t)
+
+    # Notes du praticien
+    if notes:
+        els.append(Spacer(1, 6))
+        els.extend(_section("Notes cliniques", S))
+        els.append(Paragraph(_esc(notes).replace("\n", "<br/>"), S["_Body"]))
+
+    els.append(Spacer(1, 10))
+    els.append(Paragraph(
+        "Détection produite par le modèle YOLOv8 DentalXrayAI (entraîné sur le jeu DENTEX). "
+        "Il s'agit d'une aide au dépistage, non d'un diagnostic : les détections doivent être "
+        "confirmées par le praticien à la lumière de l'examen clinique. Les faux positifs et "
+        "faux négatifs sont possibles. Le numéro de dent suivi de « (est.) » est une estimation "
+        "géométrique de la position sur le cliché, non une identification du modèle.",
+        S["_BodySm"]))
+
+    els.append(Spacer(1, 26))
+    els.append(_sig_block(doctor_name.replace("Dr. ", "")))
+
+    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    out = buf.getvalue()
+    return _stamp_on_template(out, template_path) if use_tpl else out

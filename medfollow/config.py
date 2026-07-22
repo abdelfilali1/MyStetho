@@ -75,6 +75,29 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 MAX_UPLOAD_SIZE_MB = 50
 
+# --- Radio IA : détection de pathologies sur radiographie (DentalXrayAI) ------
+# Modèle YOLOv8 entraîné sur DENTEX (SubGlitch1/DentalXrayAI) : détecte carie,
+# carie profonde, dent incluse, lésion périapicale. L'inférence tourne DANS LE
+# NAVIGATEUR via onnxruntime-web (comme la Céphalométrie) : le serveur ne fait que
+# servir le fichier modèle statique. La VM de production n'a pas assez de RAM pour
+# PyTorch — le serveur n'a donc AUCUNE dépendance lourde (torch/Ultralytics).
+#
+# Le fichier ONNX servi au navigateur (généré en local par scripts/export_onnx.py).
+RADIO_AI_ONNX = os.path.join(BASE_DIR, "static", "js", "radio", "model", "dentalxray.onnx")
+# Poids PyTorch d'origine — nécessaires UNIQUEMENT en local pour (re)générer le
+# fichier ONNX (export Ultralytics) ; jamais chargés par le serveur.
+RADIO_AI_WEIGHTS = os.getenv(
+    "MEDFOLLOW_RADIO_AI_WEIGHTS",
+    os.path.join(BASE_DIR, "models", "dentalxray", "best.pt"),
+)
+# URL de téléchargement des poids (utilisée par scripts/download_dentalxray.py).
+# Le serveur d'origine de DentalXrayAI (xray.cyphersec.eu) est hors ligne ; on
+# récupère donc best.pt (YOLOv8n DENTEX, ~6 Mo) versionné dans la fork NoahOksuz.
+RADIO_AI_MODEL_URL = os.getenv(
+    "MEDFOLLOW_RADIO_AI_MODEL_URL",
+    "https://raw.githubusercontent.com/NoahOksuz/DentalXrayAI/main/best.pt",
+)
+
 # --- WhatsApp (Meta Cloud API) : confirmations / rappels de rendez-vous ------
 # Tant que WHATSAPP_ENABLED est faux OU que le token/phone-id manquent, le
 # service tourne en « dry-run » : il journalise mais n'appelle jamais l'API.
