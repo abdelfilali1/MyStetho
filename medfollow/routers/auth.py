@@ -466,12 +466,21 @@ async def reset_password(
     await db.execute("UPDATE password_resets SET used_at=? WHERE token=?", (datetime.utcnow().isoformat(), token))
     await db.commit()
     await log_audit(db, {"sub": row[0], "email": row[3]}, "reset_mot_de_passe", ip=ip)
-    # Le mot de passe vient de changer : la session ouverte dans CE navigateur
-    # est fermée pour que la nouvelle authentification soit effective tout de
-    # suite (le JWT étant sans état, les autres sessions expirent d'elles-mêmes).
-    response = RedirectResponse(url="/login", status_code=302)
-    response.delete_cookie("access_token")
-    set_flash(response, "Mot de passe modifié. Connectez-vous avec le nouveau.")
+
+    # Cette page s'ouvre dans une fenêtre à côté de Doctivo (bouton « Modifier le
+    # mot de passe » de Mon compte). Elle partage donc les cookies de l'onglet
+    # resté ouvert derrière : supprimer la session déconnecterait aussi cet
+    # onglet, alors que la personne vient précisément de prouver qu'elle
+    # contrôle le compte. On ne ferme la session que si elle n'était PAS déjà
+    # connectée sur ce compte — cas du lien remis par l'administrateur.
+    current = get_current_user(request)
+    still_signed_in = bool(current and current.get("sub") == row[0])
+    response = templates.TemplateResponse("reset_password.html", {
+        "request": request, "error": None, "valid": False, "done": True,
+        "token": token, "email": row[3], "still_signed_in": still_signed_in,
+    })
+    if not still_signed_in:
+        response.delete_cookie("access_token")
     return response
 
 

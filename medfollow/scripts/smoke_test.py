@@ -178,15 +178,22 @@ if "configuration" not in _r.text:
     failures.append("/mon-compte : e-mail admin modifiable")
 else:
     print("  OK  changement d'e-mail admin refusé")
-# SMTP non configuré en test : la page doit rendre le lien au lieu de l'envoyer.
-_r = post("/mon-compte/mot-de-passe", {}, expect=(200,))
-if "/reset-password/" not in _r.text:
-    print("  XX  aucun lien de réinitialisation rendu")
-    failures.append("/mon-compte/mot-de-passe : pas de lien")
+# Le bouton ouvre DIRECTEMENT le lien magique : 303 vers /reset-password/{jeton}.
+_r = post("/mon-compte/mot-de-passe", {}, expect=(303,))
+_loc = _r.headers.get("location", "")
+if not _loc.startswith("/reset-password/"):
+    print("  XX  le bouton ne redirige pas vers la page de mot de passe")
+    failures.append("/mon-compte/mot-de-passe : redirection " + _loc)
 else:
-    print("  OK  lien magique généré (mode dry-run)")
-    _token = _r.text.split("/reset-password/")[1].split('"')[0]
-    get(f"/reset-password/{_token}", expect=(200,), label="/reset-password/{token}")
+    print("  OK  ouverture directe du lien de mot de passe")
+    get(_loc, expect=(200,), label="/reset-password/{jeton}")
+    _r = post(_loc, {"password": "NouveauPass123!", "password_confirm": "NouveauPass123!"},
+              expect=(200,), label="/reset-password/{jeton} (enregistrement)")
+    if "Mot de passe modifi" not in _r.text:
+        print("  XX  pas de page de confirmation")
+        failures.append("/reset-password : pas de confirmation")
+    else:
+        print("  OK  page de confirmation (fermer la fenetre / revenir a Doctivo)")
 get("/mon-compte/papier-en-tete", expect=(404,), label="/mon-compte/papier-en-tete (aucun)")
 
 print("== CSRF négatif (POST sans jeton -> 403) ==")

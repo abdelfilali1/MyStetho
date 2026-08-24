@@ -8,10 +8,10 @@ actif/inactif et le médecin lié d'une secrétaire restent du ressort de
 l'administrateur — les exposer ici ouvrirait une escalade de privilèges, chaque
 route étant atteignable par URL directe.
 
-Le mot de passe ne se change pas au formulaire : l'utilisateur demande un
-**lien magique** envoyé à l'adresse enregistrée sur le compte. On réutilise la
-table `password_resets` et la page `/reset-password/{token}` déjà en place, donc
-la même expiration (1 h) et le même usage unique.
+Le mot de passe ne se change pas au formulaire : le bouton ouvre un **lien
+magique** à usage unique dans une fenêtre dédiée. On réutilise la table
+`password_resets` et la page `/reset-password/{token}` déjà en place, donc la
+même expiration (1 h) et le même usage unique.
 """
 import os
 import re
@@ -24,13 +24,11 @@ from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from config import HTTPS_ENABLED, PUBLIC_BASE_URL, TEMPLATES_DIR
-import config
+from config import HTTPS_ENABLED, TEMPLATES_DIR
 from database.connection import get_db
 from routers.deps import require_login
 from services.audit import client_ip, log_audit
 from services.auth_service import create_token
-from services.email_service import send_password_link
 from services.flash import set_flash
 from services.rate_limit import record_failure, retry_after
 
@@ -74,8 +72,7 @@ def _render(request, user, account, **extra):
     ctx = {
         "request": request, "user": user, "active": "profile",
         "account": account, "form": account,
-        "error": None, "reset_link": None, "mail": None,
-        "email_configured": config.email_configured(),
+        "error": None,
         "link_hours": LINK_HOURS,
     }
     ctx.update(extra)
@@ -185,23 +182,30 @@ async def update_account(
 
 
 @router.post("/mon-compte/mot-de-passe", response_class=HTMLResponse)
-async def request_password_link(
+async def open_password_link(
     request: Request,
     user: dict = Depends(require_login),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Envoie à l'adresse DU COMPTE un lien à usage unique de changement de mot de passe.
+    """Ouvre le lien à usage unique de changement de mot de passe.
 
-    Le destinataire n'est jamais choisi par le formulaire : il est lu en base
-    pour le compte connecté. Un lien intercepté ne peut donc pas être détourné
-    vers une autre boîte, et il n'y a pas d'énumération de comptes possible.
+    Le compte concerné n'est jamais choisi par le formulaire : il est lu en base
+    pour la session en cours. Le lien ne peut donc pas être détourné vers un
+    autre compte, et il n'y a pas d'énumération possible.
+
+    Le formulaire vise une fenêtre dédiée (`target`) : on redirige simplement
+    vers /reset-password/{token}, qui s'ouvre donc à côté de Doctivo. Le jeton
+    garde ses garanties habituelles — usage unique, expiration à 1 h — de sorte
+    qu'une URL restée dans l'historique ne vaut plus rien.
     """
     account = await _load_account(db, user["sub"])
     if not account:
         return RedirectResponse(url="/logout", status_code=302)
 
     ip = client_ip(request)
-    wait = retry_after(f"pwlink:user:{user['sub']}", max_attempts=3, window_seconds=900)
+    # Chaque clic consomme un jeton : on tolère quelques essais (fenêtre fermée
+    # par erreur, hésitation) sans laisser une boucle en générer indéfiniment.
+    wait = retry_after(f"pwlink:user:{user['sub']}", max_attempts=6, window_seconds=900)
     if wait:
         minutes = max(1, (wait + 59) // 60)
         return _render(request, user, account,
@@ -221,28 +225,11 @@ async def request_password_link(
         (token, user["sub"], (datetime.utcnow() + timedelta(hours=LINK_HOURS)).isoformat()),
     )
     await db.commit()
+    await log_audit(db, user, "ouverture_lien_mot_de_passe", entity_type="user",
+                    entity_id=user["sub"], ip=ip)
 
-    base_url = PUBLIC_BASE_URL or str(request.base_url).rstrip("/")
-    link = f"{base_url}/reset-password/{token}"
-
-    result = await send_password_link(account["email"], account["first_name"], link, LINK_HOURS)
-    await log_audit(db, user, "demande_lien_mot_de_passe", entity_type="user",
-                    entity_id=user["sub"], ip=ip,
-                    details="envoye" if result["sent"] else ("dry-run" if result["dry_run"] else "echec"))
-
-    if result["sent"]:
-        response = RedirectResponse(url="/mon-compte", status_code=302)
-        set_flash(response, f"Lien envoyé à {account['email']}")
-        return response
-
-    if result["dry_run"]:
-        # Aucun serveur d'e-mail configuré (cas du poste local). Le lien est
-        # affiché au propriétaire du compte, déjà authentifié : il n'apprend
-        # rien qu'il ne puisse déjà obtenir.
-        return _render(request, user, account, reset_link=link, mail="dry_run")
-
-    return _render(request, user, account, reset_link=link, mail="error",
-                   error="L'e-mail n'a pas pu être envoyé (" + (result["error"] or "erreur inconnue") + ").")
+    # 303 : la réponse à un POST doit être suivie en GET par le navigateur.
+    return RedirectResponse(url=f"/reset-password/{token}", status_code=303)
 
 
 @router.get("/mon-compte/papier-en-tete")

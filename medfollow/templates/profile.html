@@ -51,7 +51,7 @@
                     </small>
                     {% else %}
                     <small style="display:block;color:var(--gray-500);margin-top:4px;">
-                        Sert à vous connecter et à recevoir le lien de changement de mot de passe.
+                        C'est l'identifiant avec lequel vous vous connectez à Doctivo.
                     </small>
                     {% endif %}
                 </div>
@@ -92,45 +92,16 @@
         <h3>Mot de passe</h3>
     </div>
     <div class="card-body">
-        {% if reset_link %}
-        <div class="alert {{ 'alert-error' if mail == 'error' else 'alert-info' }}" style="margin-bottom:16px;">
-            {% if mail == 'dry_run' %}
-            <strong>Aucun serveur d'e-mail n'est configuré sur cette installation.</strong>
-            Le lien n'a donc pas été envoyé — utilisez-le directement ci-dessous.
-            {% else %}
-            L'envoi a échoué, mais le lien reste valable — utilisez-le directement ci-dessous.
-            {% endif %}
-        </div>
-        <div style="background:var(--gray-50,#f9fafb);border:1px solid var(--gray-200);border-radius:10px;padding:14px;">
-            <p style="margin:0 0 10px;font-size:13px;color:var(--gray-500);">
-                Lien à usage unique, valable {{ link_hours }} heure{{ 's' if link_hours > 1 else '' }} :
-            </p>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input type="text" id="reset-link" readonly value="{{ reset_link }}"
-                       style="flex:1;min-width:260px;font-size:12px;" onclick="this.select();">
-                <button type="button" class="btn btn-outline btn-sm" id="copy-link">Copier</button>
-                <a href="{{ reset_link }}" class="btn btn-primary btn-sm">Ouvrir</a>
-            </div>
-        </div>
-        {% else %}
         <p style="margin:0 0 16px;font-size:14px;color:var(--gray-600,#475569);line-height:1.55;">
-            Pour des raisons de sécurité, le mot de passe ne se modifie pas directement ici.
-            Nous envoyons un lien à usage unique à
-            <strong>{{ account.email }}</strong> ; il vous permettra d'en choisir un nouveau
-            et expire au bout de {{ link_hours }} heure{{ 's' if link_hours > 1 else '' }}.
+            Le bouton ouvre une fenêtre sécurisée où vous choisirez votre nouveau mot de passe.
+            Une fois enregistré, refermez-la : vous retrouverez Doctivo tel que vous l'avez laissé.
         </p>
-        {% if not email_configured %}
-        <div class="alert alert-info" style="margin-bottom:16px;">
-            Aucun serveur d'e-mail n'est configuré sur cette installation : le lien vous sera
-            affiché à l'écran au lieu d'être envoyé.
-        </div>
-        {% endif %}
-        <form method="POST" action="/mon-compte/mot-de-passe">
-            <button type="submit" class="btn btn-primary">
-                {{ "Recevoir le lien par e-mail" if email_configured else "Générer le lien de modification" }}
-            </button>
+        <form method="POST" action="/mon-compte/mot-de-passe" target="doctivo-motdepasse" id="pw-form">
+            <button type="submit" class="btn btn-primary">Modifier le mot de passe</button>
         </form>
-        {% endif %}
+        <p style="margin:14px 0 0;font-size:12px;color:var(--gray-500);">
+            La page ouverte n'est valable qu'une heure et ne sert qu'une fois.
+        </p>
     </div>
 </div>
 
@@ -172,20 +143,14 @@
 {% block scripts %}
 <script>
 (function () {
-    var btn = document.getElementById('copy-link');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-        var input = document.getElementById('reset-link');
-        input.select();
-        // navigator.clipboard n'existe qu'en contexte sécurisé (HTTPS ou
-        // localhost) : sur la VM en HTTP, on retombe sur execCommand.
-        var done = function () { btn.textContent = 'Copié'; setTimeout(function () { btn.textContent = 'Copier'; }, 1800); };
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(input.value).then(done);
-        } else {
-            document.execCommand('copy');
-            done();
-        }
+    var form = document.getElementById('pw-form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+        // La fenêtre est ouverte PAR SCRIPT (dans le geste de clic, donc pas
+        // bloquée) : elle pourra ainsi se refermer d'elle-même à la fin. Un
+        // onglet créé par le seul target="_blank" ne le peut pas — le
+        // navigateur refuse window.close() sur ce qu'il n'a pas ouvert.
+        window.open('', 'doctivo-motdepasse', 'width=560,height=760');
     });
 })();
 </script>
