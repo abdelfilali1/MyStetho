@@ -1,0 +1,36 @@
+{# Liste des spécialités — partagée par le formulaire admin et « Mon compte ».
+   Attend `specialty_value` : la spécialité actuellement sélectionnée. #}
+                    <optgroup label="Médecine de premier recours">
+                        <option value="Médecine générale" {% if specialty_value == 'Médecine générale' %}selected{% endif %}>Médecine générale</option>
+                        <option value="Médecine interne" {% if specialty_value == 'Médecine interne' %}selected{% endif %}>Médecine interne</option>
+                        <option value="Médecine d'urgence" {% if specialty_value == "Médecine d'urgence" %}selected{% endif %}>Médecine d'urgence</option>
+                    </optgroup>
+                    <optgroup label="Spécialités chirurgicales">
+                        <option value="Chirurgie générale" {% if specialty_value == 'Chirurgie générale' %}selected{% endif %}>Chirurgie générale</option>
+                        <option value="Chirurgie orthopédique" {% if specialty_value == 'Chirurgie orthopédique' %}selected{% endif %}>Chirurgie orthopédique</option>
+                        <option value="Chirurgie pédiatrique" {% if specialty_value == 'Chirurgie pédiatrique' %}selected{% endif %}>Chirurgie pédiatrique</option>
+                        <option value="Neurochirurgie" {% if specialty_value == 'Neurochirurgie' %}selected{% endif %}>Neurochirurgie</option>
+                        <option value="Ophtalmologie" {% if specialty_value == 'Ophtalmologie' %}selected{% endif %}>Ophtalmologie</option>
+                        <option value="ORL" {% if specialty_value == 'ORL' %}selected{% endif %}>ORL (Oto-rhino-laryngologie)</option>
+                        <option value="Stomatologie" {% if specialty_value == 'Stomatologie' %}selected{% endif %}>Stomatologie</option>
+                        <option value="Dentiste" {% if specialty_value == 'Dentiste' %}selected{% endif %}>Dentiste / Chirurgie dentaire</option>
+                    </optgroup>
+                    <optgroup label="Spécialités médicales">
+                        <option value="Cardiologie" {% if specialty_value == 'Cardiologie' %}selected{% endif %}>Cardiologie</option>
+                        <option value="Dermatologie" {% if specialty_value == 'Dermatologie' %}selected{% endif %}>Dermatologie</option>
+                        <option value="Endocrinologie" {% if specialty_value == 'Endocrinologie' %}selected{% endif %}>Endocrinologie / Diabétologie</option>
+                        <option value="Gastro-entérologie" {% if specialty_value == 'Gastro-entérologie' %}selected{% endif %}>Gastro-entérologie</option>
+                        <option value="Gynécologie-Obstétrique" {% if specialty_value == 'Gynécologie-Obstétrique' %}selected{% endif %}>Gynécologie / Obstétrique</option>
+                        <option value="Hématologie" {% if specialty_value == 'Hématologie' %}selected{% endif %}>Hématologie</option>
+                        <option value="Neurologie" {% if specialty_value == 'Neurologie' %}selected{% endif %}>Neurologie</option>
+                        <option value="Oncologie" {% if specialty_value == 'Oncologie' %}selected{% endif %}>Oncologie</option>
+                        <option value="Pédiatrie" {% if specialty_value == 'Pédiatrie' %}selected{% endif %}>Pédiatrie</option>
+                        <option value="Pneumologie" {% if specialty_value == 'Pneumologie' %}selected{% endif %}>Pneumologie</option>
+                        <option value="Psychiatrie" {% if specialty_value == 'Psychiatrie' %}selected{% endif %}>Psychiatrie</option>
+                        <option value="Rhumatologie" {% if specialty_value == 'Rhumatologie' %}selected{% endif %}>Rhumatologie</option>
+                        <option value="Urologie" {% if specialty_value == 'Urologie' %}selected{% endif %}>Urologie</option>
+                    </optgroup>
+                    <optgroup label="Autres">
+                        <option value="Radiologie" {% if specialty_value == 'Radiologie' %}selected{% endif %}>Radiologie / Imagerie médicale</option>
+                        <option value="Anesthésiologie" {% if specialty_value == 'Anesthésiologie' %}selected{% endif %}>Anesthésiologie</option>
+                    </optgroup>

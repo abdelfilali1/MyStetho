@@ -13,6 +13,7 @@ from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED, ADMIN_EMAIL
 from services.auth_service import hash_password, verify_password, create_token, decode_token
 from services.rate_limit import retry_after, record_failure, reset as rate_limit_reset
 from services.audit import log_audit, client_ip
+from services.flash import set_flash
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -465,7 +466,13 @@ async def reset_password(
     await db.execute("UPDATE password_resets SET used_at=? WHERE token=?", (datetime.utcnow().isoformat(), token))
     await db.commit()
     await log_audit(db, {"sub": row[0], "email": row[3]}, "reset_mot_de_passe", ip=ip)
-    return RedirectResponse(url="/login", status_code=302)
+    # Le mot de passe vient de changer : la session ouverte dans CE navigateur
+    # est fermée pour que la nouvelle authentification soit effective tout de
+    # suite (le JWT étant sans état, les autres sessions expirent d'elles-mêmes).
+    response = RedirectResponse(url="/login", status_code=302)
+    response.delete_cookie("access_token")
+    set_flash(response, "Mot de passe modifié. Connectez-vous avec le nouveau.")
+    return response
 
 
 @router.post("/admin/users/{user_id}/toggle-active")

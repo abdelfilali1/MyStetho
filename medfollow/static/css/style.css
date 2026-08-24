@@ -229,6 +229,52 @@ body.mobile-nav-open {
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
+    /* Lien vers « Mon compte » : le bloc entier est cliquable. */
+    text-decoration: none;
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.user-info:hover,
+.user-info:focus-visible,
+.user-info.is-active {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(181, 216, 241, 0.28);
+}
+
+.user-info:hover .user-name,
+.user-info.is-active .user-name {
+    color: #fff;
+}
+
+.user-chevron {
+    margin-left: auto;
+    color: #7ea6c4;
+    flex-shrink: 0;
+    opacity: 0;
+    transform: translateX(-3px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.user-info:hover .user-chevron,
+.user-info:focus-visible .user-chevron,
+.user-info.is-active .user-chevron {
+    opacity: 1;
+    transform: none;
+}
+
+/* Le nom et l'e-mail sont tronques plutot que de deformer la barre laterale. */
+.user-details {
+    min-width: 0;
+}
+
+.user-name,
+.user-role {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .user-avatar {
@@ -617,6 +663,12 @@ body.mobile-nav-open {
     border: 1px solid #ffc5d0;
     background: linear-gradient(180deg, #ffe9ee, #ffdde6);
     color: #b91d3d;
+}
+
+.alert-info {
+    border: 1px solid #bcdcf7;
+    background: linear-gradient(180deg, #eaf5fe, #dcecfb);
+    color: #1a5f9e;
 }
 
 .alert-success {

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260702-1">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260824">
     <style>
     /* Recherche globale + badge messagerie (intégration) */
     .sidebar-search { padding: 10px 14px 4px; position: relative; }
@@ -146,13 +146,14 @@
             {% endif %}
         </ul>
         <div class="sidebar-footer">
-            <div class="user-info">
+            <a href="/mon-compte" class="user-info{% if active == 'profile' %} is-active{% endif %}" title="Mon compte : informations et mot de passe">
                 <div class="user-avatar">{{ (user.first_name or user.email)[0]|upper }}</div>
                 <div class="user-details">
                     <span class="user-name">{% if user.first_name or user.last_name %}{% if user.role == 'secretaire' %}{{ user.first_name }} {{ user.last_name }}{% else %}Dr. {{ user.first_name }} {{ user.last_name }}{% endif %}{% else %}{{ user.email }}{% endif %}</span>
                     <span class="user-role">{{ user.email }}</span>
                 </div>
-            </div>
+                <svg class="user-chevron" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
             <a href="/logout" class="logout-btn">Deconnexion</a>
         </div>
     </nav>

@@ -134,3 +134,34 @@ WHATSAPP_APP_SECRET = os.getenv("MEDFOLLOW_WHATSAPP_APP_SECRET", "")
 def whatsapp_configured() -> bool:
     """Vrai si l'envoi réel est possible (sinon : mode dry-run/journal seul)."""
     return bool(WHATSAPP_ENABLED and WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID)
+
+
+# --- URL publique -----------------------------------------------------------
+# Les liens envoyés par e-mail (lien magique de mot de passe) doivent pointer
+# vers l'adresse PUBLIQUE de l'application. Derrière un reverse proxy, l'URL vue
+# par uvicorn est celle du proxy (http://127.0.0.1:8000) : un lien construit à
+# partir d'elle serait inutilisable depuis la boîte mail du destinataire.
+# Renseignez MEDFOLLOW_PUBLIC_BASE_URL en production (ex. https://www.doctivo.org).
+# À vide, on retombe sur l'URL de la requête — correct en local.
+PUBLIC_BASE_URL = os.getenv("MEDFOLLOW_PUBLIC_BASE_URL", "").rstrip("/")
+
+# --- E-mail sortant (SMTP) --------------------------------------------------
+# Sert aujourd'hui au lien magique de modification du mot de passe (« Mon
+# compte »). Même principe que WhatsApp : tant que l'hôte SMTP n'est pas
+# renseigné, le service tourne en **dry-run** — il journalise le message au lieu
+# de l'envoyer, et l'application reste pleinement utilisable (le lien est alors
+# affiché à l'écran au propriétaire du compte, déjà authentifié).
+SMTP_HOST = os.getenv("MEDFOLLOW_SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("MEDFOLLOW_SMTP_PORT", "587"))
+SMTP_USER = os.getenv("MEDFOLLOW_SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("MEDFOLLOW_SMTP_PASSWORD", "")
+# 'starttls' (587, cas courant : Gmail, OVH, Office 365) | 'ssl' (465) | 'none'
+SMTP_SECURITY = os.getenv("MEDFOLLOW_SMTP_SECURITY", "starttls").lower()
+SMTP_FROM = os.getenv("MEDFOLLOW_SMTP_FROM", "") or SMTP_USER
+SMTP_FROM_NAME = os.getenv("MEDFOLLOW_SMTP_FROM_NAME", "Doctivo")
+SMTP_TIMEOUT = int(os.getenv("MEDFOLLOW_SMTP_TIMEOUT", "15"))
+
+
+def email_configured() -> bool:
+    """Vrai si un envoi réel est possible (sinon : dry-run/journal seul)."""
+    return bool(SMTP_HOST and SMTP_FROM)

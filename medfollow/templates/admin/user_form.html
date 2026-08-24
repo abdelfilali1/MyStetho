@@ -86,40 +86,7 @@
                 <label for="specialty">Spécialité <span class="required-star">*</span></label>
                 <select id="specialty" name="specialty" required>
                     <option value="" disabled {% if not form or not form.specialty %}selected{% endif %}>-- Choisissez une spécialité --</option>
-                    <optgroup label="Médecine de premier recours">
-                        <option value="Médecine générale" {% if form and form.specialty == 'Médecine générale' %}selected{% endif %}>Médecine générale</option>
-                        <option value="Médecine interne" {% if form and form.specialty == 'Médecine interne' %}selected{% endif %}>Médecine interne</option>
-                        <option value="Médecine d'urgence" {% if form and form.specialty == "Médecine d'urgence" %}selected{% endif %}>Médecine d'urgence</option>
-                    </optgroup>
-                    <optgroup label="Spécialités chirurgicales">
-                        <option value="Chirurgie générale" {% if form and form.specialty == 'Chirurgie générale' %}selected{% endif %}>Chirurgie générale</option>
-                        <option value="Chirurgie orthopédique" {% if form and form.specialty == 'Chirurgie orthopédique' %}selected{% endif %}>Chirurgie orthopédique</option>
-                        <option value="Chirurgie pédiatrique" {% if form and form.specialty == 'Chirurgie pédiatrique' %}selected{% endif %}>Chirurgie pédiatrique</option>
-                        <option value="Neurochirurgie" {% if form and form.specialty == 'Neurochirurgie' %}selected{% endif %}>Neurochirurgie</option>
-                        <option value="Ophtalmologie" {% if form and form.specialty == 'Ophtalmologie' %}selected{% endif %}>Ophtalmologie</option>
-                        <option value="ORL" {% if form and form.specialty == 'ORL' %}selected{% endif %}>ORL (Oto-rhino-laryngologie)</option>
-                        <option value="Stomatologie" {% if form and form.specialty == 'Stomatologie' %}selected{% endif %}>Stomatologie</option>
-                        <option value="Dentiste" {% if form and form.specialty == 'Dentiste' %}selected{% endif %}>Dentiste / Chirurgie dentaire</option>
-                    </optgroup>
-                    <optgroup label="Spécialités médicales">
-                        <option value="Cardiologie" {% if form and form.specialty == 'Cardiologie' %}selected{% endif %}>Cardiologie</option>
-                        <option value="Dermatologie" {% if form and form.specialty == 'Dermatologie' %}selected{% endif %}>Dermatologie</option>
-                        <option value="Endocrinologie" {% if form and form.specialty == 'Endocrinologie' %}selected{% endif %}>Endocrinologie / Diabétologie</option>
-                        <option value="Gastro-entérologie" {% if form and form.specialty == 'Gastro-entérologie' %}selected{% endif %}>Gastro-entérologie</option>
-                        <option value="Gynécologie-Obstétrique" {% if form and form.specialty == 'Gynécologie-Obstétrique' %}selected{% endif %}>Gynécologie / Obstétrique</option>
-                        <option value="Hématologie" {% if form and form.specialty == 'Hématologie' %}selected{% endif %}>Hématologie</option>
-                        <option value="Neurologie" {% if form and form.specialty == 'Neurologie' %}selected{% endif %}>Neurologie</option>
-                        <option value="Oncologie" {% if form and form.specialty == 'Oncologie' %}selected{% endif %}>Oncologie</option>
-                        <option value="Pédiatrie" {% if form and form.specialty == 'Pédiatrie' %}selected{% endif %}>Pédiatrie</option>
-                        <option value="Pneumologie" {% if form and form.specialty == 'Pneumologie' %}selected{% endif %}>Pneumologie</option>
-                        <option value="Psychiatrie" {% if form and form.specialty == 'Psychiatrie' %}selected{% endif %}>Psychiatrie</option>
-                        <option value="Rhumatologie" {% if form and form.specialty == 'Rhumatologie' %}selected{% endif %}>Rhumatologie</option>
-                        <option value="Urologie" {% if form and form.specialty == 'Urologie' %}selected{% endif %}>Urologie</option>
-                    </optgroup>
-                    <optgroup label="Autres">
-                        <option value="Radiologie" {% if form and form.specialty == 'Radiologie' %}selected{% endif %}>Radiologie / Imagerie médicale</option>
-                        <option value="Anesthésiologie" {% if form and form.specialty == 'Anesthésiologie' %}selected{% endif %}>Anesthésiologie</option>
-                    </optgroup>
+                    {% with specialty_value = (form.specialty if form else '') %}{% include "_specialty_options.html" %}{% endwith %}
                 </select>
             </div>
             <div class="form-row">

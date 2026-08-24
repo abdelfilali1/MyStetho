@@ -163,6 +163,32 @@ get(_screen, expect=(200,), label="/salle-attente/ecran/{token}")
 get("/salle-attente/api/ecran/" + _screen.rsplit("/", 1)[-1], expect=(200,), label="/salle-attente/api/ecran/{token}")
 get("/salle-attente/ecran/jeton-invalide", expect=(404,), label="/salle-attente/ecran/{jeton invalide}")
 
+print("== Mon compte ==")
+get("/mon-compte")
+post("/mon-compte", {"first_name": "Smoke", "last_name": "Admin",
+                     "email": "admin@smoke.test", "phone": "0522000000",
+                     "address": "12 rue des Écoles, Casablanca", "specialty": "Dentiste"})
+# L'e-mail de l'admin principal est figé par la configuration : toute autre
+# adresse doit être refusée (200 = formulaire re-rendu avec l'erreur).
+_r = post("/mon-compte", {"first_name": "Smoke", "last_name": "Admin",
+                          "email": "pirate@example.com", "specialty": "Dentiste"},
+          expect=(200,), label="/mon-compte (e-mail admin verrouillé)")
+if "configuration" not in _r.text:
+    print("  XX  changement d'e-mail admin non refusé")
+    failures.append("/mon-compte : e-mail admin modifiable")
+else:
+    print("  OK  changement d'e-mail admin refusé")
+# SMTP non configuré en test : la page doit rendre le lien au lieu de l'envoyer.
+_r = post("/mon-compte/mot-de-passe", {}, expect=(200,))
+if "/reset-password/" not in _r.text:
+    print("  XX  aucun lien de réinitialisation rendu")
+    failures.append("/mon-compte/mot-de-passe : pas de lien")
+else:
+    print("  OK  lien magique généré (mode dry-run)")
+    _token = _r.text.split("/reset-password/")[1].split('"')[0]
+    get(f"/reset-password/{_token}", expect=(200,), label="/reset-password/{token}")
+get("/mon-compte/papier-en-tete", expect=(404,), label="/mon-compte/papier-en-tete (aucun)")
+
 print("== CSRF négatif (POST sans jeton -> 403) ==")
 r = client.post("/rappels/new", data={"patient_id": "1", "description": "x"}, follow_redirects=False)
 if r.status_code == 403:
