@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Nouveau devis — Doctivo{% endblock %}
+{% block title %}{% if devis %}Modifier le devis {{ devis.devis_number }}{% else %}Nouveau devis{% endif %} — Doctivo{% endblock %}
 
 {% block head %}
 <style>
@@ -62,13 +62,18 @@
 {% block content %}
 <div class="page-header">
     <div>
+        {% if devis %}
+        <h2>Modifier le devis {{ devis.devis_number }}</h2>
+        <p class="subtitle">{{ devis.patient_name }} — les prix modifiés ici ne changent pas le tarif de référence des actes</p>
+        {% else %}
         <h2>Nouveau devis / plan de traitement</h2>
         <p class="subtitle">Nomenclature NGAP — {{ total_acts }} actes référencés</p>
+        {% endif %}
     </div>
-    <a href="/invoices/devis" class="btn btn-outline">Retour</a>
+    <a href="{% if devis %}/invoices/devis/{{ devis.id }}{% else %}/invoices/devis{% endif %}" class="btn btn-outline">Retour</a>
 </div>
 
-<form method="POST" action="/invoices/devis/new" id="devis-form">
+<form method="POST" action="{% if devis %}/invoices/devis/{{ devis.id }}/edit{% else %}/invoices/devis/new{% endif %}" id="devis-form">
 <div class="devis-layout">
     <!-- Colonne actes -->
     <div class="acts-column">
@@ -101,12 +106,19 @@
             <div class="panel-total"><span>Total</span><strong id="panel-total">0,00 DH</strong></div>
             <div class="form-group">
                 <label>Patient <span style="color:var(--danger)">*</span></label>
+                {% if devis %}
+                {# Le patient d'un devis existant ne change pas : le numero lui est rattache. #}
+                <select disabled style="background:var(--gray-50);color:var(--gray-500);">
+                    <option>{{ devis.patient_name }}</option>
+                </select>
+                {% else %}
                 <select name="patient_id" id="sel-patient-d" required>
                     <option value="">Sélectionner…</option>
                     {% for p in patients %}
                     <option value="{{ p.id }}" {{ 'selected' if selected_patient_id and selected_patient_id == p.id }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
                     {% endfor %}
                 </select>
+                {% endif %}
             </div>
             <div class="form-group">
                 <label>Valable jusqu'au</label>
@@ -114,9 +126,9 @@
             </div>
             <div class="form-group">
                 <label>Notes</label>
-                <textarea name="notes" rows="2" placeholder="Conditions, remarques…"></textarea>
+                <textarea name="notes" rows="2" placeholder="Conditions, remarques…">{{ devis.notes if devis and devis.notes else '' }}</textarea>
             </div>
-            <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Créer le devis</button>
+            <button type="submit" class="btn btn-primary btn-full" id="submit-btn">{% if devis %}Enregistrer les modifications{% else %}Créer le devis{% endif %}</button>
         </div>
     </div>
 </div>
@@ -149,7 +161,10 @@
 <script>
 let ALL_ACTS = {{ acts_json | safe }};
 let activeCat = '', searchQ = '';
-let selected = []; // {_id, code, libelle, montant, qty, teeth}
+let selected = {{ preselected_json | safe }}; // {_id, code, libelle, montant, qty, teeth}
+// Le code d'un acte personnalise (« PERSO 1 ») sert a le retrouver au catalogue ;
+// il n'a pas a figurer sur le devis remis au patient.
+const PERSO_CODES = new Set(ALL_ACTS.filter(a => a.categorie === 'Actes personnalisés').map(a => a.code));
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -190,7 +205,7 @@ function renderSelection() {
     box.innerHTML = selected.map(s => `
         <div class="sel-row" data-id="${s._id}">
             <div class="sel-top">
-                <span class="sel-code">${esc(s.code)}</span>
+                ${PERSO_CODES.has(s.code) ? '' : `<span class="sel-code">${esc(s.code)}</span>`}
                 <span class="sel-libelle">${esc(s.libelle)}</span>
                 <button type="button" class="sel-del" title="Retirer" onclick="removeSel('${s._id}')">×</button>
             </div>
@@ -264,5 +279,6 @@ document.getElementById('devis-form').addEventListener('submit', function(e){
 });
 
 renderActs();
+renderSelection();   // affiche les lignes deja enregistrees (mode modification)
 </script>
 {% endblock %}

@@ -425,6 +425,14 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Mutuelle
         </button>
+        <button class="view-btn" id="btn-facturation" onclick="switchTab('facturation')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Devis &amp; Factures
+        </button>
+        <button class="view-btn" id="btn-analyses" onclick="switchTab('analyses')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18h18"/><polyline points="7 14 11 9 15 13 21 6"/></svg>
+            Analyses
+        </button>
         {% if is_dentist %}
         <div class="view-btn-sep"></div>
         <button class="view-btn" id="btn-odontogram" onclick="switchTab('odontogram')">
@@ -798,6 +806,144 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         Aucune fiche de soin enregistrée pour ce patient.
     </div>
     {% endif %}
+</div>
+
+<!-- ===== ONGLET : DEVIS & FACTURES ===== -->
+<div id="view-facturation" style="display:none;">
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Devis / plans de traitement</h3>
+            <a href="/invoices/devis/new?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouveau devis</a>
+        </div>
+        <div class="card-body">
+            {% if devis_list %}
+            <table class="table">
+                <thead>
+                    <tr><th>N&deg;</th><th>Date</th><th>Validit&eacute;</th><th>Total</th><th>Statut</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for d in devis_list %}
+                    <tr>
+                        <td style="font-family:monospace;font-weight:700;">{{ d.devis_number }}</td>
+                        <td>{{ d.devis_date or (d.created_at or '')[:10] }}</td>
+                        <td>{{ d.valid_until or '&mdash;' }}</td>
+                        <td><strong>{{ '%.2f'|format(d.total_amount or 0) }} DH</strong></td>
+                        {% set d_badge = {'propose':'planifie','accepte':'confirme','refuse':'annule','converti':'en_cours'}.get(d.status, 'planifie') %}
+                        <td><span class="badge badge-{{ d_badge }}">{{ d.status_label }}</span></td>
+                        <td><a href="/invoices/devis/{{ d.id }}" class="btn btn-outline btn-sm">Voir</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucun devis pour ce patient</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Factures</h3>
+            <a href="/invoices/new?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouvelle facture</a>
+        </div>
+        <div class="card-body">
+            {% if invoices_list %}
+            <table class="table">
+                <thead>
+                    <tr><th>N&deg;</th><th>Date</th><th>Total</th><th>Pay&eacute;</th><th>Reste d&ucirc;</th><th>Statut</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for i in invoices_list %}
+                    <tr>
+                        <td style="font-family:monospace;font-weight:700;">{{ i.invoice_number }}</td>
+                        <td>{{ i.invoice_date or '&mdash;' }}</td>
+                        <td><strong>{{ '%.2f'|format(i.total_amount or 0) }} DH</strong></td>
+                        <td>{{ '%.2f'|format(i.paid_amount or 0) }} DH</td>
+                        <td {% if i.reste_du > 0 %}style="color:var(--danger);font-weight:600;"{% endif %}>{{ '%.2f'|format(i.reste_du) }} DH</td>
+                        {% set i_badge = {'payee':'confirme','emise':'planifie','partiellement_payee':'en_cours','annulee':'annule'}.get(i.status, 'termine') %}
+                        <td><span class="badge badge-{{ i_badge }}">{{ i.status_label }}</span></td>
+                        <td><a href="/invoices/{{ i.id }}" class="btn btn-outline btn-sm">Voir</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucune facture pour ce patient</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ===== ONGLET : ANALYSES (c&eacute;phalom&eacute;trie + radio IA) ===== -->
+<div id="view-analyses" style="display:none;">
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>C&eacute;phalom&eacute;trie</h3>
+            <a href="/cephalometrie/?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouvelle analyse</a>
+        </div>
+        <div class="card-body">
+            {% if ceph_cases %}
+            <table class="table">
+                <thead>
+                    <tr><th>Clich&eacute; du</th><th>Analyse</th><th>Points pos&eacute;s</th><th>Notes</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for c in ceph_cases %}
+                    <tr>
+                        <td>{{ c.taken_on_fr }}</td>
+                        <td><span class="badge">{{ c.analysis_label }}</span></td>
+                        <td>{{ c.n_points }}</td>
+                        <td>{{ c.notes or '&mdash;' }}</td>
+                        <td><a href="/cephalometrie/{{ c.id }}" class="btn btn-outline btn-sm">Ouvrir</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucune analyse c&eacute;phalom&eacute;trique pour ce patient</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Radio IA</h3>
+            <a href="/radio-ia/?patient_id={{ patient.id }}" class="btn btn-primary btn-sm">+ Nouveau clich&eacute;</a>
+        </div>
+        <div class="card-body">
+            {% if radio_cases %}
+            <table class="table">
+                <thead>
+                    <tr><th>Clich&eacute; du</th><th>Statut</th><th>L&eacute;sions retenues</th><th>Notes</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for r in radio_cases %}
+                    <tr>
+                        <td>{{ r.taken_on_fr }}</td>
+                        <td>
+                            {% if r.status == 'analyse' %}
+                            <span class="badge badge-termine">Analys&eacute;</span>
+                            {% else %}
+                            <span class="badge">&Agrave; analyser</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.n_findings }}</td>
+                        <td>{{ r.notes or '&mdash;' }}</td>
+                        <td style="display:flex;gap:6px;align-items:center;">
+                            <a href="/radio-ia/{{ r.id }}" class="btn btn-outline btn-sm">Ouvrir</a>
+                            {% if r.status == 'analyse' %}
+                            <a href="/radio-ia/{{ r.id }}/rapport.pdf" target="_blank" class="btn btn-outline btn-sm">Rapport PDF</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding: 16px;">Aucun clich&eacute; radio pour ce patient</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 {% if is_dentist %}
@@ -1398,7 +1544,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===== Tab switching — available for all users =====
-const PATIENT_TABS = ['info','appts','ordonnance','documents','mutuelle'];
+const PATIENT_TABS = ['info','appts','ordonnance','documents','mutuelle','facturation','analyses'];
 const DENTAL_TABS  = ['odontogram','endo'];
 const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
 let reactOdoMounted = false, endoGridBuilt = false;

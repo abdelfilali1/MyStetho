@@ -761,7 +761,7 @@ async def init_db():
     await db.execute("""
         CREATE TABLE IF NOT EXISTS devis (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            devis_number TEXT UNIQUE NOT NULL,
+            devis_number TEXT NOT NULL,
             patient_id INTEGER NOT NULL REFERENCES patients(id),
             doctor_id INTEGER NOT NULL REFERENCES users(id),
             consultation_id INTEGER REFERENCES consultations(id),
@@ -772,7 +772,8 @@ async def init_db():
             valid_until DATE,
             converted_invoice_id INTEGER REFERENCES invoices(id),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(doctor_id, devis_number)
         )
     """)
     await db.execute("""
@@ -818,6 +819,63 @@ async def init_db():
         await db.commit()
     except Exception:
         pass
+
+    # Migration : le numero de devis doit etre unique PAR PRATICIEN, pas sur toute
+    # la base. L'ancien schema declarait « devis_number TEXT UNIQUE » alors que la
+    # numerotation est calculee par medecin (DEV{annee}-{NNN}) : deux praticiens du
+    # meme cabinet entraient en collision et la creation de devis finissait par
+    # echouer definitivement pour celui qui etait en retard sur la suite.
+    # SQLite ne sait pas retirer une contrainte UNIQUE de colonne -> reconstruction
+    # de la table. Gardee par la detection de l'ancien schema : ne rejoue jamais.
+    cursor = await db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'devis'")
+    _devis_sql = await cursor.fetchone()
+    if _devis_sql and "devis_number TEXT UNIQUE" in (_devis_sql[0] or ""):
+        # Residu d'une tentative interrompue.
+        await db.execute("DROP TABLE IF EXISTS devis_migr")
+        # Procedure officielle SQLite de reconstruction de table :
+        #  - foreign_keys OFF (hors transaction, sinon sans effet), sans quoi le
+        #    DROP echoue puisque devis_items reference devis ;
+        #  - legacy_alter_table ON pour que le RENAME ne tente pas de reecrire la
+        #    clause REFERENCES de devis_items ;
+        #  - BEGIN explicite car sqlite3 execute le DDL hors transaction par
+        #    defaut : une coupure entre le DROP et le RENAME perdrait les devis.
+        await db.execute("PRAGMA foreign_keys = OFF")
+        await db.execute("PRAGMA legacy_alter_table = ON")
+        await db.execute("BEGIN IMMEDIATE")
+        await db.execute("""
+            CREATE TABLE devis_migr (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                devis_number TEXT NOT NULL,
+                patient_id INTEGER NOT NULL REFERENCES patients(id),
+                doctor_id INTEGER NOT NULL REFERENCES users(id),
+                consultation_id INTEGER REFERENCES consultations(id),
+                devis_date DATE DEFAULT CURRENT_DATE,
+                total_amount REAL NOT NULL DEFAULT 0,
+                status TEXT CHECK(status IN ('propose', 'accepte', 'refuse', 'converti')) DEFAULT 'propose',
+                notes TEXT,
+                valid_until DATE,
+                converted_invoice_id INTEGER REFERENCES invoices(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(doctor_id, devis_number)
+            )
+        """)
+        # Colonnes nommees explicitement : les ids sont conserves, donc les
+        # devis_items et les converted_invoice_id restent valides.
+        await db.execute("""
+            INSERT INTO devis_migr (id, devis_number, patient_id, doctor_id, consultation_id,
+                                    devis_date, total_amount, status, notes, valid_until,
+                                    converted_invoice_id, created_at, updated_at)
+            SELECT id, devis_number, patient_id, doctor_id, consultation_id,
+                   devis_date, total_amount, status, notes, valid_until,
+                   converted_invoice_id, created_at, updated_at
+            FROM devis
+        """)
+        await db.execute("DROP TABLE devis")
+        await db.execute("ALTER TABLE devis_migr RENAME TO devis")
+        await db.commit()
+        await db.execute("PRAGMA legacy_alter_table = OFF")
+        await db.execute("PRAGMA foreign_keys = ON")
 
     # --- WhatsApp : suivi des notifications de rendez-vous -------------------
     # Colonnes de suivi sur les rendez-vous (envoi confirmation/rappel + réponse

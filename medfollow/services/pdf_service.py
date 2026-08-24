@@ -2,9 +2,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor, white
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    SimpleDocTemplate, BaseDocTemplate, PageTemplate, Frame,
+    Paragraph, Spacer, Table, TableStyle,
     HRFlowable, KeepTogether,
 )
+from reportlab.pdfgen import canvas as _canvas
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from xml.sax.saxutils import escape as _xml_escape
@@ -30,19 +32,23 @@ def _has_template(template_path: Optional[str]) -> bool:
 
 
 def _stamp_on_template(content_pdf: bytes, template_path: str) -> bytes:
-    """Overlay each page of the reportlab-generated PDF on top of the first page
-    of the user's template PDF (letterhead). Returns the merged PDF bytes.
-    Falls back to the untouched content on any error so a PDF is always produced."""
+    """Pose le contenu genere sur le papier a en-tete du praticien.
+
+    Le fond pre-imprime n'est applique qu'a la PREMIERE page : un document de
+    trois pages porte l'en-tete du dentiste page 1, puis la mise en page standard
+    (marges normales + pied de page Doctivo) pages 2 et 3. En cas d'erreur, on
+    renvoie le contenu intact pour toujours produire un PDF."""
     try:
         from pypdf import PdfReader, PdfWriter
         content_reader = PdfReader(io.BytesIO(content_pdf))
         writer = PdfWriter()
-        for content_page in content_reader.pages:
-            # Re-read the template per page so each output page gets a fresh
-            # background (a pypdf page object can't be safely reused/merged twice).
-            tpl_page = PdfReader(template_path).pages[0]
-            tpl_page.merge_page(content_page)  # content drawn over the letterhead
-            writer.add_page(tpl_page)
+        for i, content_page in enumerate(content_reader.pages):
+            if i == 0:
+                tpl_page = PdfReader(template_path).pages[0]
+                tpl_page.merge_page(content_page)  # contenu dessine sur l'en-tete
+                writer.add_page(tpl_page)
+            else:
+                writer.add_page(content_page)
         out = io.BytesIO()
         writer.write(out)
         return out.getvalue()
@@ -99,7 +105,44 @@ def _draw_footer(canvas, doc):
 # Shared helpers
 # ─────────────────────────────────────────────────────────────
 
-def _make_doc(buf, top=32, bottom=24):
+# Marges standard du contenu, hors papier a en-tete.
+STD_TOP_MM    = 32
+STD_BOTTOM_MM = 24
+
+
+class _LetterheadDoc(SimpleDocTemplate):
+    """Document dont la PREMIERE page reserve la bande du papier a en-tete et
+    dont les pages SUIVANTES reprennent les marges standard.
+
+    `SimpleDocTemplate.build()` cree deja deux gabarits « First » et « Later »
+    (et `handle_pageBegin()` bascule seul sur « Later » apres la page 1) ; ils
+    partagent simplement le meme cadre. On surcharge donc uniquement `build()`
+    pour donner a « Later » un cadre aux marges normales."""
+
+    def __init__(self, *args, later_top=STD_TOP_MM * mm, later_bottom=STD_BOTTOM_MM * mm, **kwargs):
+        SimpleDocTemplate.__init__(self, *args, **kwargs)
+        self._later_top = later_top
+        self._later_bottom = later_bottom
+
+    def build(self, flowables, onFirstPage=None, onLaterPages=None, canvasmaker=_canvas.Canvas):
+        def _noop(canv, doc):
+            return
+        self._calc()
+        first = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="first")
+        later = Frame(
+            self.leftMargin, self._later_bottom,
+            self.pagesize[0] - self.leftMargin - self.rightMargin,
+            self.pagesize[1] - self._later_top - self._later_bottom,
+            id="later",
+        )
+        self.addPageTemplates([
+            PageTemplate(id="First", frames=first, onPage=onFirstPage or _noop, pagesize=self.pagesize),
+            PageTemplate(id="Later", frames=later, onPage=onLaterPages or _noop, pagesize=self.pagesize),
+        ])
+        BaseDocTemplate.build(self, flowables, canvasmaker=canvasmaker)
+
+
+def _make_doc(buf, top=STD_TOP_MM, bottom=STD_BOTTOM_MM):
     return SimpleDocTemplate(
         buf, pagesize=A4,
         leftMargin=22 * mm, rightMargin=22 * mm,
@@ -107,19 +150,38 @@ def _make_doc(buf, top=32, bottom=24):
     )
 
 
-def _doc_for(buf, template_path, top=32):
+def _doc_for(buf, template_path, top=STD_TOP_MM):
     """Build the document with margins adapted to the letterhead.
 
     Avec un papier à en-tête, on réserve une zone d'en-tête (et de pied)
-    pour ne JAMAIS écrire par-dessus le fond pré-imprimé. Cette zone est
-    DÉTECTÉE AUTOMATIQUEMENT à partir du template lui-même (chaque médecin a
-    un en-tête différent → aucun réglage manuel). Si la détection est
-    indisponible, on retombe sur une zone fixe généreuse."""
+    pour ne JAMAIS écrire par-dessus le fond pré-imprimé, sur la PREMIÈRE PAGE
+    seulement — c'est la seule qui porte le fond. Cette zone est DÉTECTÉE
+    AUTOMATIQUEMENT à partir du template lui-même (chaque médecin a un en-tête
+    différent → aucun réglage manuel). Si la détection est indisponible, on
+    retombe sur une zone fixe généreuse."""
     if _has_template(template_path):
         m = _detect_letterhead_margins(template_path)
         t, b = m if m else (TPL_TOP_MM, TPL_BOTTOM_MM)
-        return _make_doc(buf, top=t, bottom=b)
+        return _LetterheadDoc(
+            buf, pagesize=A4,
+            leftMargin=22 * mm, rightMargin=22 * mm,
+            topMargin=t * mm, bottomMargin=b * mm,
+        )
     return _make_doc(buf, top=top)
+
+
+def _build(doc, els, use_tpl):
+    """Construit le document en distinguant la page 1 des suivantes.
+
+    Page 1 : avec un papier à en-tête, aucun pied de page dessiné (le fond
+    pré-imprimé porte déjà le sien). Pages 2+ : elles n'ont jamais de fond, donc
+    elles reçoivent toujours le pied de page standard (filet, date, n° de page)
+    et aucun bandeau en haut."""
+    def _none(canv, d):
+        return
+    doc.build(els,
+              onFirstPage=_none if use_tpl else _draw_footer,
+              onLaterPages=_draw_footer)
 
 
 # ── Détection automatique de la zone imprimable d'un papier à en-tête ────
@@ -390,11 +452,6 @@ def generate_prescription_pdf(prescription: dict, items: list,
 
     doctor_name = f"{prescription['d_first']} {prescription['d_last']}"
 
-    def _page(canv, d):
-        if use_tpl:
-            return  # le papier à en-tête fournit l'en-tête / pied de page
-        _draw_footer(canv, d)
-
     # En-tête standard : titre « ORDONNANCE » (toujours) + identité praticien
     # (nom / spécialité / adresse / téléphone) si pas de papier à en-tête.
     els = _masthead(
@@ -453,7 +510,7 @@ def generate_prescription_pdf(prescription: dict, items: list,
     els.append(Paragraph(f"Dr. {doctor_name}", sign_st))
     els.append(Paragraph("Signature et cachet", sigl_st))
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -499,11 +556,6 @@ def generate_patient_brochure_pdf(
     S = _styles()
 
     full_name = f"{patient.get('last_name', '').upper()} {patient.get('first_name', '')}"
-
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
 
     els = _masthead(
         S, "Fiche patient",
@@ -659,7 +711,7 @@ def generate_patient_brochure_pdf(
             els.append(dt)
             els.append(Spacer(1, 10))
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -679,11 +731,6 @@ def generate_consultation_pdf(
 
     doc_date    = consultation.get("consultation_date", "")[:10]
     doctor_name = consultation.get("doctor_name", "")
-
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
 
     els = _masthead(
         S, "Compte rendu de consultation",
@@ -809,7 +856,7 @@ def generate_consultation_pdf(
     els.append(Spacer(1, 36))
     els.append(_sig_block(doctor_name))
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -830,16 +877,10 @@ def generate_note_honoraires_pdf(
     doc = _doc_for(buf, template_path)
     S = _styles()
 
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
-
     els = _masthead(
         S, "Note d'honoraires",
         doctor_name=doctor_name or None, specialty=specialty or None,
         address=address, phone=phone, use_tpl=use_tpl,
-        subtitle="CNOPS / CNSS",
     )
 
     # Identifiants fiscaux du praticien (n'inclure que les valeurs fournies =
@@ -937,7 +978,7 @@ def generate_note_honoraires_pdf(
     ]))
     els.append(sig)
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -1008,11 +1049,6 @@ def generate_invoice_pdf(
     doc = _doc_for(buf, template_path)
     S = _styles()
 
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
-
     els = _masthead(
         S, "Facture",
         doctor_name=doctor_name or None, specialty=specialty or None,
@@ -1057,7 +1093,7 @@ def generate_invoice_pdf(
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY), ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY), ("TOPPADDING", (0, 0), (-1, -1), 6)]))
     els.append(sig)
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -1072,11 +1108,6 @@ def generate_devis_pdf(
     buf = io.BytesIO()
     doc = _doc_for(buf, template_path)
     S = _styles()
-
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
 
     els = _masthead(
         S, "Devis — plan de traitement",
@@ -1113,7 +1144,7 @@ def generate_devis_pdf(
     sig.setStyle(TableStyle([("LINEABOVE", (0, 0), (0, 0), 0.7, GRAY), ("LINEABOVE", (1, 0), (1, 0), 0.7, GRAY), ("TOPPADDING", (0, 0), (-1, -1), 6)]))
     els.append(sig)
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -1153,11 +1184,6 @@ def generate_cephalo_pdf(
     buf = io.BytesIO()
     doc = _doc_for(buf, template_path)
     S = _styles()
-
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
 
     subtitle = analysis_subtitle
     if citation:
@@ -1303,7 +1329,7 @@ def generate_cephalo_pdf(
     els.append(Spacer(1, 26))
     els.append(_sig_block(doctor_name.replace("Dr. ", "")))
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out
 
@@ -1334,11 +1360,6 @@ def generate_radio_ai_pdf(
     buf = io.BytesIO()
     doc = _doc_for(buf, template_path)
     S = _styles()
-
-    def _page(canv, d):
-        if use_tpl:
-            return
-        _draw_footer(canv, d)
 
     els = _masthead(
         S, "Détection IA de pathologies",
@@ -1454,6 +1475,6 @@ def generate_radio_ai_pdf(
     els.append(Spacer(1, 26))
     els.append(_sig_block(doctor_name.replace("Dr. ", "")))
 
-    doc.build(els, onFirstPage=_page, onLaterPages=_page)
+    _build(doc, els, use_tpl)
     out = buf.getvalue()
     return _stamp_on_template(out, template_path) if use_tpl else out

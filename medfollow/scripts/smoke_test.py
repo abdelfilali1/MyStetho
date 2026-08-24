@@ -99,8 +99,29 @@ print("== Devis workflow (item 21) ==")
 post("/invoices/devis/new", {"patient_id": "1", "valid_until": "2026-08-01", "notes": "", "item_desc_0": "Couronne", "item_teeth_0": "26", "item_qty_0": "1", "item_price_0": "2000"})
 get("/invoices/devis/1")
 get("/invoices/devis/1/pdf", label="/invoices/devis/1/pdf")
+# Modification apres creation : prix change, ligne ajoutee, ligne supprimee.
+get("/invoices/devis/1/edit", label="/invoices/devis/1/edit")
+post("/invoices/devis/1/edit", {
+    "valid_until": "2026-09-01", "notes": "revise",
+    "item_desc_0": "Couronne", "item_teeth_0": "26", "item_qty_0": "1", "item_price_0": "1800",
+    "item_desc_1": "Extraction", "item_teeth_1": "38", "item_qty_1": "1", "item_price_1": "400",
+})
 post("/invoices/devis/1/status", {"status": "accepte"})
 post("/invoices/devis/1/convert")
+# Un devis converti n'est plus modifiable : redirection, pas d'erreur serveur.
+get("/invoices/devis/1/edit", expect=(302, 303), label="/invoices/devis/1/edit (converti -> refuse)")
+
+print("== Fiche patient : onglets Devis & Factures + Analyses ==")
+_r = get("/patients/1", label="/patients/1 (onglets)")
+for _needle, _label in (
+    ('id="view-facturation"', "onglet Devis & Factures"),
+    ('id="view-analyses"', "onglet Analyses"),
+    ("'facturation','analyses'", "onglets declares cote JS"),
+):
+    _ok = _needle in _r.text
+    print(f"  {'OK ' if _ok else 'XX '} {_label}")
+    if not _ok:
+        failures.append(f"fiche patient : {_label} absent")
 
 print("== Dental (item 24) ==")
 post("/dental/1/tooth/26/condition", {"condition": "carie"})

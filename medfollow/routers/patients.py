@@ -17,6 +17,17 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 SORT_WHITELIST = {"last_name", "date_of_birth", "city", "created_at", "last_visit"}
 
+# Libelles et helpers des modules d'imagerie, reutilises tels quels par l'onglet
+# « Analyses » de la fiche patient (pas de duplication de logique).
+from routers.cephalo import ANALYSIS_LABELS as _CEPH_LABELS, _fr_date as _ceph_fr_date
+from routers.radio import _kept_detections as _radio_kept, _loads as _radio_loads
+
+_DEVIS_LABELS = {"propose": "Proposé", "accepte": "Accepté", "refuse": "Refusé", "converti": "Converti"}
+_INVOICE_LABELS = {
+    "brouillon": "Brouillon", "emise": "Émise", "payee": "Payée",
+    "partiellement_payee": "Partiellement payée", "annulee": "Annulée",
+}
+
 HISTORY_TYPES = {"medical", "surgical", "family", "allergy"}
 
 @router.get("/", response_class=HTMLResponse)
@@ -302,6 +313,60 @@ async def view_patient(
     )
     feuilles_soin = [dict(r) for r in await cursor.fetchall()]
 
+    # ── Onglet « Devis & Factures » ────────────────────────────────────────
+    cursor = await db.execute(
+        "SELECT * FROM devis WHERE patient_id = ? AND doctor_id = ? ORDER BY created_at DESC",
+        (patient_id, doctor_id),
+    )
+    devis_list = [dict(r) for r in await cursor.fetchall()]
+    for d in devis_list:
+        d["status_label"] = _DEVIS_LABELS.get(d.get("status"), d.get("status") or "—")
+
+    cursor = await db.execute(
+        "SELECT * FROM invoices WHERE patient_id = ? AND doctor_id = ? ORDER BY invoice_date DESC, id DESC",
+        (patient_id, doctor_id),
+    )
+    invoices_list = [dict(r) for r in await cursor.fetchall()]
+    for inv in invoices_list:
+        inv["status_label"] = _INVOICE_LABELS.get(inv.get("status"), inv.get("status") or "—")
+        inv["reste_du"] = round((inv.get("total_amount") or 0) - (inv.get("paid_amount") or 0), 2)
+
+    # ── Onglet « Analyses » (céphalométrie + radio IA) ─────────────────────
+    cursor = await db.execute(
+        """SELECT id, taken_on, analysis_id, landmarks_json, notes, updated_at
+           FROM ceph_cases WHERE patient_id = ? AND doctor_id = ?
+           ORDER BY updated_at DESC, id DESC""",
+        (patient_id, doctor_id),
+    )
+    ceph_cases = []
+    for r in await cursor.fetchall():
+        pts = _radio_loads(r["landmarks_json"], {})
+        ceph_cases.append({
+            "id": r["id"],
+            "taken_on_fr": _ceph_fr_date(r["taken_on"]) or (r["taken_on"] or "—"),
+            "analysis_label": _CEPH_LABELS.get(r["analysis_id"], r["analysis_id"] or "Steiner"),
+            "n_points": len(pts) if isinstance(pts, dict) else 0,
+            "notes": r["notes"],
+        })
+
+    cursor = await db.execute(
+        """SELECT id, taken_on, status, detections_json, notes, updated_at
+           FROM radio_cases WHERE patient_id = ? AND doctor_id = ?
+           ORDER BY updated_at DESC, id DESC""",
+        (patient_id, doctor_id),
+    )
+    radio_cases = []
+    for r in await cursor.fetchall():
+        data = _radio_loads(r["detections_json"], {})
+        kept = _radio_kept(data.get("detections", []) if isinstance(data, dict) else [])
+        radio_cases.append({
+            "id": r["id"],
+            "taken_on_fr": _ceph_fr_date(r["taken_on"]) or (r["taken_on"] or "—"),
+            "status": r["status"] or "importe",
+            "n_findings": len(kept),
+            "notes": r["notes"],
+        })
+
     # Detect active consultation session for this doctor+patient
     active_consultation = None
     if consultation_id:
@@ -364,6 +429,8 @@ async def view_patient(
             "patient": patient, "history": history,
             "appointments": appointments, "consultations": consultations,
             "prescriptions": prescriptions, "documents": documents, "feuilles_soin": feuilles_soin,
+            "devis_list": devis_list, "invoices_list": invoices_list,
+            "ceph_cases": ceph_cases, "radio_cases": radio_cases,
             "now_year": now_year, "is_dentist": is_dentist,
             "teeth_data_json": teeth_data_json,
             "endo_summary_json": endo_summary_json,

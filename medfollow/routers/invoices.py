@@ -16,19 +16,53 @@ router = APIRouter(prefix="/invoices", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
-def _generate_invoice_number(year: int, count: int) -> str:
-    return f"F{year}-{count + 1:04d}"
+def _invoice_number(year: int, n: int) -> str:
+    return f"F{year}-{n:04d}"
 
 
-async def _next_devis_number(db, doctor_id: int, year: int) -> str:
-    """Numérotation par praticien et par année : DEV{YYYY}-{NNN}."""
+async def _next_invoice_rank(db, year: int) -> int:
+    """Prochain rang de facture de l'année, calculé sur le MAX du numéro déjà
+    attribué et non sur un COUNT : une facture supprimée décalait le compteur
+    vers le bas et provoquait une collision au prochain enregistrement."""
+    cur = await db.execute(
+        "SELECT MAX(CAST(SUBSTR(invoice_number, 7) AS INTEGER)) FROM invoices WHERE invoice_number LIKE ?",
+        (f"F{year}-%",),
+    )
+    row = await cur.fetchone()
+    return (row[0] or 0) + 1
+
+
+def _devis_number(year: int, n: int) -> str:
+    return f"DEV{year}-{n:03d}"
+
+
+async def _next_devis_rank(db, doctor_id: int, year: int) -> int:
+    """Prochain rang de devis DU PRATICIEN pour l'année (numérotation
+    DEV{YYYY}-{NNN} propre à chaque médecin). L'unicité en base porte sur
+    (doctor_id, devis_number) : deux praticiens peuvent donc porter le même
+    numéro sans se bloquer l'un l'autre."""
     cur = await db.execute(
         "SELECT MAX(CAST(SUBSTR(devis_number, 9) AS INTEGER)) FROM devis WHERE doctor_id = ? AND devis_number LIKE ?",
         (doctor_id, f"DEV{year}-%"),
     )
     row = await cur.fetchone()
-    n = (row[0] or 0) + 1
-    return f"DEV{year}-{n:03d}"
+    return (row[0] or 0) + 1
+
+
+async def _load_devis_items(db, devis_id: int) -> list:
+    """Lignes d'un devis, code des actes personnalisés masqué.
+
+    Le code (« PERSO 1 »…) reste au catalogue pour retrouver l'acte, mais il n'a
+    pas à figurer sur le devis remis au patient. Le masquage se fait ici, à la
+    lecture, pour couvrir aussi les devis déjà enregistrés."""
+    cur = await db.execute("SELECT code FROM ngap_acts WHERE categorie = 'Actes personnalisés'")
+    perso = {r[0] for r in await cur.fetchall()}
+    cur = await db.execute("SELECT * FROM devis_items WHERE devis_id = ? ORDER BY id", (devis_id,))
+    items = [dict(r) for r in await cur.fetchall()]
+    for it in items:
+        if it.get("code") in perso:
+            it["code"] = None
+    return items
 
 
 async def _doctor_pdf_ctx(db, doctor_id: int):
@@ -216,10 +250,9 @@ async def create_invoice(request: Request, user: dict = Depends(require_login), 
 
     from aiosqlite import IntegrityError
     invoice_id = None
-    for attempt in range(3):
-        cursor = await db.execute("SELECT COUNT(*) FROM invoices WHERE strftime('%Y', invoice_date) = ?", (str(today.year),))
-        count = (await cursor.fetchone())[0] + attempt
-        invoice_number = _generate_invoice_number(today.year, count)
+    base_n = await _next_invoice_rank(db, today.year)
+    for attempt in range(6):
+        invoice_number = _invoice_number(today.year, base_n + attempt)
         try:
             cursor = await db.execute(
                 "INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, tiers_payant, notes) VALUES (?, ?, ?, ?, ?, ?)",
@@ -294,22 +327,56 @@ async def _ngap_acts(db) -> list:
     ]
 
 
-@router.get("/devis/new", response_class=HTMLResponse)
-async def new_devis_form(request: Request, patient_id: Optional[int] = None, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+async def _devis_form_ctx(request, user, db, *, patient_id=None, devis=None, preselected=None):
+    """Contexte de `devis_form.html`, partage par la creation et la modification.
+    En modification, `devis` est renseigne et `preselected` porte les lignes deja
+    enregistrees, au format attendu par le panneau de selection."""
     uid = user["sub"]
     cursor = await db.execute("SELECT id, first_name, last_name FROM patients WHERE doctor_id = ? AND is_active = 1 ORDER BY last_name", (uid,))
     patients = [dict(r) for r in await cursor.fetchall()]
     acts = await _ngap_acts(db)
     categories = sorted(set(a["categorie"] for a in acts if a["categorie"]))
-    default_valid = (date.today() + timedelta(days=30)).isoformat()
-    return templates.TemplateResponse(
-        "invoices/devis_form.html",
-        {
-            "request": request, "user": user, "active": "invoices", "patients": patients,
-            "acts_json": json.dumps(acts, ensure_ascii=False), "categories": categories,
-            "total_acts": len(acts), "selected_patient_id": patient_id, "default_valid": default_valid,
-        },
-    )
+    return {
+        "request": request, "user": user, "active": "invoices", "patients": patients,
+        "acts_json": json.dumps(acts, ensure_ascii=False), "categories": categories,
+        "total_acts": len(acts),
+        "selected_patient_id": (devis["patient_id"] if devis else patient_id),
+        "default_valid": (devis["valid_until"] if devis else None) or (date.today() + timedelta(days=30)).isoformat(),
+        "devis": devis,
+        "preselected_json": json.dumps(preselected or [], ensure_ascii=False),
+    }
+
+
+def _parse_devis_items(form):
+    """Lit les lignes `item_*_{i}` postees par `devis_form.html`.
+    Renvoie (total, [(desc, qty, price, total_ligne, code, dents), ...])."""
+    total = 0.0
+    items = []
+    idx = 0
+    while f"item_desc_{idx}" in form:
+        desc = form[f"item_desc_{idx}"]
+        if desc.strip():
+            try:
+                qty = max(1, int(form.get(f"item_qty_{idx}", "1") or "1"))
+            except ValueError:
+                qty = 1
+            try:
+                price = float(form.get(f"item_price_{idx}", "0") or "0")
+            except ValueError:
+                price = 0.0
+            code = (form.get(f"item_code_{idx}", "") or "").strip() or None
+            teeth = form.get(f"item_teeth_{idx}", "") or None
+            item_total = qty * price
+            total += item_total
+            items.append((desc, qty, price, item_total, code, teeth))
+        idx += 1
+    return total, items
+
+
+@router.get("/devis/new", response_class=HTMLResponse)
+async def new_devis_form(request: Request, patient_id: Optional[int] = None, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+    ctx = await _devis_form_ctx(request, user, db, patient_id=patient_id)
+    return templates.TemplateResponse("invoices/devis_form.html", ctx)
 
 
 @router.post("/devis/acts/new")
@@ -357,28 +424,13 @@ async def create_devis(request: Request, user: dict = Depends(require_login), db
     doctor_id = user["sub"]
     today = date.today()
 
-    total = 0.0
-    items = []
-    idx = 0
-    while f"item_desc_{idx}" in form:
-        desc = form[f"item_desc_{idx}"]
-        if desc.strip():
-            qty = int(form.get(f"item_qty_{idx}", "1") or "1")
-            price = float(form.get(f"item_price_{idx}", "0") or "0")
-            code = (form.get(f"item_code_{idx}", "") or "").strip() or None
-            teeth = form.get(f"item_teeth_{idx}", "") or None
-            item_total = qty * price
-            total += item_total
-            items.append((desc, qty, price, item_total, code, teeth))
-        idx += 1
+    total, items = _parse_devis_items(form)
 
     from aiosqlite import IntegrityError
     devis_id = None
-    for attempt in range(4):
-        number = await _next_devis_number(db, doctor_id, today.year)
-        if attempt:
-            base, n = number.rsplit("-", 1)
-            number = f"{base}-{int(n) + attempt:03d}"
+    base_n = await _next_devis_rank(db, doctor_id, today.year)
+    for attempt in range(6):
+        number = _devis_number(today.year, base_n + attempt)
         try:
             cursor = await db.execute(
                 "INSERT INTO devis (devis_number, patient_id, doctor_id, total_amount, status, notes, valid_until) VALUES (?, ?, ?, ?, 'propose', ?, ?)",
@@ -419,13 +471,89 @@ async def view_devis(request: Request, devis_id: int, user: dict = Depends(requi
     devis = await _load_devis(db, devis_id, user["sub"])
     if not devis:
         return RedirectResponse(url="/invoices/devis", status_code=302)
-    cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ?", (devis_id,))
-    items = [dict(r) for r in await cursor.fetchall()]
+    items = await _load_devis_items(db, devis_id)
     await log_audit(db, user, "devis_consulte", entity_type="devis", entity_id=devis_id, patient_id=devis["patient_id"], ip=client_ip(request))
     return templates.TemplateResponse(
         "invoices/devis_detail.html",
         {"request": request, "user": user, "active": "invoices", "devis": devis, "items": items, "status_labels": _DEVIS_STATUS_LABELS},
     )
+
+
+# Un devis converti a donne naissance a une facture : le modifier laisserait la
+# facture desynchronisee, il est donc verrouille. Tous les autres statuts restent
+# modifiables (prix, ajout et suppression de lignes).
+_DEVIS_LOCKED = {"converti"}
+
+
+@router.get("/devis/{devis_id}/edit", response_class=HTMLResponse)
+async def edit_devis_form(request: Request, devis_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+    devis = await _load_devis(db, devis_id, user["sub"])
+    if not devis:
+        return RedirectResponse(url="/invoices/devis", status_code=302)
+    if devis["status"] in _DEVIS_LOCKED:
+        resp = RedirectResponse(url=f"/invoices/devis/{devis_id}", status_code=302)
+        set_flash(resp, "Un devis converti en facture ne peut plus être modifié", "error")
+        return resp
+
+    # Lignes brutes (code conserve) : le masquage du code des actes personnalises
+    # est un choix d'affichage, il ne doit pas effacer la donnee a l'enregistrement.
+    cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ? ORDER BY id", (devis_id,))
+    preselected = [
+        {
+            "_id": r["id"],
+            "code": r["code"] or "",
+            "libelle": r["description"] or "",
+            "montant": round(float(r["unit_price"] or 0), 2),
+            "qty": int(r["quantity"] or 1),
+            "teeth": r["tooth_numbers"] or "",
+        }
+        for r in await cursor.fetchall()
+    ]
+    ctx = await _devis_form_ctx(request, user, db, devis=devis, preselected=preselected)
+    return templates.TemplateResponse("invoices/devis_form.html", ctx)
+
+
+@router.post("/devis/{devis_id}/edit")
+async def update_devis(request: Request, devis_id: int, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
+    devis = await _load_devis(db, devis_id, user["sub"])
+    if not devis:
+        return RedirectResponse(url="/invoices/devis", status_code=302)
+    if devis["status"] in _DEVIS_LOCKED:
+        resp = RedirectResponse(url=f"/invoices/devis/{devis_id}", status_code=302)
+        set_flash(resp, "Un devis converti en facture ne peut plus être modifié", "error")
+        return resp
+
+    form = await request.form()
+    total, items = _parse_devis_items(form)
+    if not items:
+        resp = RedirectResponse(url=f"/invoices/devis/{devis_id}/edit", status_code=302)
+        set_flash(resp, "Un devis doit comporter au moins un acte", "error")
+        return resp
+
+    notes = form.get("notes", "")
+    valid_until = form.get("valid_until", "") or None
+
+    # Le numero, le patient et le statut du devis ne changent jamais : seules les
+    # lignes, le total et les mentions libres sont remplaces.
+    await db.execute("DELETE FROM devis_items WHERE devis_id = ?", (devis_id,))
+    for desc, qty, price, item_total, code, teeth in items:
+        await db.execute(
+            "INSERT INTO devis_items (devis_id, medical_act_id, description, quantity, unit_price, total_price, tooth_numbers, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (devis_id, None, desc, qty, price, item_total, teeth, code),
+        )
+    await db.execute(
+        "UPDATE devis SET total_amount = ?, notes = ?, valid_until = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?",
+        (total, notes or None, valid_until, devis_id, user["sub"]),
+    )
+    await db.commit()
+    await log_audit(
+        db, user, "devis_modifie", entity_type="devis", entity_id=devis_id,
+        patient_id=devis["patient_id"], ip=client_ip(request),
+        details=f"{len(items)} ligne(s), total={total:.2f}",
+    )
+    resp = RedirectResponse(url=f"/invoices/devis/{devis_id}", status_code=302)
+    set_flash(resp, "Devis modifié")
+    return resp
 
 
 @router.post("/devis/{devis_id}/status")
@@ -456,17 +584,15 @@ async def convert_devis(request: Request, devis_id: int, user: dict = Depends(re
         set_flash(resp, "Seul un devis accepté peut être converti en facture", "error")
         return resp
 
-    cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ?", (devis_id,))
-    ditems = [dict(r) for r in await cursor.fetchall()]
+    ditems = await _load_devis_items(db, devis_id)
     doctor_id = user["sub"]
     today = date.today()
 
     from aiosqlite import IntegrityError
     invoice_id = None
-    for attempt in range(3):
-        cursor = await db.execute("SELECT COUNT(*) FROM invoices WHERE strftime('%Y', invoice_date) = ?", (str(today.year),))
-        count = (await cursor.fetchone())[0] + attempt
-        number = _generate_invoice_number(today.year, count)
+    base_n = await _next_invoice_rank(db, today.year)
+    for attempt in range(6):
+        number = _invoice_number(today.year, base_n + attempt)
         try:
             cursor = await db.execute(
                 "INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, status, notes) VALUES (?, ?, ?, ?, 'emise', ?)",
@@ -503,8 +629,7 @@ async def devis_pdf(request: Request, devis_id: int, dl: int = 0, user: dict = D
     devis = await _load_devis(db, devis_id, user["sub"])
     if not devis:
         return RedirectResponse(url="/invoices/devis", status_code=302)
-    cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ?", (devis_id,))
-    items = [dict(r) for r in await cursor.fetchall()]
+    items = await _load_devis_items(db, devis_id)
     doctor_name, specialty, doc_phone, doc_address, template_path = await _doctor_pdf_ctx(db, user["sub"])
     from services.pdf_service import generate_devis_pdf
     await log_audit(db, user, "devis_pdf_exporte", entity_type="devis", entity_id=devis_id, patient_id=devis["patient_id"], ip=client_ip(request))

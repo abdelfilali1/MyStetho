@@ -62,6 +62,13 @@
 .t-meta { margin-top:3px; font-size:.72rem; color:var(--gray-400); }
 .t-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
 .t-amount { font-size:.875rem; font-weight:700; color:var(--gray-800); white-space:nowrap; }
+.t-amount-wrap { display:flex; align-items:center; gap:4px; }
+.t-amount-input { width:78px; padding:3px 6px; border:1px solid var(--gray-200); border-radius:6px;
+                  font-size:.8125rem; font-weight:700; color:var(--gray-800); text-align:right;
+                  background:#fff; -moz-appearance:textfield; }
+.t-amount-input::-webkit-outer-spin-button, .t-amount-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.t-amount-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+.t-amount-unit { font-size:.75rem; font-weight:700; color:var(--gray-500); }
 .t-delete { background:none; border:none; cursor:pointer; color:var(--gray-300); padding:2px; border-radius:4px; transition:color .15s; }
 .t-delete:hover { color:var(--danger); }
 .empty-panel { padding:40px 18px; text-align:center; color:var(--gray-400); }
@@ -825,9 +832,7 @@ function renderPanel() {
     if (!treatments.length) { empty.style.display=''; document.getElementById('panel-total').textContent='0,00 Dh'; return; }
     empty.style.display = 'none';
 
-    let total = 0;
     treatments.forEach(t => {
-        total += t.montant;
         const row = document.createElement('div');
         row.className = 'treatment-row';
         row.innerHTML = `<span class="t-code">${esc(t.code)}</span>
@@ -836,7 +841,12 @@ function renderPanel() {
                 <div class="t-meta">${t.toothNumber?'Dent '+esc(t.toothNumber)+' · ':''} ${new Date(t.date+'T00:00:00').toLocaleDateString('fr-MA')}</div>
             </div>
             <div class="t-right">
-                <span class="t-amount">${t.montant.toFixed(2)} Dh</span>
+                <span class="t-amount-wrap">
+                    <input type="number" class="t-amount-input" min="0" step="0.01"
+                           value="${t.montant.toFixed(2)}" data-id="${t._id}"
+                           title="Montant facturé — sans effet sur le tarif de référence de l'acte">
+                    <span class="t-amount-unit">Dh</span>
+                </span>
                 <button class="t-delete" data-id="${t._id}" title="Supprimer">
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L12 12M12 4L4 12"/></svg>
                 </button>
@@ -846,6 +856,25 @@ function renderPanel() {
     list.querySelectorAll('.t-delete').forEach(btn => {
         btn.onclick = () => { treatments = treatments.filter(t => t._id != btn.dataset.id); renderAll(); };
     });
+    list.querySelectorAll('.t-amount-input').forEach(inp => {
+        inp.oninput = () => {
+            const t = treatments.find(x => x._id == inp.dataset.id);
+            if (!t) return;
+            t.montant = Math.max(0, parseFloat(inp.value) || 0);
+            refreshPanelTotal();
+        };
+        inp.onblur = () => {
+            const t = treatments.find(x => x._id == inp.dataset.id);
+            if (t) inp.value = t.montant.toFixed(2);
+        };
+    });
+    refreshPanelTotal();
+}
+
+// Total du panneau seul : appele pendant la saisie d'un montant, la ou un
+// renderPanel() complet ferait perdre le focus au champ en cours d'edition.
+function refreshPanelTotal() {
+    const total = treatments.reduce((s, t) => s + t.montant, 0);
     document.getElementById('panel-total').textContent = total.toFixed(2).replace('.',',') + ' Dh';
 }
 
@@ -1420,8 +1449,7 @@ function buildNoteHtml(fields) {
 *{box-sizing:border-box}
 body{font-family:'Times New Roman',Times,serif;padding:${hasDoc?'15mm 15mm 25mm':'0 15mm'};color:#1a1a1a;font-size:11pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .top-spacer{height:${hasDoc?'0':'15vh'}}
-h1{text-align:center;font-size:16pt;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-.subtitle{text-align:center;font-size:9pt;color:#555;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #ccc}
+h1{text-align:center;font-size:16pt;letter-spacing:2px;text-transform:uppercase;margin-bottom:0;padding-bottom:12px;border-bottom:1px solid #ccc}
 .doc-header{text-align:center;margin-bottom:20px}
 .doc-header .name{font-size:13pt;font-weight:bold}
 .doc-header .spec{font-size:9pt;color:#555}
@@ -1440,8 +1468,7 @@ td.right{text-align:right;font-weight:600}
 </style></head><body>
 ${hasDoc?`<div class="doc-header"><div class="name">${praticien}</div><div class="spec">${specialite}</div></div>`:'<div class="top-spacer"></div>'}
 <h1>NOTE D'HONORAIRES</h1>
-<div class="subtitle">CNOPS / CNSS — Fiche de soin</div>
-<div class="meta"><div>N° ${num}</div><div>Date : ${dateStr}</div></div>
+<div class="meta" style="margin-top:20px;"><div>N° ${num}</div><div>Date : ${dateStr}</div></div>
 <div class="patient">Patient : ${patient}</div>
 <table>
   <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Date</th><th>Montant</th></tr></thead>
