@@ -757,6 +757,14 @@ async def init_db():
     """)
     await db.commit()
 
+    # Migration : mesures libres (distances et angles) posees sur le cliche.
+    # Additive et idempotente, comme le reste du projet.
+    try:
+        await db.execute("ALTER TABLE ceph_cases ADD COLUMN measures_json TEXT DEFAULT '[]'")
+        await db.commit()
+    except Exception:
+        pass
+
     # Devis / plans de traitement chiffrés (workflow proposé → accepté/refusé → converti en facture)
     await db.execute("""
         CREATE TABLE IF NOT EXISTS devis (

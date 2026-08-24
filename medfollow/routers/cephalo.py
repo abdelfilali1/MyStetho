@@ -229,6 +229,9 @@ async def workstation(request: Request, case_id: int,
             "analysis_id": case["analysis_id"] or "steiner",
             "landmarks": _loads(case["landmarks_json"], {}),
             "traces": _loads(case["traces_json"], []),
+            # Colonne ajoutee apres coup : absente des dossiers anciens tant que
+            # la migration n'a pas tourne, d'ou l'acces defensif.
+            "measures": _loads(case["measures_json"] if "measures_json" in case.keys() else None, []),
             "calibration": _loads(case["calibration_json"], {}),
             "adjust": _loads(case["adjust_json"], {}),
         },
@@ -275,13 +278,15 @@ async def save_case(request: Request, case_id: int,
 
     await db.execute(
         """UPDATE ceph_cases
-           SET analysis_id = ?, landmarks_json = ?, traces_json = ?, calibration_json = ?,
-               adjust_json = ?, mm_per_px = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+           SET analysis_id = ?, landmarks_json = ?, traces_json = ?, measures_json = ?,
+               calibration_json = ?, adjust_json = ?, mm_per_px = ?, notes = ?,
+               updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND doctor_id = ?""",
         (
             data.get("analysis_id") or "steiner",
             json.dumps(data.get("landmarks") or {}, ensure_ascii=False),
             json.dumps(data.get("traces") or [], ensure_ascii=False),
+            json.dumps(data.get("measures") or [], ensure_ascii=False),
             json.dumps(calibration, ensure_ascii=False),
             json.dumps(data.get("adjust") or {}, ensure_ascii=False),
             float(mm_per_px) if isinstance(mm_per_px, (int, float)) else None,

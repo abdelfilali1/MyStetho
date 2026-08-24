@@ -11,8 +11,8 @@ import { ANALYSES, ANALYSIS_BY_ID, evaluate, fmt, fmtNorm, requiredLandmarks } f
 import { GROUP_COLOR, LANDMARK_BY_ID, LANDMARK_GROUPS, orderLandmarks } from './landmarks.js';
 import { drawablePlanes, diagnosticSummary, PLANES, PLANE_GROUP_LABEL, TRACE_COLOR, TRACE_STRUCTURES } from './tracing.js';
 import { detectLandmarks, modelAvailable } from './autodetect.js';
+import { computeHistogram, computeClahe, windowLut } from './imaging.js';
 
-const LOUPE_FACTOR = 4;
 const LOUPE_R = 78;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -36,24 +36,65 @@ const SEVERITY_LABEL = {
 // État
 // ---------------------------------------------------------------------------
 
+/** Reglages d'image par defaut : fenetre pleine, aucun traitement. */
+const NEUTRAL_ADJUST = {
+    center: 128, width: 255, gamma: 1,
+    invert: false, flipH: false, rotate: 0, sharpen: 0, clahe: false,
+};
+
+/**
+ * Les anciens dossiers ont ete enregistres avec `brightness`/`contrast` en
+ * pourcentage. On les convertit une fois pour toutes vers le couple
+ * centre/largeur du fenetrage radiologique, qui exprime la meme droite :
+ *   ancien : sortie = b·(c·(e − 0,5) + 0,5)
+ *   nouveau : sortie = (e − C)/L + 0,5
+ * L'egalite des pentes donne L = 1/(b·c), et celle des ordonnees le centre.
+ */
+function migrateAdjust(raw) {
+    const a = Object.assign({}, NEUTRAL_ADJUST, raw || {});
+    if (raw && raw.center === undefined && (raw.brightness !== undefined || raw.contrast !== undefined)) {
+        const b = (raw.brightness ?? 100) / 100;
+        const c = (raw.contrast ?? 100) / 100;
+        if (b > 0.01 && c > 0.01) {
+            const w = 1 / (b * c);
+            const centre = (0.5 - 0.5 * b + 0.5 * b * c) / (b * c);
+            a.width = Math.max(4, Math.min(510, Math.round(w * 255)));
+            a.center = Math.max(0, Math.min(255, Math.round(centre * 255)));
+        }
+    }
+    delete a.brightness;
+    delete a.contrast;
+    return a;
+}
+
 const S = {
     analysisId: CFG.case.analysis_id || 'steiner',
     landmarks: CFG.case.landmarks || {},
     aiSuggested: new Set(),     // points posés par l'IA, non encore validés par le praticien
     traces: CFG.case.traces || [],
+    measures: CFG.case.measures || [],
     calibration: Object.assign({ mmPerPx: null, p1: null, p2: null, knownMm: 100 }, CFG.case.calibration || {}),
-    adjust: Object.assign({ brightness: 100, contrast: 100, gamma: 1, invert: false, flipH: false }, CFG.case.adjust || {}),
+    adjust: migrateAdjust(CFG.case.adjust),
     subject: { sex: CFG.patient.sex, age: CFG.patient.age },
 
     mode: 'landmark',           // landmark | calibrate | trace | measure
     activeLandmark: null,
     traceStructure: 'soft-profile',
+    measureType: 'dist',        // dist | angle
+    measureDraft: null,         // points en cours de pose
     visiblePlanes: { ...DEFAULT_PLANES },
     showLandmarks: true,
     showLabels: true,
     showTraces: true,
-    loupe: true,
-    ruler: null,
+    showScaleBar: true,
+    showGrid: false,
+    loupeFactor: 4,             // 0 = loupe désactivée
+    handTool: false,            // outil Main : déplacement au bouton gauche
+    windowing: null,            // fenêtrage en cours (clic droit glissé)
+
+    histo: null,                // { hist, count, peak, percentile }
+    claheUrl: null,             // URL blob de l'image égalisée (calculée à la demande)
+    claheBusy: false,
 
     view: { zoom: 1, x: 0, y: 0 },
     image: null,                // { el, width, height }
@@ -75,6 +116,7 @@ const stage = $('ceph-stage');
 const svg = $('ceph-svg');
 const gImage = $('ceph-g-image');
 const gOverlay = $('ceph-g-overlay');
+const gScreen = $('ceph-g-screen');
 const gLoupe = $('ceph-g-loupe');
 const imgEl = $('ceph-img');
 const loupeImgEl = $('ceph-loupe-img');
@@ -89,19 +131,76 @@ function loadImage() {
     const probe = new Image();
     probe.onload = () => {
         S.image = { width: probe.naturalWidth, height: probe.naturalHeight };
-        imgEl.setAttribute('href', CFG.case.image_url);
-        imgEl.setAttribute('width', S.image.width);
-        imgEl.setAttribute('height', S.image.height);
-        loupeImgEl.setAttribute('href', CFG.case.image_url);
-        loupeImgEl.setAttribute('width', S.image.width);
-        loupeImgEl.setAttribute('height', S.image.height);
+        setImageSource(CFG.case.image_url);
         fitToStage();
+        // L'histogramme est calcule une seule fois, hors ecran : il alimente le
+        // bandeau radiologique ET les presets, qui se calent sur les centiles
+        // reels du cliche plutot que sur des seuils fixes.
+        try {
+            S.histo = computeHistogram(probe);
+        } catch (err) {
+            console.warn('Histogramme indisponible :', err);
+        }
         renderAll();
+        renderHistogram();
     };
     probe.onerror = () => {
         hintEl.textContent = 'Impossible de charger la radiographie.';
     };
     probe.src = CFG.case.image_url;
+}
+
+/** Bascule les deux <image> (vue principale et loupe) sur une meme source. */
+function setImageSource(url) {
+    for (const node of [imgEl, loupeImgEl]) {
+        node.setAttribute('href', url);
+        node.setAttribute('width', S.image.width);
+        node.setAttribute('height', S.image.height);
+    }
+}
+
+/**
+ * Egalisation locale (CLAHE). Le calcul pixel est fait UNE fois puis mis en
+ * cache sous forme de blob : basculer d'un mode a l'autre ensuite ne coute
+ * qu'un changement d'attribut `href`.
+ */
+async function setClahe(on) {
+    S.adjust.clahe = on;
+    $('ceph-clahe-btn').classList.toggle('is-active', on);
+    if (!on) {
+        setImageSource(CFG.case.image_url);
+        renderViewer();
+        return;
+    }
+    if (S.claheUrl) {
+        setImageSource(S.claheUrl);
+        renderViewer();
+        return;
+    }
+    if (S.claheBusy) return;
+    S.claheBusy = true;
+    const btn = $('ceph-clahe-btn');
+    const label = btn.textContent;
+    btn.textContent = 'Calcul…';
+    btn.disabled = true;
+    try {
+        // Laisse le navigateur peindre le libelle avant le calcul bloquant.
+        await new Promise((r) => setTimeout(r, 30));
+        S.claheUrl = await computeClahe(bitmap.complete && bitmap.naturalWidth ? bitmap : imgEl);
+        claheBitmap = new Image();
+        claheBitmap.src = S.claheUrl;
+        setImageSource(S.claheUrl);
+        renderViewer();
+    } catch (err) {
+        console.error(err);
+        S.adjust.clahe = false;
+        btn.classList.remove('is-active');
+        window.showToast && window.showToast('Égalisation locale impossible sur ce cliché.', 'error');
+    } finally {
+        S.claheBusy = false;
+        btn.textContent = label;
+        btn.disabled = false;
+    }
 }
 
 function fitToStage() {
@@ -120,14 +219,42 @@ function fitToStage() {
 // Transformations de coordonnées
 // ---------------------------------------------------------------------------
 
+/**
+ * Chaine de transformation de la vue, partagee par l'image et le calque
+ * geometrique : deplacement, zoom, rotation autour du centre de l'image, puis
+ * miroir. Ecrite une seule fois pour que tout reste coherent.
+ */
+function viewTransform(zoom, tx, ty) {
+    const w = S.image ? S.image.width : 0;
+    const h = S.image ? S.image.height : 0;
+    const rot = S.adjust.rotate ? ` rotate(${S.adjust.rotate} ${w / 2} ${h / 2})` : '';
+    const flip = S.adjust.flipH ? ` translate(${w} 0) scale(-1 1)` : '';
+    return `translate(${tx} ${ty}) scale(${zoom})${rot}${flip}`;
+}
+
+/**
+ * Ecran -> pixels de l'image. On inverse la matrice reelle du calque plutot que
+ * de refaire le calcul a la main : rotation et miroir sont pris en compte sans
+ * code supplementaire, et il n'y a qu'une seule source de verite.
+ */
 function toImage(clientX, clientY) {
-    const r = stage.getBoundingClientRect();
-    const sx = clientX - r.left;
-    const sy = clientY - r.top;
-    let ix = (sx - S.view.x) / S.view.zoom;
-    const iy = (sy - S.view.y) / S.view.zoom;
-    if (S.adjust.flipH && S.image) ix = S.image.width - ix;
-    return { x: ix, y: iy };
+    const m = gOverlay.getScreenCTM();
+    if (!m) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const q = pt.matrixTransform(m.inverse());
+    return { x: q.x, y: q.y };
+}
+
+/** Pixels de l'image -> coordonnees du SVG (= pixels de la zone d'affichage). */
+function toScreen(p) {
+    const m = gOverlay.getCTM();
+    if (!m) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = p.x;
+    pt.y = p.y;
+    return pt.matrixTransform(m);
 }
 
 function zoomBy(factor, center) {
@@ -222,34 +349,41 @@ function el(name, attrs, parent) {
     return n;
 }
 
+/**
+ * Une seule table de 256 valeurs porte le fenetrage, le gamma et le negatif.
+ * C'est ce qui distingue un vrai reglage radiologique d'un simple contraste :
+ * la courbe de tons est arbitraire, et le materiel n'a pas a la recalculer.
+ */
 function updateFilter() {
-    const b = S.adjust.brightness / 100;
-    const c = S.adjust.contrast / 100;
-    const g = 1 / S.adjust.gamma;
-    for (const ch of ['R', 'G', 'B']) {
-        const gam = $(`ceph-gamma${ch}`);
-        gam.setAttribute('exponent', g);
-        const lin = $(`ceph-lin${ch}`);
-        // Le contraste pivote autour du gris moyen, puis la luminosité multiplie.
-        lin.setAttribute('slope', c * b);
-        lin.setAttribute('intercept', (0.5 - 0.5 * c) * b);
+    const lut = windowLut({
+        center: S.adjust.center,
+        width: S.adjust.width,
+        gamma: S.adjust.gamma,
+        invert: S.adjust.invert,
+    });
+    for (const node of document.querySelectorAll('.ceph-lut')) {
+        node.setAttribute('tableValues', lut);
     }
-    $('ceph-invert').style.display = S.adjust.invert ? '' : 'none';
-    // feComponentTransfer ne se désactive pas par display : on neutralise la table.
-    for (const ch of ['R', 'G', 'B']) {
-        $(`ceph-inv${ch}`).setAttribute('tableValues', S.adjust.invert ? '1 0' : '0 1');
-    }
+    // Accentuation : melange lineaire entre l'image tonalisee et sa version
+    // convoluee. A 0 %, on repointe l'image sur le filtre sans convolution pour
+    // ne pas payer le cout du noyau a chaque redessin.
+    const a = Math.max(0, Math.min(1, (S.adjust.sharpen || 0) / 100));
+    const mix = $('ceph-sharp-mix');
+    mix.setAttribute('k2', a.toFixed(3));
+    mix.setAttribute('k3', (1 - a).toFixed(3));
+    imgEl.setAttribute('filter', a > 0 ? 'url(#ceph-adj-sharp)' : 'url(#ceph-adj)');
 }
 
 function renderViewer() {
     if (!S.image) return;
     const { zoom, x, y } = S.view;
-    const flipT = S.adjust.flipH ? `translate(${S.image.width} 0) scale(-1 1)` : '';
-    gImage.setAttribute('transform', `translate(${x} ${y}) scale(${zoom}) ${flipT}`);
-    gOverlay.setAttribute('transform', `translate(${x} ${y}) scale(${zoom}) ${flipT}`);
+    const t = viewTransform(zoom, x, y);
+    gImage.setAttribute('transform', t);
+    gOverlay.setAttribute('transform', t);
     imgEl.style.imageRendering = zoom > 2 ? 'pixelated' : 'auto';
     updateFilter();
     renderOverlay();
+    renderScreen();
     renderLoupe();
     renderHud();
 }
@@ -258,8 +392,38 @@ function renderOverlay() {
     gOverlay.innerHTML = '';
     const zoom = S.view.zoom;
     const lw = 1 / zoom;
-    const fs = 11 / zoom;
     const r = 4 / zoom;
+
+    // Grille anatomique : dans le repère de l'image, donc elle suit la rotation
+    // et donne un repère d'horizontalité une fois le cliché redressé.
+    if (S.showGrid) {
+        // Pas choisi pour rester lisible : on monte dans les pas ronds jusqu'a
+        // ce que deux lignes soient separees d'au moins 14 px a l'ecran. Une
+        // grille figee a 10 mm disparaitrait sur un cliche peu resolu et
+        // deviendrait un aplat sur un cliche tres defini.
+        const NICE_MM = [1, 2, 5, 10, 20, 50, 100];
+        let step;
+        if (S.calibration.mmPerPx) {
+            const mm = NICE_MM.find((v) => (v / S.calibration.mmPerPx) * zoom >= 14) || 100;
+            step = mm / S.calibration.mmPerPx;
+        } else {
+            step = Math.max(20, Math.pow(10, Math.ceil(Math.log10(14 / zoom))));
+        }
+        if (step * zoom >= 6) {
+            for (let x = 0; x <= S.image.width; x += step) {
+                el('line', {
+                    x1: x, y1: 0, x2: x, y2: S.image.height,
+                    stroke: '#38bdf8', 'stroke-width': lw * 0.6, opacity: 0.28,
+                }, gOverlay);
+            }
+            for (let y = 0; y <= S.image.height; y += step) {
+                el('line', {
+                    x1: 0, y1: y, x2: S.image.width, y2: y,
+                    stroke: '#38bdf8', 'stroke-width': lw * 0.6, opacity: 0.28,
+                }, gOverlay);
+            }
+        }
+    }
 
     // Plans de référence
     const planes = drawablePlanes(S.landmarks).filter((p) => S.visiblePlanes[p.id]);
@@ -308,15 +472,22 @@ function renderOverlay() {
         el('circle', { cx: c.p1.x, cy: c.p1.y, r: r * 0.8, fill: '#0891b2' }, gOverlay);
     }
 
-    // Règle de mesure ponctuelle
-    if (S.ruler) {
-        el('line', {
-            x1: S.ruler.a.x, y1: S.ruler.a.y, x2: S.ruler.b.x, y2: S.ruler.b.y,
-            stroke: '#ca8a04', 'stroke-width': lw * 1.4,
-        }, gOverlay);
-        el('circle', { cx: S.ruler.a.x, cy: S.ruler.a.y, r: r * 0.7, fill: '#ca8a04' }, gOverlay);
-        el('circle', { cx: S.ruler.b.x, cy: S.ruler.b.y, r: r * 0.7, fill: '#ca8a04' }, gOverlay);
-    }
+    // Mesures libres (persistantes) et mesure en cours de pose
+    const drawMeasure = (m, live) => {
+        const col = live ? '#fbbf24' : '#ca8a04';
+        for (let i = 1; i < m.pts.length; i++) {
+            el('line', {
+                x1: m.pts[i - 1].x, y1: m.pts[i - 1].y, x2: m.pts[i].x, y2: m.pts[i].y,
+                stroke: col, 'stroke-width': lw * 1.5,
+                'stroke-dasharray': live ? `${lw * 4} ${lw * 3}` : null,
+            }, gOverlay);
+        }
+        for (const p of m.pts) {
+            el('circle', { cx: p.x, cy: p.y, r: r * 0.7, fill: col, stroke: '#fff', 'stroke-width': lw * 0.7 }, gOverlay);
+        }
+    };
+    for (const m of S.measures) drawMeasure(m, false);
+    if (S.measureDraft && S.measureDraft.pts.length) drawMeasure(S.measureDraft, true);
 
     // Points céphalométriques
     if (S.showLandmarks) {
@@ -342,66 +513,250 @@ function renderOverlay() {
                 'stroke-width': lw * (suggested ? 1.2 : 0.8), opacity: 0.98,
             }, gOverlay);
             el('circle', { cx: p.x, cy: p.y, r: r * 0.28, fill: suggested ? '#f59e0b' : '#fff', opacity: 0.9 }, gOverlay);
-            if (S.showLabels) {
-                // Un halo blanc garde l'étiquette lisible aussi bien sur l'émail
-                // clair que sur l'air sombre du cliché.
-                const t = el('text', {
-                    x: p.x + r * 1.8, y: p.y - r * 1.1,
-                    'font-size': fs, fill: color, stroke: '#fff',
-                    'stroke-width': fs * 0.3, 'paint-order': 'stroke',
-                    'font-weight': 600, 'pointer-events': 'none',
-                    transform: S.adjust.flipH ? `translate(${2 * p.x} 0) scale(-1 1)` : null,
-                }, gOverlay);
-                t.textContent = def.abbr;
-            }
         }
     }
 }
 
 /**
- * La loupe redessine la radio à LOUPE_FACTOR × le zoom courant, découpée en
+ * Calque d'annotations, en coordonnees ecran et SANS transformation : les
+ * etiquettes et la barre d'echelle restent droites et de taille constante,
+ * meme cliche redresse, en miroir ou tres zoome. C'est le comportement d'une
+ * console de radiologie — le texte n'est pas une partie de l'image.
+ */
+function renderScreen() {
+    gScreen.innerHTML = '';
+    if (!S.image) return;
+
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+
+    // Encombrement du cliche a l'ecran : on projette ses quatre coins, ce qui
+    // reste valable quelles que soient la rotation et le miroir.
+    const corners = [
+        { x: 0, y: 0 }, { x: S.image.width, y: 0 },
+        { x: S.image.width, y: S.image.height }, { x: 0, y: S.image.height },
+    ].map(toScreen);
+    const imgRight = Math.max(...corners.map((c) => c.x));
+
+    // Marge libre a droite du cliche. En dessous d'une centaine de pixels il n'y
+    // a plus la place d'une colonne : on revient a l'etiquette collee au point.
+    const gutter = stageW - imgRight;
+    const useGutter = gutter >= 100;
+    const colX = Math.max(imgRight + 14, stageW - gutter + 14);
+
+    // Etiquettes des points
+    if (S.showLandmarks && S.showLabels) {
+        const items = [];
+        for (const id in S.landmarks) {
+            const def = LANDMARK_BY_ID[id];
+            if (!def) continue;
+            items.push({ def, p: toScreen(S.landmarks[id]) });
+        }
+
+        if (useGutter && items.length) {
+            // Le bandeau d'aide occupe le haut de la colonne : on demarre dessous.
+            const hintH = hintEl.style.display === 'none' ? 0 : hintEl.offsetHeight + 12;
+            const top = 10 + hintH;
+            const GAP = 15;
+            items.sort((a, b) => a.p.y - b.p.y);
+
+            // Chaque etiquette part de la hauteur de son point puis est repoussee
+            // vers le bas juste ce qu'il faut pour ne pas chevaucher la precedente.
+            let y = top;
+            for (const it of items) {
+                y = Math.max(y, it.p.y);
+                it.y = y;
+                y += GAP;
+            }
+            // Si la pile deborde en bas, on la remonte d'un bloc.
+            const bottom = stageH - 8;
+            if (items[items.length - 1].y > bottom) {
+                let yy = bottom;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    yy = Math.min(yy, items[i].y);
+                    items[i].y = yy;
+                    yy -= GAP;
+                }
+            }
+
+            // Le nom complet n'est ajoute que si la colonne est assez large pour
+            // l'accueillir sans etre tronque.
+            const withName = gutter >= 200;
+            for (const it of items) {
+                const color = GROUP_COLOR[it.def.group];
+                el('line', {
+                    x1: it.p.x + 7, y1: it.p.y, x2: colX - 5, y2: it.y - 4,
+                    stroke: color, 'stroke-width': 1, opacity: 0.45,
+                    'stroke-dasharray': '3 3', 'pointer-events': 'none',
+                }, gScreen);
+                el('circle', { cx: colX - 8, cy: it.y - 4, r: 2, fill: color, opacity: 0.8 }, gScreen);
+                const t = el('text', {
+                    x: colX, y: it.y,
+                    'font-size': 11.5, fill: color, stroke: '#0b1220',
+                    'stroke-width': 3, 'paint-order': 'stroke',
+                    'font-weight': 700, 'pointer-events': 'none',
+                }, gScreen);
+                t.textContent = it.def.abbr;
+                if (withName) {
+                    const n = el('tspan', {
+                        'font-size': 10.5, fill: '#94a3b8', 'font-weight': 500, dx: 6,
+                    }, t);
+                    n.textContent = it.def.name.replace(/\s*\(.*\)\s*$/, '');
+                }
+            }
+        } else {
+            // Pas de marge (cliche zoome) : on revient a l'etiquette au point.
+            for (const it of items) {
+                const t = el('text', {
+                    x: it.p.x + 9, y: it.p.y - 7,
+                    'font-size': 11.5, fill: GROUP_COLOR[it.def.group], stroke: '#0b1220',
+                    'stroke-width': 3, 'paint-order': 'stroke',
+                    'font-weight': 700, 'pointer-events': 'none',
+                }, gScreen);
+                t.textContent = it.def.abbr;
+            }
+        }
+    }
+
+    // Valeur de chaque mesure, posee au milieu du segment
+    const labelMeasure = (m, live) => {
+        const v = measureValue(m);
+        if (!v) return;
+        const anchor = m.type === 'angle' ? m.pts[1] : {
+            x: (m.pts[0].x + m.pts[m.pts.length - 1].x) / 2,
+            y: (m.pts[0].y + m.pts[m.pts.length - 1].y) / 2,
+        };
+        const s = toScreen(anchor);
+        const t = el('text', {
+            x: s.x + 10, y: s.y - 8, 'font-size': 12,
+            fill: live ? '#fbbf24' : '#facc15', stroke: '#0b1220',
+            'stroke-width': 3.4, 'paint-order': 'stroke',
+            'font-weight': 700, 'pointer-events': 'none',
+        }, gScreen);
+        t.textContent = v;
+    };
+    for (const m of S.measures) labelMeasure(m, false);
+    if (S.measureDraft && S.measureDraft.pts.length >= 2) labelMeasure(S.measureDraft, true);
+
+    // Barre d'echelle : seulement quand le cliche est calibre, sinon elle
+    // donnerait une fausse impression de mesure absolue.
+    if (S.showScaleBar && S.calibration.mmPerPx) {
+        const pxPerMm = S.view.zoom / S.calibration.mmPerPx;
+        const target = 140;                              // longueur visee, en pixels ecran
+        const NICE = [1, 2, 5, 10, 20, 50, 100, 200];
+        let mm = NICE[NICE.length - 1];
+        for (const n of NICE) { if (n * pxPerMm >= target * 0.6) { mm = n; break; } }
+        const len = mm * pxPerMm;
+        const x0 = 16;
+        const y0 = stage.clientHeight - 22;
+        el('rect', {
+            x: x0 - 8, y: y0 - 20, width: len + 60, height: 30,
+            rx: 6, fill: '#0b1220', opacity: 0.55,
+        }, gScreen);
+        el('line', { x1: x0, y1: y0, x2: x0 + len, y2: y0, stroke: '#e2e8f0', 'stroke-width': 2 }, gScreen);
+        for (const x of [x0, x0 + len]) {
+            el('line', { x1: x, y1: y0 - 5, x2: x, y2: y0 + 5, stroke: '#e2e8f0', 'stroke-width': 2 }, gScreen);
+        }
+        const t = el('text', {
+            x: x0 + len + 8, y: y0 + 4, 'font-size': 12, fill: '#e2e8f0', 'font-weight': 700,
+        }, gScreen);
+        t.textContent = `${mm} mm`;
+    }
+}
+
+/** Valeur formatee d'une mesure : millimetres si calibre, pixels sinon. */
+function measureValue(m) {
+    if (m.type === 'angle') {
+        if (m.pts.length < 3) return null;
+        const [a, b, c] = m.pts;
+        const a1 = Math.atan2(a.y - b.y, a.x - b.x);
+        const a2 = Math.atan2(c.y - b.y, c.x - b.x);
+        let d = Math.abs((a1 - a2) * 180 / Math.PI);
+        if (d > 180) d = 360 - d;
+        return `${d.toFixed(1).replace('.', ',')}°`;
+    }
+    if (m.pts.length < 2) return null;
+    const px = Math.hypot(m.pts[1].x - m.pts[0].x, m.pts[1].y - m.pts[0].y);
+    return S.calibration.mmPerPx
+        ? `${(px * S.calibration.mmPerPx).toFixed(2).replace('.', ',')} mm`
+        : `${px.toFixed(1).replace('.', ',')} px`;
+}
+
+/**
+ * La loupe redessine la radio à N × le zoom courant (×2, ×4 ou ×8), découpée en
  * disque, décalée du curseur. Placer un point au pixel près sur un cliché flou
  * est impossible sans elle.
  */
 function renderLoupe() {
-    if (!S.loupe || !S.cursor || S.panning || !S.image) {
+    if (!S.loupeFactor || !S.cursor || S.panning || S.windowing || !S.image) {
         gLoupe.style.display = 'none';
         return;
     }
     gLoupe.style.display = '';
-    const Z = S.view.zoom * LOUPE_FACTOR;
-    const cx = S.cursor.s.x + LOUPE_R + 26;
-    const cy = S.cursor.s.y - LOUPE_R - 26;
-    const ix = S.adjust.flipH ? S.image.width - S.cursor.i.x : S.cursor.i.x;
-    const iy = S.cursor.i.y;
-    const flipT = S.adjust.flipH ? `translate(${S.image.width} 0) scale(-1 1)` : '';
+    const Z = S.view.zoom * S.loupeFactor;
 
-    $('ceph-loupe-clipped').setAttribute('transform', `translate(${cx} ${cy})`);
-    $('ceph-loupe-scale').setAttribute('transform', `scale(${Z}) translate(${-ix} ${-iy})`);
-    $('ceph-loupe-flip').setAttribute('transform', flipT);
+    // La loupe se place en haut a droite du curseur, et bascule des qu'elle
+    // sortirait du cadre : elle ne doit jamais masquer ce qu'on vise.
+    let cx = S.cursor.s.x + LOUPE_R + 26;
+    let cy = S.cursor.s.y - LOUPE_R - 26;
+    if (cx + LOUPE_R + 6 > stage.clientWidth) cx = S.cursor.s.x - LOUPE_R - 26;
+    if (cy - LOUPE_R - 6 < 0) cy = S.cursor.s.y + LOUPE_R + 26;
+
+    // Meme chaine de transformation que la vue principale, a ceci pres qu'on
+    // choisit la translation pour amener le point vise au centre du disque.
+    const q = imagePointAtZoom(S.cursor.i, Z);
+    $('ceph-loupe-clipped').setAttribute('transform', '');
+    $('ceph-loupe-clip-c').setAttribute('cx', cx);
+    $('ceph-loupe-clip-c').setAttribute('cy', cy);
+    $('ceph-loupe-scale').setAttribute('transform', viewTransform(Z, cx - q.x, cy - q.y));
     $('ceph-loupe-ring').setAttribute('cx', cx);
     $('ceph-loupe-ring').setAttribute('cy', cy);
+    $('ceph-loupe-cross').setAttribute('transform', `translate(${cx} ${cy})`);
+    const fac = $('ceph-loupe-badge');
+    fac.setAttribute('x', cx);
+    fac.setAttribute('y', cy + LOUPE_R + 14);
+    fac.textContent = `×${S.loupeFactor}`;
 
     const pts = $('ceph-loupe-points');
     pts.innerHTML = '';
     for (const id in S.landmarks) {
         const p = S.landmarks[id];
         el('circle', {
-            cx: S.adjust.flipH ? S.image.width - p.x : p.x,
-            cy: p.y, r: 3 / Z, fill: '#0284c7', stroke: '#fff',
+            cx: p.x, cy: p.y, r: 3 / Z, fill: '#0284c7', stroke: '#fff',
             'stroke-width': 1 / Z, opacity: 0.95,
         }, pts);
     }
 }
 
+/**
+ * Position d'un point image apres rotation, miroir et zoom, translation mise a
+ * zero. Sert a caler la loupe sans dupliquer la matrice de la vue.
+ */
+function imagePointAtZoom(p, zoom) {
+    const w = S.image.width;
+    const h = S.image.height;
+    let x = S.adjust.flipH ? w - p.x : p.x;
+    let y = p.y;
+    if (S.adjust.rotate) {
+        const a = S.adjust.rotate * Math.PI / 180;
+        const dx = x - w / 2;
+        const dy = y - h / 2;
+        x = dx * Math.cos(a) - dy * Math.sin(a) + w / 2;
+        y = dx * Math.sin(a) + dy * Math.cos(a) + h / 2;
+    }
+    return { x: x * zoom, y: y * zoom };
+}
+
 function renderHud() {
     const bits = [];
-    if (S.ruler) {
-        const px = Math.hypot(S.ruler.b.x - S.ruler.a.x, S.ruler.b.y - S.ruler.a.y);
-        bits.push(`<b class="ceph-hud-ruler">${S.calibration.mmPerPx
-            ? (px * S.calibration.mmPerPx).toFixed(2).replace('.', ',') + ' mm'
-            : px.toFixed(1).replace('.', ',') + ' px'}</b>`);
+    if (S.windowing) {
+        bits.push('<b class="ceph-hud-ruler">Fenêtrage</b>');
     }
+    // Lecture radiologique permanente : centre et largeur de fenetre, comme sur
+    // une console. C'est ce qui permet de reproduire un reglage d'un cliche a
+    // l'autre au lieu de le retrouver a tatons.
+    bits.push(`F ${Math.round(S.adjust.center)} / ${Math.round(S.adjust.width)}`);
+    if (S.adjust.rotate) bits.push(`${S.adjust.rotate.toFixed(1).replace('.', ',')}°`);
     if (S.cursor) bits.push(`${S.cursor.i.x.toFixed(0)}, ${S.cursor.i.y.toFixed(0)}`);
     bits.push(`${(S.view.zoom * 100).toFixed(0)} %`);
     bits.push(S.calibration.mmPerPx
@@ -424,8 +779,11 @@ function renderHud() {
             <span class="ceph-hint-def">Dessinez à main levée le contour sélectionné par-dessus la radiographie.</span>`;
         hintEl.style.display = '';
     } else if (S.mode === 'measure') {
-        hintEl.innerHTML = `<span class="ceph-hint-name">Règle</span>
-            <span class="ceph-hint-def">Glissez pour mesurer une distance libre sur le cliché.</span>`;
+        hintEl.innerHTML = `<span class="ceph-hint-name">Mesures</span>
+            <span class="ceph-hint-def">${S.measureType === 'angle'
+                ? 'Cliquez trois points : la valeur de l’angle est prise au deuxième (le sommet).'
+                : 'Cliquez les deux extrémités de la distance à mesurer.'}
+                Les mesures sont enregistrées avec le dossier.</span>`;
         hintEl.style.display = '';
     } else {
         hintEl.style.display = 'none';
@@ -604,11 +962,40 @@ function renderTools() {
     });
     $('ceph-calib-panel').style.display = S.mode === 'calibrate' ? '' : 'none';
     $('ceph-trace-panel').style.display = S.mode === 'trace' ? '' : 'none';
+    $('ceph-measure-panel').style.display = S.mode === 'measure' ? '' : 'none';
+    document.querySelectorAll('[data-measure]').forEach((b) => {
+        b.classList.toggle('is-active', b.dataset.measure === S.measureType);
+    });
+    $('ceph-measure-hint').textContent = S.measureType === 'angle'
+        ? 'Trois clics : première branche, sommet, seconde branche.'
+        : 'Deux clics : les extrémités de la distance.';
+    renderMeasureList();
     $('ceph-calib-mm').value = S.calibration.knownMm;
     $('ceph-calib-state').textContent = S.calibration.mmPerPx
         ? `Calibré : ${S.calibration.mmPerPx.toFixed(4).replace('.', ',')} mm/px`
         : 'Non calibré — les mesures en mm sont retenues.';
     $('ceph-calib-state').className = S.calibration.mmPerPx ? 'ceph-calib-state ceph-ok' : 'ceph-calib-state ceph-warn';
+}
+
+function renderMeasureList() {
+    const box = $('ceph-measure-list');
+    if (!S.measures.length) {
+        box.innerHTML = '<div class="ceph-measure-empty">Aucune mesure.</div>';
+        return;
+    }
+    box.innerHTML = S.measures.map((m, i) => `
+        <div class="ceph-measure-row">
+            <span class="ceph-measure-kind">${m.type === 'angle' ? '∠' : '↔'}</span>
+            <span class="ceph-measure-val">${measureValue(m) || '—'}</span>
+            <button type="button" class="ceph-measure-del" data-i="${i}" title="Supprimer">×</button>
+        </div>`).join('');
+    box.querySelectorAll('.ceph-measure-del').forEach((b) => {
+        b.onclick = () => {
+            S.measures.splice(parseInt(b.dataset.i, 10), 1);
+            touch();
+            renderAll();
+        };
+    });
 }
 
 function renderAll() {
@@ -646,13 +1033,31 @@ stage.addEventListener('wheel', (e) => {
  *  calibration » ne doit pas poser un point sur le cliché en même temps. */
 const onPanel = (e) => !!(e.target.closest && e.target.closest('.ceph-float'));
 
+// Le clic droit sert au fenetrage : on neutralise le menu contextuel sur le
+// cliche, comme sur toute console d'imagerie.
+stage.addEventListener('contextmenu', (e) => {
+    if (!onPanel(e)) e.preventDefault();
+});
+
 stage.addEventListener('pointerdown', (e) => {
     if (!S.image || onPanel(e)) return;
     stage.setPointerCapture(e.pointerId);
 
-    // Bouton du milieu ou barre d'espace : déplacement, quel que soit l'outil.
-    if (e.button === 1 || S.spaceDown) {
+    // Bouton du milieu, barre d'espace ou outil Main : déplacement, quel que
+    // soit l'outil de travail sélectionné.
+    if (e.button === 1 || S.spaceDown || (S.handTool && e.button === 0)) {
         S.panning = { x: e.clientX - S.view.x, y: e.clientY - S.view.y };
+        return;
+    }
+
+    // Bouton droit : FENETRAGE. Horizontal = largeur de fenetre (contraste),
+    // vertical = centre (luminosite). C'est le geste universel des PACS, et il
+    // se fait sur l'image elle-meme plutot que dans un panneau lateral.
+    if (e.button === 2) {
+        S.windowing = {
+            x: e.clientX, y: e.clientY,
+            center: S.adjust.center, width: S.adjust.width,
+        };
         return;
     }
     if (e.button !== 0) return;
@@ -694,8 +1099,21 @@ stage.addEventListener('pointerdown', (e) => {
     }
 
     if (S.mode === 'measure') {
-        S.ruler = { a: p, b: p };
-        S.dragging = '__ruler';
+        const need = S.measureType === 'angle' ? 3 : 2;
+        if (!S.measureDraft) S.measureDraft = { type: S.measureType, pts: [] };
+        S.measureDraft.pts.push(p);
+        if (S.measureDraft.pts.length >= need) {
+            S.measures.push({
+                id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+                type: S.measureDraft.type,
+                pts: S.measureDraft.pts,
+            });
+            S.measureDraft = null;
+            touch();
+            renderAll();
+        } else {
+            renderViewer();
+        }
     }
 });
 
@@ -716,8 +1134,24 @@ stage.addEventListener('pointermove', (e) => {
         renderViewer();
         return;
     }
-    if (S.dragging === '__ruler' && S.ruler) {
-        S.ruler.b = p;
+    if (S.windowing) {
+        // Sensibilite proportionnelle a la largeur courante : le reglage reste
+        // fin quand la fenetre est etroite, rapide quand elle est large.
+        const k = Math.max(0.35, S.windowing.width / 255);
+        S.adjust.width = Math.max(4, Math.min(510,
+            Math.round(S.windowing.width + (e.clientX - S.windowing.x) * k)));
+        S.adjust.center = Math.max(0, Math.min(255,
+            Math.round(S.windowing.center + (e.clientY - S.windowing.y) * k)));
+        syncWindowInputs();
+        renderViewer();
+        renderHistogram();
+        return;
+    }
+    // Le brouillon de mesure suit le curseur tant que le dernier point n'est pas posé.
+    if (S.mode === 'measure' && S.measureDraft && S.measureDraft.pts.length) {
+        const need = S.measureType === 'angle' ? 3 : 2;
+        const pts = S.measureDraft.pts.slice(0, need - 1);
+        S.measureDraft = { type: S.measureDraft.type, pts: [...pts, p] };
         renderViewer();
         return;
     }
@@ -749,7 +1183,12 @@ function endPointer() {
     }
     S.stroke = null;
     S.panning = null;
-    if (S.dragging && S.dragging !== '__ruler' && S.mode === 'landmark') {
+    if (S.windowing) {
+        S.windowing = null;
+        touch();
+        renderViewer();
+    }
+    if (S.dragging && S.mode === 'landmark') {
         // Poser un point fait avancer la séquence guidée au suivant non posé.
         if (S.activeLandmark === S.dragging) advanceLandmark();
     }
@@ -791,9 +1230,16 @@ window.addEventListener('keydown', (e) => {
         const d = map[e.key];
         if (d) {
             e.preventDefault();
+            // Les fleches doivent decaler le point tel qu'on le VOIT : on annule
+            // donc le miroir et la rotation d'affichage avant de l'appliquer.
             const flip = S.adjust.flipH ? -1 : 1;
+            const a = -(S.adjust.rotate || 0) * Math.PI / 180;
+            const dx = d[0] * flip;
+            const dy = d[1];
+            const rx = dx * Math.cos(a) - dy * Math.sin(a);
+            const ry = dx * Math.sin(a) + dy * Math.cos(a);
             const p = S.landmarks[sel];
-            S.landmarks[sel] = { x: p.x + d[0] * flip, y: p.y + d[1] };
+            S.landmarks[sel] = { x: p.x + rx, y: p.y + ry };
             S.aiSuggested.delete(sel);   // ajusté au clavier = validé
             touch();
             renderAll();
@@ -808,6 +1254,31 @@ window.addEventListener('keydown', (e) => {
     if (e.key === '+' || e.key === '=') zoomBy(1.2);
     if (e.key === '-' || e.key === '_') zoomBy(1 / 1.2);
     if (e.key === '0') { fitToStage(); renderViewer(); }
+
+    // Raccourcis de la visionneuse. Volontairement des touches simples : le
+    // praticien a une main sur la souris et l'autre sur le clavier.
+    const MODES = { 1: 'landmark', 2: 'calibrate', 3: 'trace', 4: 'measure' };
+    if (MODES[e.key]) { setMode(MODES[e.key]); return; }
+    const k = e.key.toLowerCase();
+    if (k === 'n') { $('ceph-invert-btn').click(); return; }
+    if (k === 'm') { $('ceph-flip-btn').click(); return; }
+    if (k === 'r') { $('ceph-rotate-btn').click(); return; }
+    if (k === 'c') { setClahe(!S.adjust.clahe); return; }
+    if (k === 'f') { toggleFullscreen(); return; }
+    if (k === 'h') { $('ceph-hand').click(); return; }
+    if (k === 'l') {
+        // ×2 → ×4 → ×8 → arrêt, en boucle.
+        const cycle = [2, 4, 8, 0];
+        S.loupeFactor = cycle[(cycle.indexOf(S.loupeFactor) + 1) % cycle.length];
+        $('ceph-loupe-factor').value = String(S.loupeFactor);
+        renderViewer();
+        return;
+    }
+    if (e.key === '?') { $('ceph-help-btn').click(); return; }
+    if (e.key === 'Escape') {
+        $('ceph-help').style.display = 'none';
+        if (S.measureDraft) { S.measureDraft = null; renderViewer(); }
+    }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -860,25 +1331,172 @@ $('ceph-calib-apply').addEventListener('click', applyCalibration);
 $('ceph-calib-clear').addEventListener('click', clearCalibration);
 
 // Réglages image
-const ADJ = [
-    ['ceph-brightness', 'brightness', (v) => parseFloat(v)],
-    ['ceph-contrast', 'contrast', (v) => parseFloat(v)],
-    ['ceph-gamma', 'gamma', (v) => parseFloat(v)],
-];
-for (const [id, key, parse] of ADJ) {
-    const input = $(id);
-    input.value = S.adjust[key];
-    input.addEventListener('input', (e) => {
-        S.adjust[key] = parse(e.target.value);
-        touch();
-        renderViewer();
+// ---------------------------------------------------------------------------
+// Bandeau radiologique : fenetrage, histogramme, presets
+// ---------------------------------------------------------------------------
+
+/** Recopie l'etat du fenetrage dans les curseurs et les lectures chiffrees. */
+function syncWindowInputs() {
+    $('ceph-wcenter').value = S.adjust.center;
+    $('ceph-wwidth').value = S.adjust.width;
+    $('ceph-gamma').value = S.adjust.gamma;
+    $('ceph-sharpen').value = S.adjust.sharpen;
+    $('ceph-wc-val').textContent = Math.round(S.adjust.center);
+    $('ceph-ww-val').textContent = Math.round(S.adjust.width);
+    $('ceph-gamma-val').textContent = S.adjust.gamma.toFixed(2).replace('.', ',');
+    $('ceph-sharp-val').textContent = `${Math.round(S.adjust.sharpen)} %`;
+    $('ceph-rotate-range').value = S.adjust.rotate;
+    $('ceph-rotate-val').textContent = `${S.adjust.rotate.toFixed(1).replace('.', ',')}°`;
+    $('ceph-winread').textContent = `Fenêtre ${Math.round(S.adjust.center - S.adjust.width / 2)}`
+        + ` – ${Math.round(S.adjust.center + S.adjust.width / 2)}`;
+}
+
+/**
+ * Histogramme des niveaux de gris, en echelle racine pour que les classes
+ * peu peuplees (les tissus mous, justement) restent visibles a cote du pic
+ * du fond. Les deux poignees materialisent les bornes de la fenetre.
+ */
+function renderHistogram() {
+    const cv = $('ceph-histo');
+    const ctx = cv.getContext('2d');
+    const W = cv.width;
+    const H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!S.histo) return;
+
+    const { hist, peak } = S.histo;
+    const scale = peak > 0 ? H / Math.sqrt(peak) : 0;
+    ctx.fillStyle = '#334155';
+    for (let v = 0; v < 256; v++) {
+        const h = Math.sqrt(hist[v]) * scale;
+        ctx.fillRect((v / 256) * W, H - h, W / 256 + 0.5, h);
+    }
+
+    // Courbe de tons appliquee, superposee : le praticien voit exactement ce
+    // que la fenetre fait des niveaux d'origine.
+    const lo = S.adjust.center - S.adjust.width / 2;
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let v = 0; v < 256; v++) {
+        let t = (v - lo) / Math.max(1, S.adjust.width);
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        if (S.adjust.gamma !== 1) t = Math.pow(t, 1 / S.adjust.gamma);
+        if (S.adjust.invert) t = 1 - t;
+        const x = (v / 256) * W;
+        const y = H - t * H;
+        if (v === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Zone hors fenetre, grisee.
+    ctx.fillStyle = 'rgba(11,18,32,.55)';
+    const xLo = Math.max(0, (lo / 256) * W);
+    const xHi = Math.min(W, ((lo + S.adjust.width) / 256) * W);
+    ctx.fillRect(0, 0, xLo, H);
+    ctx.fillRect(xHi, 0, W - xHi, H);
+
+    const wrap = $('ceph-histo-wrap');
+    const px = wrap.clientWidth || W;
+    $('ceph-histo-lo').style.left = `${(lo / 256) * px}px`;
+    $('ceph-histo-hi').style.left = `${((lo + S.adjust.width) / 256) * px}px`;
+}
+
+/** Applique un couple (borne basse, borne haute) exprime en niveaux 0–255. */
+function setWindowBounds(lo, hi) {
+    if (hi - lo < 4) hi = lo + 4;
+    S.adjust.center = Math.max(0, Math.min(255, Math.round((lo + hi) / 2)));
+    S.adjust.width = Math.max(4, Math.min(510, Math.round(hi - lo)));
+    syncWindowInputs();
+    renderViewer();
+    renderHistogram();
+}
+
+// Poignees de l'histogramme
+for (const [id, which] of [['ceph-histo-lo', 'lo'], ['ceph-histo-hi', 'hi']]) {
+    $(id).addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const wrap = $('ceph-histo-wrap');
+        const move = (ev) => {
+            const r = wrap.getBoundingClientRect();
+            const v = Math.max(0, Math.min(255, ((ev.clientX - r.left) / r.width) * 256));
+            let lo = S.adjust.center - S.adjust.width / 2;
+            let hi = S.adjust.center + S.adjust.width / 2;
+            if (which === 'lo') lo = v; else hi = v;
+            if (lo > hi) { const t = lo; lo = hi; hi = t; }
+            setWindowBounds(lo, hi);
+        };
+        const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            touch();
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
     });
 }
+
+/**
+ * Presets d'affichage. Ils sont calcules sur les CENTILES du cliche courant :
+ * un seuil fixe ne vaudrait que pour un appareil donne, alors que les centiles
+ * s'adaptent a n'importe quelle teleradiographie.
+ */
+function applyPreset(name) {
+    const pc = S.histo ? S.histo.percentile : (p) => p * 2.55;
+    let lo = 0;
+    let hi = 255;
+    let gamma = 1;
+    let sharpen = 0;
+    if (name === 'original') {
+        lo = 0; hi = 255; gamma = 1; sharpen = 0;
+    } else if (name === 'bone') {
+        // Structures denses : on ouvre la fenetre sur la moitie haute et on
+        // accentue les bords pour lire les corticales.
+        lo = pc(55); hi = pc(99.5); gamma = 1; sharpen = 45;
+    } else if (name === 'soft') {
+        // Profil cutane : tres peu dense, il vit dans le bas de l'histogramme.
+        lo = pc(2); hi = pc(62); gamma = 1.35; sharpen = 15;
+    } else if (name === 'teeth') {
+        lo = pc(80); hi = pc(99.9); gamma = 0.9; sharpen = 60;
+    }
+    S.adjust.gamma = gamma;
+    S.adjust.sharpen = sharpen;
+    document.querySelectorAll('.ceph-preset[data-preset]').forEach((b) => {
+        b.classList.toggle('is-active', b.dataset.preset === name);
+    });
+    setWindowBounds(lo, hi);
+    touch();
+}
+
+document.querySelectorAll('.ceph-preset[data-preset]').forEach((b) => {
+    b.addEventListener('click', () => applyPreset(b.dataset.preset));
+});
+$('ceph-clahe-btn').addEventListener('click', () => setClahe(!S.adjust.clahe));
+
+// Curseurs de la colonne de droite
+$('ceph-wcenter').addEventListener('input', (e) => {
+    S.adjust.center = parseFloat(e.target.value);
+    syncWindowInputs(); renderViewer(); renderHistogram(); touch();
+});
+$('ceph-wwidth').addEventListener('input', (e) => {
+    S.adjust.width = parseFloat(e.target.value);
+    syncWindowInputs(); renderViewer(); renderHistogram(); touch();
+});
+$('ceph-gamma').addEventListener('input', (e) => {
+    S.adjust.gamma = parseFloat(e.target.value);
+    syncWindowInputs(); renderViewer(); renderHistogram(); touch();
+});
+$('ceph-sharpen').addEventListener('input', (e) => {
+    S.adjust.sharpen = parseFloat(e.target.value);
+    syncWindowInputs(); renderViewer(); touch();
+});
+
 $('ceph-invert-btn').addEventListener('click', () => {
     S.adjust.invert = !S.adjust.invert;
     $('ceph-invert-btn').classList.toggle('is-active', S.adjust.invert);
     touch();
     renderViewer();
+    renderHistogram();
 });
 $('ceph-flip-btn').addEventListener('click', () => {
     S.adjust.flipH = !S.adjust.flipH;
@@ -887,21 +1505,118 @@ $('ceph-flip-btn').addEventListener('click', () => {
     renderViewer();
 });
 $('ceph-reset-adjust').addEventListener('click', () => {
-    S.adjust = { brightness: 100, contrast: 100, gamma: 1, invert: false, flipH: false };
-    $('ceph-brightness').value = 100;
-    $('ceph-contrast').value = 100;
-    $('ceph-gamma').value = 1;
+    const wasClahe = S.adjust.clahe;
+    S.adjust = Object.assign({}, NEUTRAL_ADJUST);
+    document.querySelectorAll('.ceph-preset[data-preset]').forEach((b) => b.classList.remove('is-active'));
     $('ceph-invert-btn').classList.remove('is-active');
     $('ceph-flip-btn').classList.remove('is-active');
+    if (wasClahe) setClahe(false);
+    syncWindowInputs();
+    touch();
+    renderViewer();
+    renderHistogram();
+});
+
+// ---------------------------------------------------------------------------
+// Redressement du cliche
+// ---------------------------------------------------------------------------
+
+$('ceph-rotate-btn').addEventListener('click', () => {
+    const p = $('ceph-rotate-panel');
+    const open = p.style.display === 'none';
+    p.style.display = open ? '' : 'none';
+    $('ceph-rotate-btn').classList.toggle('is-active', open);
+});
+$('ceph-rotate-range').addEventListener('input', (e) => {
+    S.adjust.rotate = parseFloat(e.target.value) || 0;
+    syncWindowInputs();
     touch();
     renderViewer();
 });
+$('ceph-rotate-reset').addEventListener('click', () => {
+    S.adjust.rotate = 0;
+    syncWindowInputs();
+    touch();
+    renderViewer();
+});
+$('ceph-rotate-fh').addEventListener('click', () => {
+    // Le plan de Francfort (Porion–Orbitale) est la reference horizontale de la
+    // teleradiographie de profil : l'amener a l'horizontale rend la lecture des
+    // rapports verticaux immediate.
+    const po = S.landmarks.Po;
+    const or = S.landmarks.Or;
+    const state = $('ceph-rotate-state');
+    if (!po || !or) {
+        state.textContent = 'Posez d’abord Porion (Po) et Orbitale (Or).';
+        state.className = 'ceph-calib-state ceph-warn';
+        return;
+    }
+    const deg = Math.atan2(or.y - po.y, or.x - po.x) * 180 / Math.PI;
+    // On borne au domaine du curseur : au-dela, c'est le cliche qui est en cause.
+    S.adjust.rotate = Math.max(-30, Math.min(30, -deg));
+    state.textContent = `Francfort ramené à l’horizontale (${S.adjust.rotate.toFixed(1).replace('.', ',')}°).`;
+    state.className = 'ceph-calib-state ceph-ok';
+    syncWindowInputs();
+    touch();
+    renderViewer();
+});
+
+// ---------------------------------------------------------------------------
+// Plein ecran et aide
+// ---------------------------------------------------------------------------
+
+function toggleFullscreen() {
+    const box = $('ceph-viewer');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (box.requestFullscreen) box.requestFullscreen().catch(() => {});
+}
+$('ceph-fullscreen').addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => {
+    $('ceph-viewer').classList.toggle('is-fullscreen', !!document.fullscreenElement);
+    // La zone d'affichage change de taille : on recadre et on repositionne la
+    // barre d'echelle, qui est ancree en bas de la scene.
+    setTimeout(() => { fitToStage(); renderViewer(); renderHistogram(); }, 60);
+});
+
+const helpBox = $('ceph-help');
+$('ceph-help-btn').addEventListener('click', () => {
+    helpBox.style.display = helpBox.style.display === 'none' ? '' : 'none';
+});
+$('ceph-help-close').addEventListener('click', () => { helpBox.style.display = 'none'; });
 
 // Affichage
 $('ceph-toggle-landmarks').addEventListener('change', (e) => { S.showLandmarks = e.target.checked; renderViewer(); });
 $('ceph-toggle-labels').addEventListener('change', (e) => { S.showLabels = e.target.checked; renderViewer(); });
 $('ceph-toggle-traces').addEventListener('change', (e) => { S.showTraces = e.target.checked; renderViewer(); });
-$('ceph-toggle-loupe').addEventListener('change', (e) => { S.loupe = e.target.checked; renderViewer(); });
+$('ceph-toggle-scalebar').addEventListener('change', (e) => { S.showScaleBar = e.target.checked; renderViewer(); });
+$('ceph-toggle-grid').addEventListener('change', (e) => { S.showGrid = e.target.checked; renderViewer(); });
+$('ceph-loupe-factor').addEventListener('change', (e) => {
+    S.loupeFactor = parseInt(e.target.value, 10) || 0;
+    renderViewer();
+});
+
+// Mesures
+document.querySelectorAll('[data-measure]').forEach((b) => {
+    b.addEventListener('click', () => {
+        S.measureType = b.dataset.measure;
+        S.measureDraft = null;
+        renderAll();
+    });
+});
+$('ceph-measure-clear').addEventListener('click', () => {
+    if (!S.measures.length) return;
+    if (!confirm('Effacer toutes les mesures ?')) return;
+    S.measures = [];
+    S.measureDraft = null;
+    touch();
+    renderAll();
+});
+
+$('ceph-hand').addEventListener('click', () => {
+    S.handTool = !S.handTool;
+    $('ceph-hand').classList.toggle('is-active', S.handTool);
+    stage.classList.toggle('is-hand', S.handTool);
+});
 
 $('ceph-fit').addEventListener('click', () => { fitToStage(); renderViewer(); });
 $('ceph-zoom-in').addEventListener('click', () => zoomBy(1.2));
@@ -939,6 +1654,7 @@ async function save() {
                 analysis_id: S.analysisId,
                 landmarks: S.landmarks,
                 traces: S.traces,
+                measures: S.measures,
                 calibration: S.calibration,
                 adjust: S.adjust,
                 notes: $('ceph-notes').value,
@@ -985,12 +1701,32 @@ function renderTracingPng() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, cw, ch);
 
-    const a = S.adjust;
-    const filters = [`brightness(${a.brightness}%)`, `contrast(${a.contrast}%)`];
-    if (a.invert) filters.push('invert(1)');
-    ctx.filter = filters.join(' ');
-    if (bitmap.complete && bitmap.naturalWidth) ctx.drawImage(bitmap, 0, 0, cw, ch);
-    ctx.filter = 'none';
+    // Le rapport doit montrer EXACTEMENT ce que le praticien a lu a l'ecran :
+    // on applique la meme table de correspondance, pixel par pixel, plutot
+    // qu'une approximation par filtres CSS (qui ne savent pas faire un
+    // fenetrage arbitraire ni un gamma).
+    const source = (S.adjust.clahe && claheBitmap && claheBitmap.complete && claheBitmap.naturalWidth)
+        ? claheBitmap
+        : bitmap;
+    if (source.complete && source.naturalWidth) {
+        ctx.drawImage(source, 0, 0, cw, ch);
+        try {
+            const lut = windowLut({
+                center: S.adjust.center, width: S.adjust.width,
+                gamma: S.adjust.gamma, invert: S.adjust.invert,
+            }).split(' ').map((v) => Math.round(parseFloat(v) * 255));
+            const img = ctx.getImageData(0, 0, cw, ch);
+            const d = img.data;
+            for (let i = 0; i < d.length; i += 4) {
+                d[i] = lut[d[i]];
+                d[i + 1] = lut[d[i + 1]];
+                d[i + 2] = lut[d[i + 2]];
+            }
+            ctx.putImageData(img, 0, 0);
+        } catch (err) {
+            console.warn('Application des réglages au rapport impossible :', err);
+        }
+    }
 
     ctx.save();
     ctx.scale(scale, scale);
@@ -1042,6 +1778,30 @@ function renderTracingPng() {
         ctx.fillText(def.abbr, p.x + r * 1.6, p.y - r);
         ctx.lineWidth = 1.4 / scale;
     }
+    // Mesures libres
+    if (S.measures.length) {
+        ctx.font = `${Math.round(15 / scale)}px Manrope, sans-serif`;
+        for (const m of S.measures) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 2.2 / scale;
+            ctx.moveTo(m.pts[0].x, m.pts[0].y);
+            for (const pt of m.pts.slice(1)) ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+            const v = measureValue(m);
+            if (!v) continue;
+            const anchor = m.type === 'angle' ? m.pts[1] : {
+                x: (m.pts[0].x + m.pts[m.pts.length - 1].x) / 2,
+                y: (m.pts[0].y + m.pts[m.pts.length - 1].y) / 2,
+            };
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3.5 / scale;
+            ctx.fillStyle = '#facc15';
+            ctx.strokeText(v, anchor.x + 8 / scale, anchor.y - 8 / scale);
+            ctx.fillText(v, anchor.x + 8 / scale, anchor.y - 8 / scale);
+        }
+    }
+
     ctx.restore();
 
     return canvas.toDataURL('image/png');
@@ -1051,6 +1811,10 @@ function renderTracingPng() {
 const bitmap = new Image();
 bitmap.crossOrigin = 'anonymous';
 bitmap.src = CFG.case.image_url;
+
+// Version egalisee localement, tenue a jour pour que le rapport PDF reflete le
+// mode d'affichage reellement utilise.
+let claheBitmap = null;
 
 async function buildReport(download) {
     const btn = download ? $('ceph-pdf-dl') : $('ceph-pdf-print');
@@ -1201,6 +1965,16 @@ aiBtn.addEventListener('click', runAutodetect);
 // ---------------------------------------------------------------------------
 
 advanceLandmark();
+syncWindowInputs();
+$('ceph-invert-btn').classList.toggle('is-active', S.adjust.invert);
+$('ceph-flip-btn').classList.toggle('is-active', S.adjust.flipH);
+$('ceph-clahe-btn').classList.toggle('is-active', S.adjust.clahe);
+$('ceph-loupe-factor').value = String(S.loupeFactor);
 loadImage();
 renderAll();
 setSaveState('saved');
+// L'egalisation locale enregistree avec le dossier est recalculee au chargement
+// (le blob de la session precedente n'existe plus).
+if (S.adjust.clahe) {
+    bitmap.addEventListener('load', () => setClahe(true), { once: true });
+}

@@ -2,7 +2,7 @@
 {% block title %}Céphalométrie — {{ case.last_name }} {{ case.first_name }} - Doctivo{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/cephalo.css?v=20260713-1">
+<link rel="stylesheet" href="/static/css/cephalo.css?v=20260824-1">
 {% endblock %}
 
 {% block content %}
@@ -27,12 +27,12 @@
 <div class="ceph-workspace">
 
     <!-- ============ Colonne 1 : la radiographie ============ -->
-    <div class="ceph-viewer">
+    <div class="ceph-viewer" id="ceph-viewer">
         <div class="ceph-toolbar">
             <button type="button" class="ceph-tool" data-mode="landmark">Points</button>
             <button type="button" class="ceph-tool" data-mode="calibrate">Calibrer</button>
             <button type="button" class="ceph-tool" data-mode="trace">Tracé</button>
-            <button type="button" class="ceph-tool" data-mode="measure">Règle</button>
+            <button type="button" class="ceph-tool" data-mode="measure">Mesures</button>
             <span class="ceph-tool-sep"></span>
             <button type="button" class="ceph-tool ceph-tool-ai" id="ceph-ai-btn" style="display:none;"
                     title="Pré-positionne 19 points par IA (brouillon à valider). Le calcul se fait sur votre poste ; la radiographie ne quitte pas l'ordinateur.">
@@ -40,58 +40,116 @@
                 <span id="ceph-ai-label">Détection auto</span>
             </button>
             <span class="ceph-tool-sep"></span>
-            <button type="button" class="ceph-tool" id="ceph-invert-btn">Négatif</button>
-            <button type="button" class="ceph-tool" id="ceph-flip-btn">Miroir</button>
+            <button type="button" class="ceph-tool" id="ceph-invert-btn" title="Inverser les niveaux de gris (N)">Négatif</button>
+            <button type="button" class="ceph-tool" id="ceph-flip-btn" title="Miroir horizontal (M)">Miroir</button>
+            <button type="button" class="ceph-tool" id="ceph-rotate-btn" title="Redresser le cliché (R)">Redresser</button>
             <div class="ceph-toolbar-right">
-                <button type="button" class="ceph-tool" id="ceph-zoom-out">−</button>
-                <button type="button" class="ceph-tool" id="ceph-zoom-in">+</button>
-                <button type="button" class="ceph-tool" id="ceph-fit">Ajuster</button>
+                <button type="button" class="ceph-tool" id="ceph-zoom-out" title="Dézoomer (−)">−</button>
+                <button type="button" class="ceph-tool" id="ceph-zoom-in" title="Zoomer (+)">+</button>
+                <button type="button" class="ceph-tool" id="ceph-fit" title="Ajuster à la fenêtre (0)">Ajuster</button>
+                <button type="button" class="ceph-tool" id="ceph-hand" title="Main : déplacer le cliché au bouton gauche (H)">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a1.5 1.5 0 0 0-3 0m0 0V4.5a1.5 1.5 0 0 0-3 0V11m3-5v5m-3-5.5a1.5 1.5 0 0 0-3 0V12m0-6a1.5 1.5 0 0 0-3 0v7.5"/><path d="M6 13.5c0 4.14 2.9 7.5 6.5 7.5S18 18.14 18 14v-3"/></svg>
+                    Main
+                </button>
+                <button type="button" class="ceph-tool" id="ceph-fullscreen" title="Plein écran (F)">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>
+                </button>
+                <button type="button" class="ceph-tool" id="ceph-help-btn" title="Raccourcis clavier (?)">?</button>
             </div>
+        </div>
+
+        <!-- Bandeau radiologique : presets + histogramme + fenêtrage -->
+        <div class="ceph-imgbar">
+            <div class="ceph-presets" id="ceph-presets">
+                <button type="button" class="ceph-preset" data-preset="original">Original</button>
+                <button type="button" class="ceph-preset" data-preset="bone">Os</button>
+                <button type="button" class="ceph-preset" data-preset="soft">Profil cutané</button>
+                <button type="button" class="ceph-preset" data-preset="teeth">Dents</button>
+                <button type="button" class="ceph-preset ceph-preset-alt" id="ceph-clahe-btn"
+                        title="Égalisation locale : fait apparaître ensemble corticales et tissus mous">CLAHE</button>
+            </div>
+            <div class="ceph-histo-wrap" id="ceph-histo-wrap" title="Histogramme des niveaux de gris — glissez les poignées pour régler la fenêtre">
+                <canvas id="ceph-histo" width="512" height="56"></canvas>
+                <div class="ceph-histo-handle" id="ceph-histo-lo"></div>
+                <div class="ceph-histo-handle" id="ceph-histo-hi"></div>
+            </div>
+            <div class="ceph-winread" id="ceph-winread"></div>
         </div>
 
         <div class="ceph-stage" id="ceph-stage">
             <svg id="ceph-svg" xmlns="http://www.w3.org/2000/svg">
                 <defs>
+                    <!-- Fenêtrage + gamma + négatif, en une seule table de 256 valeurs.
+                         Un feFunc "table" permet n'importe quelle courbe de tons, donc
+                         un vrai fenêtrage radiologique et non un simple contraste. -->
                     <filter id="ceph-adj" color-interpolation-filters="sRGB">
                         <feComponentTransfer>
-                            <feFuncR id="ceph-gammaR" type="gamma" exponent="1" amplitude="1" offset="0"/>
-                            <feFuncG id="ceph-gammaG" type="gamma" exponent="1" amplitude="1" offset="0"/>
-                            <feFuncB id="ceph-gammaB" type="gamma" exponent="1" amplitude="1" offset="0"/>
-                        </feComponentTransfer>
-                        <feComponentTransfer>
-                            <feFuncR id="ceph-linR" type="linear" slope="1" intercept="0"/>
-                            <feFuncG id="ceph-linG" type="linear" slope="1" intercept="0"/>
-                            <feFuncB id="ceph-linB" type="linear" slope="1" intercept="0"/>
-                        </feComponentTransfer>
-                        <feComponentTransfer id="ceph-invert">
-                            <feFuncR id="ceph-invR" type="table" tableValues="0 1"/>
-                            <feFuncG id="ceph-invG" type="table" tableValues="0 1"/>
-                            <feFuncB id="ceph-invB" type="table" tableValues="0 1"/>
+                            <feFuncR class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncG class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncB class="ceph-lut" type="table" tableValues="0 1"/>
                         </feComponentTransfer>
                     </filter>
-                    <clipPath id="ceph-loupe-clip"><circle cx="0" cy="0" r="78"/></clipPath>
+
+                    <!-- Même chose + accentuation (masque flou 3×3), dosée par
+                         feComposite. Filtre séparé : quand l'accentuation est à 0,
+                         on repointe l'image sur #ceph-adj et la convolution ne
+                         coûte plus rien. -->
+                    <filter id="ceph-adj-sharp" color-interpolation-filters="sRGB">
+                        <feComponentTransfer result="toned">
+                            <feFuncR class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncG class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncB class="ceph-lut" type="table" tableValues="0 1"/>
+                        </feComponentTransfer>
+                        <feConvolveMatrix in="toned" result="sharp" order="3" preserveAlpha="true"
+                                          edgeMode="duplicate" divisor="1"
+                                          kernelMatrix="0 -1 0  -1 5 -1  0 -1 0"/>
+                        <feComposite id="ceph-sharp-mix" in="sharp" in2="toned"
+                                     operator="arithmetic" k1="0" k2="0.5" k3="0.5" k4="0"/>
+                    </filter>
+
+                    <!-- Loupe : toujours accentuée, même si la vue principale ne l'est pas. -->
+                    <filter id="ceph-adj-loupe" color-interpolation-filters="sRGB">
+                        <feComponentTransfer result="toned">
+                            <feFuncR class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncG class="ceph-lut" type="table" tableValues="0 1"/>
+                            <feFuncB class="ceph-lut" type="table" tableValues="0 1"/>
+                        </feComponentTransfer>
+                        <feConvolveMatrix in="toned" result="sharp" order="3" preserveAlpha="true"
+                                          edgeMode="duplicate" divisor="1"
+                                          kernelMatrix="0 -1 0  -1 5 -1  0 -1 0"/>
+                        <feComposite in="sharp" in2="toned" operator="arithmetic"
+                                     k1="0" k2="0.65" k3="0.35" k4="0"/>
+                    </filter>
+
+                    <clipPath id="ceph-loupe-clip"><circle id="ceph-loupe-clip-c" cx="0" cy="0" r="78"/></clipPath>
                 </defs>
 
                 <g id="ceph-g-image">
                     <image id="ceph-img" filter="url(#ceph-adj)" x="0" y="0"/>
                 </g>
+                <!-- Calque géométrique : suit le zoom, la rotation et le miroir. -->
                 <g id="ceph-g-overlay"></g>
+                <!-- Calque d'annotations : jamais transformé, pour que les
+                     étiquettes et la barre d'échelle restent droites et lisibles
+                     quelles que soient la rotation et le miroir. -->
+                <g id="ceph-g-screen"></g>
 
                 <!-- Loupe (espace écran : elle ne se met jamais à l'échelle) -->
                 <g id="ceph-g-loupe" style="display:none;pointer-events:none;">
                     <g id="ceph-loupe-clipped" clip-path="url(#ceph-loupe-clip)">
                         <g id="ceph-loupe-scale">
-                            <g id="ceph-loupe-flip">
-                                <image id="ceph-loupe-img" filter="url(#ceph-adj)" x="0" y="0" style="image-rendering:pixelated;"/>
-                            </g>
+                            <image id="ceph-loupe-img" filter="url(#ceph-adj-loupe)" x="0" y="0" style="image-rendering:pixelated;"/>
                             <g id="ceph-loupe-points"></g>
                         </g>
+                    </g>
+                    <g id="ceph-loupe-cross">
                         <line x1="-14" y1="0" x2="-4" y2="0" stroke="#f43f5e" stroke-width="1"/>
                         <line x1="4" y1="0" x2="14" y2="0" stroke="#f43f5e" stroke-width="1"/>
                         <line x1="0" y1="-14" x2="0" y2="-4" stroke="#f43f5e" stroke-width="1"/>
                         <line x1="0" y1="4" x2="0" y2="14" stroke="#f43f5e" stroke-width="1"/>
                     </g>
                     <circle id="ceph-loupe-ring" r="78" fill="none" stroke="#94a3b8" stroke-width="2"/>
+                    <text id="ceph-loupe-badge" text-anchor="middle" font-size="10" fill="#94a3b8"></text>
                 </g>
             </svg>
 
@@ -124,6 +182,60 @@
                 <div class="ceph-float-actions" style="margin-top:6px;">
                     <button type="button" class="ceph-tool" id="ceph-trace-clear-all">Tout effacer</button>
                 </div>
+            </div>
+
+            <!-- Panneau flottant : mesures -->
+            <div class="ceph-float" id="ceph-measure-panel" style="display:none;">
+                <h4>Mesures</h4>
+                <div class="ceph-float-actions" style="margin-bottom:8px;">
+                    <button type="button" class="ceph-tool is-active" data-measure="dist">Distance</button>
+                    <button type="button" class="ceph-tool" data-measure="angle">Angle</button>
+                </div>
+                <p style="font-size:11.5px;color:#94a3b8;line-height:1.4;" id="ceph-measure-hint"></p>
+                <div class="ceph-measure-list" id="ceph-measure-list"></div>
+                <div class="ceph-float-actions" style="margin-top:6px;">
+                    <button type="button" class="ceph-tool" id="ceph-measure-clear">Tout effacer</button>
+                </div>
+            </div>
+
+            <!-- Panneau flottant : redressement -->
+            <div class="ceph-float" id="ceph-rotate-panel" style="display:none;">
+                <h4>Redresser le cliché</h4>
+                <p style="font-size:11.5px;color:#94a3b8;line-height:1.4;margin-bottom:8px;">
+                    La rotation n'est qu'un affichage : les points restent enregistrés
+                    dans le repère de l'image d'origine, les mesures sont inchangées.
+                </p>
+                <label for="ceph-rotate-range">Angle : <span id="ceph-rotate-val">0,0°</span></label>
+                <input type="range" class="ceph-slider" id="ceph-rotate-range" min="-30" max="30" step="0.1" value="0">
+                <div class="ceph-float-actions">
+                    <button type="button" class="ceph-tool" id="ceph-rotate-fh"
+                            title="Rend le plan de Francfort (Porion–Orbitale) horizontal">Aligner sur Francfort</button>
+                </div>
+                <div class="ceph-float-actions" style="margin-top:6px;">
+                    <button type="button" class="ceph-tool" id="ceph-rotate-reset">Remettre à plat</button>
+                </div>
+                <div class="ceph-calib-state" id="ceph-rotate-state"></div>
+            </div>
+
+            <!-- Aide : raccourcis clavier -->
+            <div class="ceph-help" id="ceph-help" style="display:none;">
+                <h4>Raccourcis</h4>
+                <dl>
+                    <dt>Clic droit + glisser</dt><dd>Fenêtrage (largeur / centre)</dd>
+                    <dt>Molette</dt><dd>Zoom au curseur</dd>
+                    <dt>Espace, clic milieu ou H</dt><dd>Déplacer le cliché (outil Main)</dd>
+                    <dt>+ / − / 0</dt><dd>Zoomer / dézoomer / ajuster</dd>
+                    <dt>Flèches</dt><dd>Décaler le point de 1 px</dd>
+                    <dt>Maj + flèches</dt><dd>Décaler de 0,2 px</dd>
+                    <dt>Suppr</dt><dd>Effacer le point actif</dd>
+                    <dt>1 / 2 / 3 / 4</dt><dd>Points · Calibrer · Tracé · Mesures</dd>
+                    <dt>N / M / R</dt><dd>Négatif · Miroir · Redresser</dd>
+                    <dt>C</dt><dd>Égalisation locale (CLAHE)</dd>
+                    <dt>L</dt><dd>Loupe : ×2 → ×4 → ×8 → arrêt</dd>
+                    <dt>F</dt><dd>Plein écran</dd>
+                    <dt>Échap</dt><dd>Fermer ce panneau</dd>
+                </dl>
+                <button type="button" class="ceph-tool" id="ceph-help-close">Fermer</button>
             </div>
         </div>
     </div>
@@ -168,16 +280,26 @@
             <label class="ceph-check"><input type="checkbox" id="ceph-toggle-landmarks" checked> Points</label>
             <label class="ceph-check"><input type="checkbox" id="ceph-toggle-labels" checked> Étiquettes</label>
             <label class="ceph-check"><input type="checkbox" id="ceph-toggle-traces" checked> Tracés</label>
-            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-loupe" checked> Loupe (×4)</label>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-scalebar" checked> Barre d'échelle</label>
+            <label class="ceph-check"><input type="checkbox" id="ceph-toggle-grid"> Grille</label>
+            <div class="ceph-slider-label" style="margin-top:8px;"><span>Loupe</span></div>
+            <select id="ceph-loupe-factor" class="ceph-select">
+                <option value="0">Désactivée</option>
+                <option value="2">×2</option>
+                <option value="4" selected>×4</option>
+                <option value="8">×8</option>
+            </select>
 
             <div class="ceph-section-title">Image</div>
-            <div class="ceph-slider-label"><span>Luminosité</span></div>
-            <input type="range" class="ceph-slider" id="ceph-brightness" min="30" max="200" step="1" value="100">
-            <div class="ceph-slider-label"><span>Contraste</span></div>
-            <input type="range" class="ceph-slider" id="ceph-contrast" min="30" max="250" step="1" value="100">
-            <div class="ceph-slider-label"><span>Gamma</span></div>
+            <div class="ceph-slider-label"><span>Centre (niveau)</span><b id="ceph-wc-val">128</b></div>
+            <input type="range" class="ceph-slider" id="ceph-wcenter" min="0" max="255" step="1" value="128">
+            <div class="ceph-slider-label"><span>Largeur (fenêtre)</span><b id="ceph-ww-val">255</b></div>
+            <input type="range" class="ceph-slider" id="ceph-wwidth" min="4" max="510" step="1" value="255">
+            <div class="ceph-slider-label"><span>Gamma</span><b id="ceph-gamma-val">1,00</b></div>
             <input type="range" class="ceph-slider" id="ceph-gamma" min="0.4" max="2.5" step="0.05" value="1">
-            <button type="button" class="btn btn-outline" id="ceph-reset-adjust" style="width:100%;font-size:12px;padding:6px;">Réinitialiser l'image</button>
+            <div class="ceph-slider-label"><span>Netteté</span><b id="ceph-sharp-val">0 %</b></div>
+            <input type="range" class="ceph-slider" id="ceph-sharpen" min="0" max="100" step="5" value="0">
+            <button type="button" class="btn btn-outline" id="ceph-reset-adjust" style="width:100%;font-size:12px;padding:6px;margin-top:8px;">Réinitialiser l'image</button>
 
             <div class="ceph-section-title">Notes cliniques</div>
             <textarea class="ceph-notes" id="ceph-notes" rows="3" placeholder="Observations, plan de traitement envisagé…">{{ case.notes or '' }}</textarea>
@@ -186,6 +308,11 @@
                 Les normes sont des valeurs de référence adultes de population caucasienne : elles ne se transposent pas
                 d'une population à l'autre. Tant que le cliché n'est pas calibré, les mesures en millimètres sont retenues
                 plutôt qu'estimées ; les mesures angulaires, elles, restent valides.
+            </p>
+            <p class="ceph-footnote">
+                <b>Réglages d'image</b> : fenêtrage, gamma, accentuation et égalisation locale ne modifient que
+                l'<b>affichage</b>. Le fichier d'origine n'est jamais retouché et les coordonnées des points restent
+                exprimées dans le repère de l'image native.
             </p>
             <p class="ceph-footnote">
                 <b>Détection automatique (IA)</b> : le bouton « Détection auto » pré-positionne 19 points au moyen d'un
@@ -203,5 +330,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module" src="/static/js/ceph/workstation.js?v=20260713-1"></script>
+<script type="module" src="/static/js/ceph/workstation.js?v=20260824-1"></script>
 {% endblock %}
