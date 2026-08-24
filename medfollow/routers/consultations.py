@@ -12,6 +12,7 @@ from database.connection import get_db
 from routers.auth import get_current_user
 from routers.deps import require_login, require_login_api, set_flash, deny_secretaire
 from services.audit import log_audit, client_ip
+from services import waiting_room as wr
 
 router = APIRouter(prefix="/consultations", dependencies=[Depends(deny_secretaire)])
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -638,6 +639,7 @@ async def start_consultation(
                     (intake_json, motif or None, existing["id"]),
                 )
         await db.commit()
+        await wr.sync_consultation_started(db, uid, patient_id, existing["appointment_id"] if "appointment_id" in existing.keys() else appointment_id)
         response = RedirectResponse(
             url=f"/patients/{patient_id}?consultation_id={existing['id']}",
             status_code=302,
@@ -662,6 +664,7 @@ async def start_consultation(
     await _persist_intake_patient_data(db, patient_id, uid, pathologies, allergies, tabac_statut, tabac_paquets, consultation_id)
 
     await db.commit()
+    await wr.sync_consultation_started(db, uid, patient_id, appointment_id)
     await log_audit(db, user, "consultation_creee", entity_type="consultation", entity_id=consultation_id, patient_id=patient_id, ip=client_ip(request))
 
     response = RedirectResponse(
@@ -1159,6 +1162,7 @@ async def terminate_consultation(
         )
 
     await db.commit()
+    await wr.sync_consultation_ended(db, user["sub"], patient_id, consultation.get("appointment_id"))
 
     if is_ajax:
         return JSONResponse(content={

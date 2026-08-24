@@ -59,6 +59,13 @@
                     <span>Agenda</span>
                 </a>
             </li>
+            <li class="{% if active == 'salle_attente' %}active{% endif %}">
+                <a href="/salle-attente">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                    <span>Salle d'attente</span>
+                    <span class="msg-unread-badge" id="wr-waiting-badge" style="display:none;margin-left:auto;">0</span>
+                </a>
+            </li>
             <li class="{% if active == 'rappels' %}active{% endif %}">
                 <a href="/rappels">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -334,6 +341,23 @@
             }
             pollUnread();
             setInterval(pollUnread, 30000);
+        }
+
+        // === Badge « patients en salle d'attente » ===
+        const wrBadge = document.getElementById('wr-waiting-badge');
+        if (wrBadge) {
+            function pollWaiting() {
+                fetch('/salle-attente/api/count')
+                    .then(r => r.ok ? r.json() : null)
+                    .then(d => {
+                        if (!d || typeof d.count !== 'number') return;
+                        wrBadge.textContent = d.count > 99 ? '99+' : d.count;
+                        wrBadge.style.display = d.count > 0 ? 'inline-flex' : 'none';
+                    })
+                    .catch(() => {});
+            }
+            pollWaiting();
+            setInterval(pollWaiting, 30000);
         }
 
     })();

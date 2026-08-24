@@ -900,4 +900,64 @@ async def init_db():
     """)
     await db.commit()
 
+    # Salle d'attente : une ligne = un passage de patient dans la journee.
+    # Le chainon manquant entre l'agenda (RDV planifie) et la consultation :
+    # arrivee -> file d'attente -> appel -> consultation.
+    # patient_id/appointment_id sont NULL pour un patient sans RDV ni fiche.
+    # sort_order = minutes depuis minuit (heure du RDV, ou heure d'arrivee pour
+    # un walk-in) : les sans-RDV s'intercalent naturellement, et les fleches
+    # haut/bas se contentent d'echanger deux valeurs.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS waiting_room (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            patient_id INTEGER REFERENCES patients(id),
+            appointment_id INTEGER REFERENCES appointments(id),
+            display_name TEXT,
+            ticket_no INTEGER,
+            status TEXT CHECK(status IN ('attente','appele','en_cours','termine','absent','parti'))
+                   DEFAULT 'attente',
+            priority INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            room TEXT,
+            reason TEXT,
+            day DATE NOT NULL,
+            arrived_at DATETIME,
+            called_at DATETIME,
+            started_at DATETIME,
+            ended_at DATETIME,
+            created_by INTEGER,
+            updated_at DATETIME
+        )
+    """)
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_waiting_doctor_day ON waiting_room(doctor_id, day, status)"
+    )
+    await db.execute(
+        """CREATE UNIQUE INDEX IF NOT EXISTS idx_waiting_apt ON waiting_room(appointment_id)
+           WHERE appointment_id IS NOT NULL"""
+    )
+    await db.commit()
+
+    # Reglages d'affichage de la salle d'attente, un jeu par medecin.
+    # display_token : jeton de l'ecran TV. L'ecran de la salle d'attente n'est
+    # jamais une session authentifiee (une TV non surveillee ne doit pas porter
+    # un JWT donnant acces aux dossiers) : il lit une URL en lecture seule qui
+    # ne renvoie que des donnees deja anonymisees.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS waiting_room_settings (
+            doctor_id INTEGER PRIMARY KEY REFERENCES users(id),
+            display_token TEXT UNIQUE,
+            name_mode TEXT DEFAULT 'initial',      -- 'full' | 'initial' | 'ticket'
+            show_times INTEGER DEFAULT 1,
+            sound_enabled INTEGER DEFAULT 1,
+            auto_checkin_on_confirm INTEGER DEFAULT 1,
+            call_banner_seconds INTEGER DEFAULT 20,
+            clinic_name TEXT,
+            ticker_messages TEXT,                  -- JSON array de chaines
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+
     await db.close()

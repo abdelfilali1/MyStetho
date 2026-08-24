@@ -115,6 +115,33 @@ print("== Messages (item 4) ==")
 get("/messages/")
 get("/messages/api/unread-count", label="/messages/api/unread-count")
 
+print("== Salle d'attente ==")
+get("/salle-attente/")
+get("/salle-attente/api/board", label="/salle-attente/api/board")
+get("/salle-attente/api/count", label="/salle-attente/api/count")
+# RDV du jour -> pointage d'arrivee -> appel -> fin de passage
+from datetime import date as _date  # noqa: E402
+_today = _date.today().isoformat()
+post("/appointments/new", {"patient_id": "1", "doctor_id": "1", "title": "RDV du jour",
+                           "appointment_type": "consultation", "status": "planifie",
+                           "start_datetime": f"{_today}T10:00", "end_datetime": f"{_today}T10:30"},
+     label="/appointments/new (aujourd'hui)")
+_r = post("/salle-attente/checkin", {"appointment_id": "2"}, expect=(200,))
+_entry = (_r.json() or {}).get("id", 1)
+post(f"/salle-attente/{_entry}/priority", {}, expect=(200,), label="/salle-attente/{id}/priority")
+post(f"/salle-attente/{_entry}/move", {"direction": "down"}, expect=(200,), label="/salle-attente/{id}/move")
+post(f"/salle-attente/{_entry}/call", {"room": "Salle 1"}, expect=(200,), label="/salle-attente/{id}/call")
+post(f"/salle-attente/{_entry}/status", {"status": "termine"}, expect=(200,), label="/salle-attente/{id}/status")
+post("/salle-attente/reglages", {"name_mode": "initial", "clinic_name": "Cabinet test",
+                                 "show_times": "1", "sound_enabled": "1",
+                                 "auto_checkin_on_confirm": "1", "call_banner_seconds": "20",
+                                 "ticker": "Bienvenue"}, expect=(200,))
+_r = post("/salle-attente/reglages/token", {}, expect=(200,))
+_screen = (_r.json() or {}).get("screen_url", "")
+get(_screen, expect=(200,), label="/salle-attente/ecran/{token}")
+get("/salle-attente/api/ecran/" + _screen.rsplit("/", 1)[-1], expect=(200,), label="/salle-attente/api/ecran/{token}")
+get("/salle-attente/ecran/jeton-invalide", expect=(404,), label="/salle-attente/ecran/{jeton invalide}")
+
 print("== CSRF négatif (POST sans jeton -> 403) ==")
 r = client.post("/rappels/new", data={"patient_id": "1", "description": "x"}, follow_redirects=False)
 if r.status_code == 403:

@@ -9,6 +9,7 @@ from database.connection import get_db
 from routers.deps import require_login, require_login_api, effective_doctor_id, set_flash
 from services.audit import log_audit, client_ip
 from services import whatsapp_service
+from services import waiting_room as wr
 
 router = APIRouter(prefix="/appointments")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -341,6 +342,9 @@ async def update_status(
         (status, appointment_id),
     )
     await db.commit()
+    # La salle d'attente suit l'agenda : arrivee auto d'un RDV du jour confirme,
+    # passage en cours / termine / absent, retrait si annule.
+    await wr.sync_from_appointment(db, appointment_id, status)
     await log_audit(db, user, "rdv_statut", entity_type="appointment", entity_id=appointment_id, patient_id=row[1], ip=client_ip(request), details=f"status={status}")
     return JSONResponse(content={"ok": True})
 
@@ -403,6 +407,10 @@ async def delete_appointment(
     )
     await db.execute(
         "UPDATE questionnaire_responses SET appointment_id = NULL WHERE appointment_id = ? ",
+        (appointment_id,),
+    )
+    await db.execute(
+        "UPDATE waiting_room SET appointment_id = NULL WHERE appointment_id = ? ",
         (appointment_id,),
     )
     await db.execute("DELETE FROM appointments WHERE id = ? ", (appointment_id,))

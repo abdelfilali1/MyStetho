@@ -1,0 +1,547 @@
+{% extends "base.html" %}
+{% block title %}Salle d'attente - Doctivo{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/salle-attente.css?v=20260824-5">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Salle d'attente</h2>
+        <p class="subtitle">Arrivées, ordre de passage et appel des patients — synchronisé avec l'agenda du jour.</p>
+    </div>
+    <div class="page-header-right" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-outline" onclick="wrOpenWalkin()">+ Patient sans RDV</button>
+        <button type="button" class="btn btn-outline" onclick="wrOpenSettings()">Réglages</button>
+        <a class="btn btn-primary" id="wr-screen-btn" href="{{ screen_url }}" target="_blank" rel="noopener">Ouvrir l'écran salle d'attente</a>
+    </div>
+</div>
+
+<div class="stats-grid" style="margin-bottom:18px;">
+    <div class="stat-card">
+        <div class="stat-icon appointments">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="wr-stat-expected">{{ board.counts.expected }}</div>
+            <div class="stat-label">Attendus</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon patients">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="wr-stat-waiting">{{ board.counts.waiting }}</div>
+            <div class="stat-label">En attente</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon consultations">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="wr-stat-active">{{ board.counts.active }}</div>
+            <div class="stat-label">Appelés / en cours</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon messages">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>
+            <div class="stat-value" id="wr-stat-done">{{ board.counts.done }}</div>
+            <div class="stat-label">Passés</div>
+        </div>
+    </div>
+</div>
+
+<div class="wr-board">
+    <section class="wr-col">
+        <div class="wr-col-head">
+            <h3>Attendus aujourd'hui</h3>
+            <span class="wr-count" id="wr-count-expected">{{ board.counts.expected }}</span>
+        </div>
+        <div class="wr-col-body" id="wr-expected"></div>
+    </section>
+
+    <section class="wr-col">
+        <div class="wr-col-head">
+            <h3>File d'attente</h3>
+            <span class="wr-count" id="wr-count-waiting">{{ board.counts.waiting }}</span>
+        </div>
+        <div class="wr-col-body" id="wr-waiting"></div>
+    </section>
+
+    <section class="wr-col">
+        <div class="wr-col-head">
+            <h3>Appelés / en cours</h3>
+            <span class="wr-count" id="wr-count-active">{{ board.counts.active }}</span>
+        </div>
+        <div class="wr-col-body" id="wr-active"></div>
+        <div class="wr-col-head" style="border-top:1px solid rgba(15,33,56,.08);">
+            <h3 style="font-size:13px;color:#6b7f9b;">Déjà passés</h3>
+            <span class="wr-count" id="wr-count-done">{{ board.counts.done }}</span>
+        </div>
+        <div class="wr-col-body" id="wr-done" style="max-height:220px;"></div>
+    </section>
+</div>
+
+<!-- Démarrage de consultation : formulaire POST classique (CSRF injecté par base.html) -->
+<form id="wr-start-form" method="POST" action="/consultations/start" style="display:none;">
+    <input type="hidden" name="patient_id" id="wr-start-patient">
+    <input type="hidden" name="appointment_id" id="wr-start-appointment">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<!-- Patient sans RDV -->
+<div class="modal-overlay" id="wr-walkin-modal" style="display:none;">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-header">
+            <h3>Patient sans rendez-vous</h3>
+            <button type="button" class="modal-close" onclick="wrCloseModal('wr-walkin-modal')">&times;</button>
+        </div>
+        <div>
+            <div class="form-group">
+                <label>Patient du cabinet</label>
+                <input type="text" id="wr-walkin-search" placeholder="Rechercher un patient…" autocomplete="off">
+                <div id="wr-walkin-results" style="display:none;border:1px solid rgba(15,33,56,.12);border-radius:10px;margin-top:4px;max-height:190px;overflow-y:auto;"></div>
+                <input type="hidden" id="wr-walkin-patient-id">
+            </div>
+            <div class="form-group">
+                <label>Ou nom du patient (hors dossier)</label>
+                <input type="text" id="wr-walkin-name" placeholder="Ex. Fatima El Amrani">
+            </div>
+            <div class="form-group">
+                <label>Motif</label>
+                <input type="text" id="wr-walkin-reason" placeholder="Ex. Douleur dentaire">
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-walkin-priority" style="width:auto;"> Urgence (placer en tête de file)
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-walkin-modal')">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="wrSubmitWalkin()">Ajouter à la file</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Appel : choix de la salle -->
+<div class="modal-overlay" id="wr-call-modal" style="display:none;">
+    <div class="modal-box" style="max-width:430px;">
+        <div class="modal-header">
+            <h3>Appeler le patient</h3>
+            <button type="button" class="modal-close" onclick="wrCloseModal('wr-call-modal')">&times;</button>
+        </div>
+        <div>
+            <p class="subtitle" id="wr-call-name" style="margin-top:0;"></p>
+            <div class="form-group">
+                <label>Salle</label>
+                <input type="text" id="wr-call-room" list="wr-rooms" placeholder="Ex. Salle 1">
+                <datalist id="wr-rooms">
+                    <option value="Salle 1"><option value="Salle 2"><option value="Salle 3">
+                </datalist>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-call-modal')">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="wrSubmitCall()">Appeler</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Réglages de l'écran -->
+<div class="modal-overlay" id="wr-settings-modal" style="display:none;">
+    <div class="modal-box" style="max-width:620px;">
+        <div class="modal-header">
+            <h3>Réglages de la salle d'attente</h3>
+            <button type="button" class="modal-close" onclick="wrCloseModal('wr-settings-modal')">&times;</button>
+        </div>
+        <div>
+            <div class="form-group">
+                <label>Nom affiché sur l'écran</label>
+                <select id="wr-set-name-mode">
+                    <option value="initial" {% if settings.name_mode == 'initial' %}selected{% endif %}>Prénom + initiale (Fatima E.) — recommandé</option>
+                    <option value="full" {% if settings.name_mode == 'full' %}selected{% endif %}>Nom complet (Fatima EL AMRANI)</option>
+                    <option value="ticket" {% if settings.name_mode == 'ticket' %}selected{% endif %}>Numéro de passage uniquement (A-12)</option>
+                </select>
+                <small style="color:#6b7f9b;">Le nom complet reste toujours visible sur cette page ; seul l'écran de la salle est concerné.</small>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Nom du cabinet</label>
+                    <input type="text" id="wr-set-clinic" value="{{ settings.clinic_name or '' }}" placeholder="Cabinet Dr. …">
+                </div>
+                <div class="form-group" style="flex:0 0 190px;">
+                    <label>Durée du bandeau d'appel (s)</label>
+                    <input type="number" id="wr-set-banner" min="5" max="120" value="{{ settings.call_banner_seconds }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-set-times" style="width:auto;" {% if settings.show_times %}checked{% endif %}> Afficher les heures de rendez-vous
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-set-sound" style="width:auto;" {% if settings.sound_enabled %}checked{% endif %}> Carillon sonore à l'appel
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-set-auto" style="width:auto;" {% if settings.auto_checkin_on_confirm %}checked{% endif %}> Mettre en attente automatiquement un RDV du jour passé en « confirmé »
+                </label>
+            </div>
+            <div class="form-group">
+                <label>Messages du bandeau défilant (un par ligne)</label>
+                <textarea id="wr-set-ticker" rows="3">{{ settings.ticker | join('\n') }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Lien de l'écran (à ouvrir sur la TV)</label>
+                <div class="wr-screen-link">
+                    <code id="wr-screen-url">{{ screen_url }}</code>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="wrCopyScreenUrl()">Copier</button>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="wrRotateToken()">Régénérer</button>
+                </div>
+                <small style="color:#6b7f9b;">Ce lien ouvre l'écran sans connexion : il n'affiche que la file anonymisée, jamais un dossier. Régénérez-le si la TV change ou si le lien a été partagé.</small>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-settings-modal')">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="wrSaveSettings()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var board = {{ board | tojson }};
+    var lastSignature = null;
+    var callTargetId = null;
+
+    function esc(value) {
+        var d = document.createElement('div');
+        d.textContent = value == null ? '' : value;
+        return d.innerHTML;
+    }
+
+    // innerHTML n'echappe pas les guillemets : indispensable pour un attribut.
+    function attr(value) {
+        return esc(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function timerClass(minutes) {
+        if (minutes >= 30) return 'late';
+        if (minutes >= 15) return 'warn';
+        return 'ok';
+    }
+
+    function post(url, payload) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (data) {
+                if (!r.ok || data.error) throw new Error(data.error || 'Erreur');
+                return data;
+            });
+        });
+    }
+
+    function act(url, payload, okMessage) {
+        return post(url, payload).then(function (data) {
+            if (okMessage && window.showToast) window.showToast(okMessage);
+            refresh();
+            return data;
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        });
+    }
+
+    // ------------------------------------------------------------ rendu
+
+    function renderExpected(items) {
+        if (!items.length) return '<div class="wr-empty">Aucun rendez-vous en attente d\'arrivée.</div>';
+        return items.map(function (it) {
+            return '<div class="wr-item">' +
+                '<div class="wr-rank">' + esc(it.apt_time || '--') + '</div>' +
+                '<div class="wr-body">' +
+                    '<div class="wr-name">' + esc(it.name) + '</div>' +
+                    '<div class="wr-meta">' +
+                        (it.reason ? '<span>' + esc(it.reason) + '</span>' : '') +
+                        '<span class="badge badge-' + esc(it.status) + '">' + esc(it.status) + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="wr-actions">' +
+                    '<button type="button" class="btn btn-sm btn-primary" data-action="checkin" data-apt="' + it.appointment_id + '">Arrivé</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderWaiting(items) {
+        if (!items.length) return '<div class="wr-empty">Personne en salle d\'attente.</div>';
+        var last = items.length - 1;
+        return items.map(function (it, i) {
+            var waited = it.waited_minutes || 0;
+            return '<div class="wr-item' + (it.priority ? ' wr-urgent' : '') + '">' +
+                '<div class="wr-rank">' + (i + 1) + '</div>' +
+                '<div class="wr-body">' +
+                    '<div class="wr-name">' + esc(it.name) + (it.priority ? ' <span class="badge badge-annule">Urgence</span>' : '') + '</div>' +
+                    '<div class="wr-meta">' +
+                        (it.ticket ? '<span class="wr-ticket">' + esc(it.ticket) + '</span>' : '') +
+                        (it.apt_time ? '<span>RDV ' + esc(it.apt_time) + '</span>' : '<span>Sans RDV</span>') +
+                        '<span class="wr-timer ' + timerClass(waited) + '">' + waited + ' min</span>' +
+                        (it.reason ? '<span>· ' + esc(it.reason) + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="wr-actions">' +
+                    '<button type="button" class="wr-icon-btn" title="Monter" data-action="move" data-id="' + it.id + '" data-dir="up"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
+                    '<button type="button" class="wr-icon-btn" title="Descendre" data-action="move" data-id="' + it.id + '" data-dir="down"' + (i === last ? ' disabled' : '') + '>&darr;</button>' +
+                    '<button type="button" class="wr-icon-btn' + (it.priority ? ' is-on' : '') + '" title="Marquer urgence" data-action="priority" data-id="' + it.id + '">!</button>' +
+                    '<button type="button" class="wr-icon-btn" title="Retirer de la file" data-action="remove" data-id="' + it.id + '">&times;</button>' +
+                    '<button type="button" class="btn btn-sm btn-primary" data-action="call" data-id="' + it.id + '" data-name="' + attr(it.name) + '" data-room="' + attr(it.room) + '">Appeler</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderActive(items) {
+        if (!items.length) return '<div class="wr-empty">Aucun patient appelé.</div>';
+        return items.map(function (it) {
+            var busy = it.status === 'en_cours';
+            return '<div class="wr-item ' + (busy ? 'wr-busy' : 'wr-called') + '">' +
+                '<div class="wr-rank">' + (busy ? '&#9654;' : '&#9835;') + '</div>' +
+                '<div class="wr-body">' +
+                    '<div class="wr-name">' + esc(it.name) + '</div>' +
+                    '<div class="wr-meta">' +
+                        '<span class="badge badge-' + esc(it.status) + '">' + (busy ? 'en consultation' : 'appelé') + '</span>' +
+                        (it.room ? '<span>' + esc(it.room) + '</span>' : '') +
+                        (busy && it.busy_minutes != null ? '<span>depuis ' + it.busy_minutes + ' min</span>'
+                                                         : (it.called_at ? '<span>appelé à ' + esc(it.called_at) + '</span>' : '')) +
+                    '</div>' +
+                    '<div class="wr-actions" style="margin-top:8px;flex-wrap:wrap;">' +
+                        (busy ? '' : '<button type="button" class="btn btn-sm btn-outline" data-action="call" data-id="' + it.id + '" data-name="' + attr(it.name) + '" data-room="' + attr(it.room) + '">Rappeler</button>') +
+                        (it.patient_id ? '<button type="button" class="btn btn-sm btn-primary" data-action="start" data-patient="' + it.patient_id + '" data-apt="' + (it.appointment_id || '') + '">Consultation</button>' : '') +
+                        '<button type="button" class="btn btn-sm btn-outline" data-action="status" data-id="' + it.id + '" data-status="termine">Terminer</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline" data-action="status" data-id="' + it.id + '" data-status="absent">Absent</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderDone(items) {
+        if (!items.length) return '<div class="wr-empty">Aucun passage terminé.</div>';
+        return items.map(function (it) {
+            var label = it.status === 'termine' ? 'terminé' : (it.status === 'absent' ? 'absent' : 'parti');
+            return '<div class="wr-item wr-past">' +
+                '<div class="wr-rank">&#10003;</div>' +
+                '<div class="wr-body">' +
+                    '<div class="wr-name">' + esc(it.name) + '</div>' +
+                    '<div class="wr-meta">' +
+                        '<span class="badge badge-' + esc(it.status === 'termine' ? 'termine' : 'absent') + '">' + label + '</span>' +
+                        (it.ended_at ? '<span>' + esc(it.ended_at) + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function render(data) {
+        document.getElementById('wr-expected').innerHTML = renderExpected(data.expected);
+        document.getElementById('wr-waiting').innerHTML = renderWaiting(data.waiting);
+        document.getElementById('wr-active').innerHTML = renderActive(data.active);
+        document.getElementById('wr-done').innerHTML = renderDone(data.done);
+        ['expected', 'waiting', 'active', 'done'].forEach(function (key) {
+            var count = data.counts[key];
+            document.getElementById('wr-count-' + key).textContent = count;
+            document.getElementById('wr-stat-' + key).textContent = count;
+        });
+    }
+
+    // Le DOM n'est reconstruit que si l'état a changé : pas de clignotement,
+    // et une saisie en cours n'est pas balayée par le rafraîchissement.
+    function refresh() {
+        return fetch('/salle-attente/api/board')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data) return;
+                lastSignature = data.signature;
+                board = data;
+                // On redessine a chaque cycle : les chronometres d'attente
+                // avancent meme quand la file ne bouge pas. Aucun champ de
+                // saisie ne vit dans le tableau, rien n'est donc efface.
+                render(data);
+            })
+            .catch(function () {});
+    }
+
+    // --------------------------------------------------------- actions
+
+    document.querySelector('.wr-board').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        var id = btn.getAttribute('data-id');
+
+        if (action === 'checkin') {
+            act('/salle-attente/checkin', { appointment_id: btn.getAttribute('data-apt') }, 'Patient en salle d\'attente');
+        } else if (action === 'move') {
+            act('/salle-attente/' + id + '/move', { direction: btn.getAttribute('data-dir') });
+        } else if (action === 'priority') {
+            act('/salle-attente/' + id + '/priority', {});
+        } else if (action === 'remove') {
+            if (confirm('Retirer ce patient de la file ?')) {
+                act('/salle-attente/' + id + '/delete', {}, 'Patient retiré');
+            }
+        } else if (action === 'status') {
+            act('/salle-attente/' + id + '/status', { status: btn.getAttribute('data-status') }, 'Statut mis à jour');
+        } else if (action === 'call') {
+            callTargetId = id;
+            document.getElementById('wr-call-name').textContent = btn.getAttribute('data-name') || '';
+            document.getElementById('wr-call-room').value = btn.getAttribute('data-room') || '';
+            openModal('wr-call-modal');
+            setTimeout(function () { document.getElementById('wr-call-room').focus(); }, 50);
+        } else if (action === 'start') {
+            document.getElementById('wr-start-patient').value = btn.getAttribute('data-patient');
+            document.getElementById('wr-start-appointment').value = btn.getAttribute('data-apt') || '';
+            document.getElementById('wr-start-form').submit();
+        }
+    });
+
+    // ---------------------------------------------------------- modales
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    window.wrCloseModal = function (id) { document.getElementById(id).style.display = 'none'; };
+
+    window.wrSubmitCall = function () {
+        if (!callTargetId) return;
+        var room = document.getElementById('wr-call-room').value;
+        window.wrCloseModal('wr-call-modal');
+        act('/salle-attente/' + callTargetId + '/call', { room: room }, 'Patient appelé');
+        callTargetId = null;
+    };
+
+    window.wrOpenWalkin = function () {
+        document.getElementById('wr-walkin-patient-id').value = '';
+        document.getElementById('wr-walkin-search').value = '';
+        document.getElementById('wr-walkin-name').value = '';
+        document.getElementById('wr-walkin-reason').value = '';
+        document.getElementById('wr-walkin-priority').checked = false;
+        document.getElementById('wr-walkin-results').style.display = 'none';
+        openModal('wr-walkin-modal');
+    };
+
+    window.wrSubmitWalkin = function () {
+        var payload = {
+            patient_id: document.getElementById('wr-walkin-patient-id').value || null,
+            name: document.getElementById('wr-walkin-name').value,
+            reason: document.getElementById('wr-walkin-reason').value,
+            priority: document.getElementById('wr-walkin-priority').checked ? 1 : 0
+        };
+        if (!payload.patient_id && !payload.name.trim()) {
+            if (window.showToast) window.showToast('Choisissez un patient ou saisissez un nom', 'error');
+            return;
+        }
+        window.wrCloseModal('wr-walkin-modal');
+        act('/salle-attente/checkin', payload, 'Patient ajouté à la file');
+    };
+
+    // Recherche patient : réutilise l'endpoint de la recherche globale.
+    var searchInput = document.getElementById('wr-walkin-search');
+    var searchResults = document.getElementById('wr-walkin-results');
+    var searchTimer = null;
+    searchInput.addEventListener('input', function () {
+        document.getElementById('wr-walkin-patient-id').value = '';
+        var q = this.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 2) { searchResults.style.display = 'none'; return; }
+        searchTimer = setTimeout(function () {
+            fetch('/api/search?q=' + encodeURIComponent(q))
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    var list = (data && data.patients) || [];
+                    if (!list.length) { searchResults.style.display = 'none'; return; }
+                    searchResults.innerHTML = list.map(function (p) {
+                        return '<div class="gsr-item" data-id="' + p.id + '" style="padding:8px 12px;cursor:pointer;">' + esc(p.name) + '</div>';
+                    }).join('');
+                    searchResults.style.display = 'block';
+                })
+                .catch(function () {});
+        }, 220);
+    });
+    searchResults.addEventListener('click', function (e) {
+        var row = e.target.closest('[data-id]');
+        if (!row) return;
+        document.getElementById('wr-walkin-patient-id').value = row.getAttribute('data-id');
+        searchInput.value = row.textContent;
+        searchResults.style.display = 'none';
+    });
+
+    // --------------------------------------------------------- réglages
+
+    window.wrOpenSettings = function () { openModal('wr-settings-modal'); };
+
+    window.wrSaveSettings = function () {
+        post('/salle-attente/reglages', {
+            name_mode: document.getElementById('wr-set-name-mode').value,
+            clinic_name: document.getElementById('wr-set-clinic').value,
+            call_banner_seconds: document.getElementById('wr-set-banner').value,
+            show_times: document.getElementById('wr-set-times').checked ? 1 : 0,
+            sound_enabled: document.getElementById('wr-set-sound').checked ? 1 : 0,
+            auto_checkin_on_confirm: document.getElementById('wr-set-auto').checked ? 1 : 0,
+            ticker: document.getElementById('wr-set-ticker').value
+        }).then(function () {
+            if (window.showToast) window.showToast('Réglages enregistrés');
+            window.wrCloseModal('wr-settings-modal');
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        });
+    };
+
+    window.wrRotateToken = function () {
+        if (!confirm('Régénérer le lien ? L\'ancien lien cessera immédiatement de fonctionner sur la TV.')) return;
+        post('/salle-attente/reglages/token', {}).then(function (data) {
+            document.getElementById('wr-screen-url').textContent = data.screen_url;
+            document.getElementById('wr-screen-btn').setAttribute('href', data.screen_url);
+            if (window.showToast) window.showToast('Nouveau lien généré');
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        });
+    };
+
+    window.wrCopyScreenUrl = function () {
+        var url = window.location.origin + document.getElementById('wr-screen-url').textContent;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(function () {
+                if (window.showToast) window.showToast('Lien copié');
+            });
+        } else {
+            window.prompt('Lien de l\'écran :', url);
+        }
+    };
+
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) overlay.style.display = 'none';
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay').forEach(function (o) { o.style.display = 'none'; });
+        }
+    });
+
+    // ------------------------------------------------------- démarrage
+
+    render(board);
+    lastSignature = board.signature;
+    setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}

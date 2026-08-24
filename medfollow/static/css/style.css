@@ -1173,6 +1173,9 @@ tr.unread td {
 .nav-links li:nth-child(7) { animation-delay: 0.14s; }
 .nav-links li:nth-child(8) { animation-delay: 0.16s; }
 .nav-links li:nth-child(9) { animation-delay: 0.18s; }
+/* Au-dela du 9e element, un delai unique : la cascade reste lisible sans
+   qu'il faille ajouter une regle a chaque nouveau module. */
+.nav-links li:nth-child(n+10) { animation-delay: 0.2s; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1100px) {

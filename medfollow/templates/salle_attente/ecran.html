@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% if data.clinic_name %}{{ data.clinic_name }} — {% endif %}Salle d'attente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/salle-attente.css?v=20260824-5">
+</head>
+<body class="tv-body">
+
+<div class="tv-dot" id="tv-dot" title="Liaison"></div>
+
+<header class="tv-header">
+    <div class="tv-brand">
+        <img src="/static/img/logo4-trim.png" alt="Doctivo">
+        <div class="tv-tagline">La santé, mieux organisée</div>
+    </div>
+    <div class="tv-clock">
+        <div class="tv-time" id="tv-time">--:--</div>
+        <div class="tv-date" id="tv-date"></div>
+    </div>
+</header>
+
+<main class="tv-main">
+    <section class="tv-panel">
+        <div class="tv-panel-title">En consultation</div>
+        <div class="tv-current" id="tv-current"></div>
+    </section>
+
+    <section class="tv-panel">
+        <div class="tv-panel-title">Prochains patients</div>
+        <ul class="tv-next-list" id="tv-next"></ul>
+        <div class="tv-more" id="tv-more"></div>
+    </section>
+</main>
+
+<div class="tv-ticker">
+    <div class="tv-ticker-track" id="tv-ticker"></div>
+</div>
+
+<div class="tv-call" id="tv-call">
+    <div class="tv-call-text" id="tv-call-text"></div>
+</div>
+
+<!-- Voile de démarrage : un clic est requis par les navigateurs avant de pouvoir
+     jouer un son, passer en plein écran et empêcher la mise en veille. -->
+<div class="tv-gate" id="tv-gate">
+    <img src="/static/img/logo4-trim.png" alt="Doctivo">
+    <h1>Écran de la salle d'attente</h1>
+    <p>Un clic est nécessaire pour activer le plein écran, le carillon d'appel et empêcher la mise en veille de l'écran.</p>
+    <button type="button" id="tv-gate-btn">▶ Lancer l'affichage</button>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var TOKEN = {{ token | tojson }};
+    var data = {{ data | tojson }};
+    var lastCallKey = data.last_call ? data.last_call.key : null;   // pas de bandeau au chargement
+    var callTimer = null;
+    var audioCtx = null;
+    var wakeLock = null;
+
+    function esc(value) {
+        var d = document.createElement('div');
+        d.textContent = value == null ? '' : value;
+        return d.innerHTML;
+    }
+
+    // ------------------------------------------------------------ horloge
+
+    function tick() {
+        var now = new Date();
+        document.getElementById('tv-time').textContent =
+            now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('tv-date').textContent =
+            now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    // ------------------------------------------------------------ carillon
+
+    var CHIME_SECONDS = 5;      // durée totale du carillon
+    var CHIME_REPEATS = 5;      // nombre de « ding-dong » sur cette durée
+
+    function ding(dest, at, freq) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        // Attaque franche puis extinction : un vrai carillon, bien audible
+        // dans une salle d'attente bruyante.
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(0.9, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.7);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(at);
+        osc.stop(at + 0.75);
+    }
+
+    function chime() {
+        if (!data.sound_enabled) return;
+        try {
+            if (!audioCtx) {
+                var Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return;
+                audioCtx = new Ctx();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Notes synthétisées : aucun fichier audio externe, donc compatible
+            // avec la politique de sécurité du contenu du site.
+            var master = audioCtx.createGain();
+            master.gain.value = 1;
+            // Le compresseur laisse monter le volume sans saturer quand deux
+            // notes se recouvrent.
+            var comp = audioCtx.createDynamicsCompressor();
+            master.connect(comp);
+            comp.connect(audioCtx.destination);
+
+            var t0 = audioCtx.currentTime;
+            var SECOND_NOTE = 0.2;                       // décalage du « dong »
+            var TAIL = SECOND_NOTE + 0.7;                // longueur d'un ding-dong
+            var step = (CHIME_SECONDS - TAIL) / (CHIME_REPEATS - 1);
+            for (var i = 0; i < CHIME_REPEATS; i++) {
+                var at = t0 + i * step;
+                ding(master, at, 880);                   // la
+                ding(master, at + SECOND_NOTE, 1174.7);  // ré
+            }
+        } catch (e) { /* le visuel suffit si le son est indisponible */ }
+    }
+
+    // -------------------------------------------------------------- rendu
+
+    function renderCurrent(items) {
+        var box = document.getElementById('tv-current');
+        if (!items.length) {
+            box.innerHTML = '<div class="tv-idle">Aucun patient appelé pour le moment</div>';
+            return;
+        }
+        box.innerHTML = items.slice(0, 3).map(function (it) {
+            return '<div class="tv-current-item">' +
+                '<div class="tv-current-name">' + esc(it.label) + '</div>' +
+                (it.room ? '<div class="tv-current-room">' + esc(it.room) + '</div>' : '') +
+            '</div>';
+        }).join('');
+    }
+
+    function renderNext(items, more, total) {
+        var list = document.getElementById('tv-next');
+        if (!items.length) {
+            list.innerHTML = '<li class="tv-idle" style="padding:24px 0;">Aucun patient en attente</li>';
+        } else {
+            list.innerHTML = items.map(function (it) {
+                return '<li class="tv-next-item' + (it.urgent ? ' urgent' : '') + '">' +
+                    '<span class="tv-pos">' + it.position + '</span>' +
+                    '<span class="tv-next-name">' + esc(it.label) + '</span>' +
+                    (it.time ? '<span class="tv-next-time">' + esc(it.time) + '</span>' : '') +
+                '</li>';
+            }).join('');
+        }
+        var footer = document.getElementById('tv-more');
+        if (more > 0) {
+            footer.textContent = '+ ' + more + (more > 1 ? ' autres patients en attente' : ' autre patient en attente');
+        } else {
+            footer.textContent = total ? (total > 1 ? total + ' patients en attente' : '1 patient en attente') : '';
+        }
+    }
+
+    var tickerCache = null;
+
+    function renderTicker(messages) {
+        // Ne redessiner que si les messages changent : reconstruire le ruban
+        // relancerait l'animation de défilement a chaque interrogation.
+        var key = JSON.stringify(messages || []);
+        if (key === tickerCache) return;
+        tickerCache = key;
+        var track = document.getElementById('tv-ticker');
+        var text = (messages && messages.length) ? messages : [''];
+        // Doublé pour que le défilement reste continu sur un écran large.
+        track.innerHTML = text.concat(text).map(function (m) {
+            return '<span>' + esc(m) + '</span>';
+        }).join('');
+    }
+
+    function showCall(call) {
+        var banner = document.getElementById('tv-call');
+        document.getElementById('tv-call-text').textContent =
+            call.label + (call.room ? ' — ' + call.room : '') + ', veuillez vous présenter';
+        banner.classList.add('visible');
+        chime();
+        clearTimeout(callTimer);
+        callTimer = setTimeout(function () {
+            banner.classList.remove('visible');
+        }, (data.call_banner_seconds || 20) * 1000);
+    }
+
+    function render(payload) {
+        data = payload;
+        renderCurrent(payload.current || []);
+        renderNext(payload.next || [], payload.more || 0, payload.waiting_total || 0);
+        renderTicker(payload.ticker || []);
+    }
+
+    // ------------------------------------------------------- interrogation
+
+    function poll() {
+        fetch('/salle-attente/api/ecran/' + encodeURIComponent(TOKEN))
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (payload) {
+                if (!payload) throw new Error('indisponible');
+                document.getElementById('tv-dot').classList.remove('stale');
+                var call = payload.last_call;
+                render(payload);
+                if (call && call.key !== lastCallKey) {
+                    lastCallKey = call.key;
+                    showCall(call);
+                }
+            })
+            .catch(function () {
+                // Coupure réseau : on garde le dernier affichage connu et on
+                // signale discrètement la perte de liaison.
+                document.getElementById('tv-dot').classList.add('stale');
+            });
+    }
+
+    // ------------------------------------------------- plein écran / veille
+
+    function goFullscreen() {
+        var el = document.documentElement;
+        var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (req) { try { req.call(el); } catch (e) { /* refusé par le navigateur */ } }
+    }
+
+    function requestWakeLock() {
+        if (!navigator.wakeLock) return;
+        navigator.wakeLock.request('screen').then(function (lock) {
+            wakeLock = lock;
+            lock.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () {});
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+            if (!wakeLock) requestWakeLock();
+            poll();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'f' || e.key === 'F') {
+            if (document.fullscreenElement) { document.exitFullscreen(); } else { goFullscreen(); }
+        }
+    });
+
+    document.getElementById('tv-gate-btn').addEventListener('click', function () {
+        document.getElementById('tv-gate').style.display = 'none';
+        goFullscreen();
+        requestWakeLock();
+        // Débloque le contexte audio tant qu'on est dans le geste utilisateur.
+        try {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) { audioCtx = new Ctx(); audioCtx.resume(); }
+        } catch (e) {}
+        poll();
+    });
+
+    // ---------------------------------------------------------- démarrage
+
+    render(data);
+    tick();
+    setInterval(tick, 1000);
+    setInterval(poll, 5000);
+})();
+</script>
+</body>
+</html>
