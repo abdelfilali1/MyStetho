@@ -472,10 +472,31 @@ async def view_devis(request: Request, devis_id: int, user: dict = Depends(requi
     if not devis:
         return RedirectResponse(url="/invoices/devis", status_code=302)
     items = await _load_devis_items(db, devis_id)
+    # Lignes brutes (code conserve) pour l'edition en place : le masquage du code
+    # des actes personnalises est un choix d'affichage, il ne doit pas effacer la
+    # donnee quand le praticien reenregistre le devis.
+    cursor = await db.execute("SELECT * FROM devis_items WHERE devis_id = ? ORDER BY id", (devis_id,))
+    items_raw = [
+        {
+            "code": r["code"] or "",
+            "libelle": r["description"] or "",
+            "montant": round(float(r["unit_price"] or 0), 2),
+            "qty": int(r["quantity"] or 1),
+            "teeth": r["tooth_numbers"] or "",
+        }
+        for r in await cursor.fetchall()
+    ]
+    perso_codes = sorted({it["code"] for it in items_raw if it["code"]} - {it["code"] for it in items if it["code"]})
     await log_audit(db, user, "devis_consulte", entity_type="devis", entity_id=devis_id, patient_id=devis["patient_id"], ip=client_ip(request))
     return templates.TemplateResponse(
         "invoices/devis_detail.html",
-        {"request": request, "user": user, "active": "invoices", "devis": devis, "items": items, "status_labels": _DEVIS_STATUS_LABELS},
+        {
+            "request": request, "user": user, "active": "invoices", "devis": devis,
+            "items": items, "status_labels": _DEVIS_STATUS_LABELS,
+            "items_json": json.dumps(items_raw, ensure_ascii=False),
+            "perso_codes_json": json.dumps(perso_codes, ensure_ascii=False),
+            "editable": devis["status"] not in _DEVIS_LOCKED,
+        },
     )
 
 

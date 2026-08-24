@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Devis {{ devis.devis_number }} — Doctivo{% endblock %}
 
+{% block head %}
+<style>
+/* Édition en place des lignes du devis */
+.dl-input { width:100%; box-sizing:border-box; border:1.5px solid var(--gray-200); border-radius:8px;
+            padding:7px 9px; font-size:.875rem; color:var(--gray-800); background:#fff; }
+.dl-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+.dl-num { text-align:right; -moz-appearance:textfield; }
+.dl-num::-webkit-outer-spin-button, .dl-num::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.dl-w-teeth { width:90px; } .dl-w-qty { width:70px; } .dl-w-price { width:110px; }
+.dl-code { font-family:"Courier New",monospace; font-weight:700; color:var(--gray-500); font-size:.8rem; }
+.dl-del { background:none; border:none; cursor:pointer; color:var(--gray-300); font-size:20px; line-height:1; padding:0 4px; }
+.dl-del:hover { color:var(--danger); }
+.dl-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-top:1px solid var(--gray-100); }
+.dl-hint { font-size:.78rem; color:var(--gray-500); margin-left:auto; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -8,8 +25,8 @@
         <p class="subtitle">{{ devis.devis_date }} — {{ devis.patient_name }}{% if devis.valid_until %} — valable jusqu'au {{ devis.valid_until }}{% endif %}</p>
     </div>
     <div class="no-print" style="display:flex;gap:8px;align-items:center;">
-        {% if devis.status != 'converti' %}
-        <a href="/invoices/devis/{{ devis.id }}/edit" class="btn btn-outline">Modifier</a>
+        {% if editable %}
+        <button type="button" class="btn btn-outline" id="btn-edit-lines">Modifier</button>
         {% endif %}
         <button type="button" class="btn btn-outline" onclick="printPdf('/invoices/devis/{{ devis.id }}/pdf', 'Devis')">Imprimer</button>
         <a href="/invoices/devis/{{ devis.id }}/pdf?dl=1" class="btn btn-primary">Télécharger PDF</a>
@@ -58,7 +75,9 @@
 <div class="card">
     <div class="card-header"><h3>Détail du devis</h3></div>
     <div class="card-body" style="padding:0;">
-        <table class="table">
+
+        <!-- Vue lecture -->
+        <table class="table" id="dl-view">
             <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
             <tbody>
                 {% for item in items %}
@@ -79,6 +98,36 @@
                 </tr>
             </tfoot>
         </table>
+
+        {% if editable %}
+        <!-- Vue édition : les mêmes lignes, modifiables sur place -->
+        <form method="POST" action="/invoices/devis/{{ devis.id }}/edit" id="dl-form" class="no-print" style="display:none;">
+            {# Le numéro, le patient et le statut ne changent pas ; les mentions
+               libres sont renvoyées telles quelles pour ne pas être perdues. #}
+            <input type="hidden" name="notes" value="{{ devis.notes or '' }}">
+            <input type="hidden" name="valid_until" value="{{ devis.valid_until or '' }}">
+            <table class="table">
+                <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th><th></th></tr></thead>
+                <tbody id="dl-rows"></tbody>
+                <tfoot>
+                    <tr style="border-top:2px solid var(--gray-300);">
+                        <td colspan="5" style="text-align:right;font-weight:700;">Total</td>
+                        <td style="font-weight:700;font-size:16px;" id="dl-total">0.00 DH</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <div class="dl-bar">
+                <button type="button" class="btn btn-outline btn-sm" id="dl-add">+ Ajouter une ligne</button>
+                <a href="/invoices/devis/{{ devis.id }}/edit" class="btn btn-outline btn-sm">Ajouter depuis la nomenclature NGAP</a>
+                <span class="dl-hint">Les prix saisis ici ne modifient pas le tarif de référence des actes.</span>
+            </div>
+            <div class="dl-bar" style="border-top:1.5px solid var(--gray-100);">
+                <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+                <button type="button" class="btn btn-outline btn-sm" id="dl-cancel">Annuler</button>
+            </div>
+        </form>
+        {% endif %}
     </div>
 </div>
 
@@ -87,5 +136,130 @@
     <div class="card-header"><h3>Notes</h3></div>
     <div class="card-body"><p style="margin:0;">{{ devis.notes }}</p></div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if editable %}
+<script>
+(function () {
+    'use strict';
+
+    // Lignes brutes : le code des actes personnalisés est conservé ici (il n'est
+    // que masqué à l'affichage) pour ne pas être perdu à l'enregistrement.
+    var INITIAL = {{ items_json | safe }};
+    var PERSO = {{ perso_codes_json | safe }};
+    var rows = JSON.parse(JSON.stringify(INITIAL));
+
+    var form = document.getElementById('dl-form');
+    var view = document.getElementById('dl-view');
+    var tbody = document.getElementById('dl-rows');
+    var btnEdit = document.getElementById('btn-edit-lines');
+
+    function esc(v) {
+        var d = document.createElement('div');
+        d.textContent = v == null ? '' : v;
+        return d.innerHTML;
+    }
+    function attr(v) {
+        return esc(v).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function money(n) {
+        return (Math.round(n * 100) / 100).toFixed(2) + ' DH';
+    }
+
+    // Les totaux se recalculent SANS reconstruire le tableau : le redessiner
+    // ferait perdre le focus du champ à chaque frappe.
+    function refreshTotals() {
+        var total = 0;
+        rows.forEach(function (r, i) {
+            var line = (r.montant || 0) * (r.qty || 0);
+            total += line;
+            var cell = document.getElementById('dl-line-' + i);
+            if (cell) cell.textContent = money(line);
+        });
+        document.getElementById('dl-total').textContent = money(total);
+    }
+
+    // Les index des champs doivent rester contigus (le serveur lit item_desc_0,
+    // item_desc_1… jusqu'au premier manquant) : on redessine à chaque ajout ou
+    // suppression de ligne, jamais pendant la saisie.
+    function render() {
+        tbody.innerHTML = rows.map(function (r, i) {
+            var code = r.code || '';
+            var shown = PERSO.indexOf(code) === -1 && code ? esc(code) : '—';
+            return '<tr>' +
+                '<td><span class="dl-code">' + shown + '</span>' +
+                    '<input type="hidden" name="item_code_' + i + '" value="' + attr(code) + '"></td>' +
+                '<td><input class="dl-input" type="text" name="item_desc_' + i + '" value="' + attr(r.libelle) + '" placeholder="Désignation de l&#39;acte"></td>' +
+                '<td><input class="dl-input dl-w-teeth" type="text" name="item_teeth_' + i + '" value="' + attr(r.teeth) + '" placeholder="—"></td>' +
+                '<td><input class="dl-input dl-num dl-w-qty" type="number" min="1" step="1" name="item_qty_' + i + '" value="' + (r.qty || 1) + '"></td>' +
+                '<td><input class="dl-input dl-num dl-w-price" type="number" min="0" step="0.01" name="item_price_' + i + '" value="' + (r.montant || 0) + '"></td>' +
+                '<td><strong id="dl-line-' + i + '"></strong></td>' +
+                '<td><button type="button" class="dl-del" data-i="' + i + '" title="Supprimer la ligne">&times;</button></td>' +
+            '</tr>';
+        }).join('');
+
+        tbody.querySelectorAll('input[name^="item_desc_"]').forEach(function (el, i) {
+            el.oninput = function () { rows[i].libelle = el.value; };
+        });
+        tbody.querySelectorAll('input[name^="item_teeth_"]').forEach(function (el, i) {
+            el.oninput = function () { rows[i].teeth = el.value; };
+        });
+        tbody.querySelectorAll('input[name^="item_qty_"]').forEach(function (el, i) {
+            el.oninput = function () {
+                rows[i].qty = Math.max(1, parseInt(el.value, 10) || 1);
+                refreshTotals();
+            };
+            el.onblur = function () { el.value = rows[i].qty; };
+        });
+        tbody.querySelectorAll('input[name^="item_price_"]').forEach(function (el, i) {
+            el.oninput = function () {
+                rows[i].montant = Math.max(0, parseFloat(el.value) || 0);
+                refreshTotals();
+            };
+            el.onblur = function () { el.value = rows[i].montant.toFixed(2); };
+        });
+        tbody.querySelectorAll('.dl-del').forEach(function (btn) {
+            btn.onclick = function () {
+                rows.splice(parseInt(btn.dataset.i, 10), 1);
+                render();
+            };
+        });
+        refreshTotals();
+    }
+
+    btnEdit.addEventListener('click', function () {
+        view.style.display = 'none';
+        form.style.display = '';
+        btnEdit.style.display = 'none';
+        render();
+        var first = tbody.querySelector('input[name="item_price_0"]');
+        if (first) { first.focus(); first.select(); }
+    });
+
+    document.getElementById('dl-cancel').addEventListener('click', function () {
+        rows = JSON.parse(JSON.stringify(INITIAL));
+        form.style.display = 'none';
+        view.style.display = '';
+        btnEdit.style.display = '';
+    });
+
+    document.getElementById('dl-add').addEventListener('click', function () {
+        rows.push({ code: '', libelle: '', montant: 0, qty: 1, teeth: '' });
+        render();
+        var last = tbody.querySelector('tr:last-child input[type="text"]');
+        if (last) last.focus();
+    });
+
+    form.addEventListener('submit', function (e) {
+        var kept = rows.filter(function (r) { return (r.libelle || '').trim(); });
+        if (!kept.length) {
+            e.preventDefault();
+            if (window.showToast) showToast('Un devis doit comporter au moins un acte', 'error');
+        }
+    });
+})();
+</script>
 {% endif %}
 {% endblock %}
