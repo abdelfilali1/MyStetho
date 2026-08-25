@@ -2,7 +2,7 @@
 {% block title %}Salle d'attente - Doctivo{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/salle-attente.css?v=20260824-5">
+<link rel="stylesheet" href="/static/css/salle-attente.css?v=20260825-10">
 {% endblock %}
 
 {% block content %}
@@ -13,6 +13,7 @@
     </div>
     <div class="page-header-right" style="display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" class="btn btn-outline" onclick="wrOpenWalkin()">+ Patient sans RDV</button>
+        <button type="button" class="btn btn-outline" onclick="wrOpenNewPatient()">+ Créer un patient</button>
         <button type="button" class="btn btn-outline" onclick="wrOpenSettings()">Réglages</button>
         <a class="btn btn-primary" id="wr-screen-btn" href="{{ screen_url }}" target="_blank" rel="noopener">Ouvrir l'écran salle d'attente</a>
     </div>
@@ -97,13 +98,13 @@
 
 {% block scripts %}
 <!-- Patient sans RDV -->
-<div class="modal-overlay" id="wr-walkin-modal" style="display:none;">
+<div class="modal-overlay wr-modal" id="wr-walkin-modal" style="display:none;">
     <div class="modal-box" style="max-width:520px;">
         <div class="modal-header">
             <h3>Patient sans rendez-vous</h3>
             <button type="button" class="modal-close" onclick="wrCloseModal('wr-walkin-modal')">&times;</button>
         </div>
-        <div>
+        <div class="wr-modal-body">
             <div class="form-group">
                 <label>Patient du cabinet</label>
                 <input type="text" id="wr-walkin-search" placeholder="Rechercher un patient…" autocomplete="off">
@@ -113,6 +114,8 @@
             <div class="form-group">
                 <label>Ou nom du patient (hors dossier)</label>
                 <input type="text" id="wr-walkin-name" placeholder="Ex. Fatima El Amrani">
+                <small style="color:#6b7f9b;">Pas encore de dossier ?
+                    <a href="#" onclick="wrCloseModal('wr-walkin-modal');wrOpenNewPatient();return false;">Créer sa fiche</a>.</small>
             </div>
             <div class="form-group">
                 <label>Motif</label>
@@ -131,14 +134,70 @@
     </div>
 </div>
 
+<!-- Création d'une fiche patient au comptoir -->
+<div class="modal-overlay wr-modal" id="wr-newpatient-modal" style="display:none;">
+    <div class="modal-box" style="max-width:540px;">
+        <div class="modal-header">
+            <h3 id="wr-np-title">Nouveau patient</h3>
+            <button type="button" class="modal-close" onclick="wrCloseModal('wr-newpatient-modal')">&times;</button>
+        </div>
+        <div class="wr-modal-body">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Nom <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="wr-np-last" placeholder="EL AMRANI">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Prénom <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="wr-np-first" placeholder="Fatima">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Date de naissance <span style="color:var(--danger)">*</span></label>
+                    <input type="date" id="wr-np-dob" max="{{ board.day }}">
+                </div>
+                <div class="form-group" style="flex:0 0 120px;">
+                    <label>Sexe</label>
+                    <select id="wr-np-gender">
+                        <option value="">—</option>
+                        <option value="F">F</option>
+                        <option value="M">M</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Téléphone</label>
+                    <input type="tel" id="wr-np-phone" placeholder="06 12 34 56 78">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Motif</label>
+                    <input type="text" id="wr-np-reason" placeholder="Ex. Douleur dentaire">
+                </div>
+            </div>
+            <div class="form-group" id="wr-np-priority-box">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-np-priority" style="width:auto;"> Urgence (placer en tête de file)
+                </label>
+            </div>
+            <div class="form-actions" style="align-items:center;">
+                <a href="/patients/new?next=/salle-attente/" style="margin-right:auto;font-size:13px;">Fiche complète →</a>
+                <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-newpatient-modal')">Annuler</button>
+                <button type="button" class="btn btn-primary" id="wr-np-submit" onclick="wrSubmitNewPatient()">Créer et ajouter à la file</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Appel : choix de la salle -->
-<div class="modal-overlay" id="wr-call-modal" style="display:none;">
+<div class="modal-overlay wr-modal" id="wr-call-modal" style="display:none;">
     <div class="modal-box" style="max-width:430px;">
         <div class="modal-header">
             <h3>Appeler le patient</h3>
             <button type="button" class="modal-close" onclick="wrCloseModal('wr-call-modal')">&times;</button>
         </div>
-        <div>
+        <div class="wr-modal-body">
             <p class="subtitle" id="wr-call-name" style="margin-top:0;"></p>
             <div class="form-group">
                 <label>Salle</label>
@@ -156,13 +215,13 @@
 </div>
 
 <!-- Réglages de l'écran -->
-<div class="modal-overlay" id="wr-settings-modal" style="display:none;">
+<div class="modal-overlay wr-modal" id="wr-settings-modal" style="display:none;">
     <div class="modal-box" style="max-width:620px;">
         <div class="modal-header">
             <h3>Réglages de la salle d'attente</h3>
             <button type="button" class="modal-close" onclick="wrCloseModal('wr-settings-modal')">&times;</button>
         </div>
-        <div>
+        <div class="wr-modal-body">
             <div class="form-group">
                 <label>Nom affiché sur l'écran</label>
                 <select id="wr-set-name-mode">
@@ -198,6 +257,36 @@
                 <textarea id="wr-set-ticker" rows="3">{{ settings.ticker | join('\n') }}</textarea>
             </div>
             <div class="form-group">
+                <label>Logo du cabinet</label>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    {# Pas de src quand il n'y a pas de logo : inutile d'aller chercher un 404. #}
+                    <img id="wr-logo-preview" alt="Logo du cabinet"
+                         style="max-height:64px;max-width:180px;background:#f4f7fb;border-radius:8px;padding:6px;{% if not settings.logo_path %}display:none;{% endif %}"
+                         {% if settings.logo_path %}src="{{ screen_url }}/logo?v={{ settings.logo_version }}"{% endif %}>
+                    <input type="file" id="wr-logo-file" accept="image/png,image/jpeg,image/webp" style="flex:1;min-width:180px;">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="wrUploadLogo()">Envoyer</button>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="wrDeleteLogo()">Retirer</button>
+                </div>
+                <small style="color:#6b7f9b;">PNG, JPEG ou WEBP, 2 Mo maximum. Il s'affiche à côté du logo Doctivo, à la même hauteur.</small>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+                    <input type="checkbox" id="wr-set-music" style="width:auto;" {% if settings.music_enabled %}checked{% endif %}> Musique d'ambiance sur l'écran
+                </label>
+                <div class="form-row" style="margin-top:8px;">
+                    <div class="form-group" style="flex:1;">
+                        <label>Lien YouTube (vidéo ou playlist)</label>
+                        <input type="url" id="wr-set-music-url" value="{{ settings.music_url or '' }}" placeholder="https://www.youtube.com/watch?v=…">
+                    </div>
+                    <div class="form-group" style="flex:0 0 170px;">
+                        <label>Volume (<span id="wr-music-vol-label">{{ settings.music_volume }}</span> %)</label>
+                        <input type="range" id="wr-set-music-volume" min="0" max="100" step="5" value="{{ settings.music_volume }}"
+                               oninput="document.getElementById('wr-music-vol-label').textContent = this.value;">
+                    </div>
+                </div>
+                <small style="color:#6b7f9b;" id="wr-music-hint">La lecture démarre au clic sur « Lancer l'affichage » de l'écran, boucle en continu, et le volume baisse pendant l'appel d'un patient.</small>
+            </div>
+            <div class="form-group">
                 <label>Lien de l'écran (à ouvrir sur la TV)</label>
                 <div class="wr-screen-link">
                     <code id="wr-screen-url">{{ screen_url }}</code>
@@ -221,6 +310,10 @@
     var board = {{ board | tojson }};
     var lastSignature = null;
     var callTargetId = null;
+    // Le module Consultations refuse le rôle secrétaire (deny_secretaire) : lui
+    // proposer le bouton ne mènerait qu'à une page 403.
+    var CAN_CONSULT = {{ (user.role != 'secretaire') | tojson }};
+    var npEntryId = null;
 
     function esc(value) {
         var d = document.createElement('div');
@@ -326,7 +419,11 @@
                     '</div>' +
                     '<div class="wr-actions" style="margin-top:8px;flex-wrap:wrap;">' +
                         (busy ? '' : '<button type="button" class="btn btn-sm btn-outline" data-action="call" data-id="' + it.id + '" data-name="' + attr(it.name) + '" data-room="' + attr(it.room) + '">Rappeler</button>') +
-                        (it.patient_id ? '<button type="button" class="btn btn-sm btn-primary" data-action="start" data-patient="' + it.patient_id + '" data-apt="' + (it.appointment_id || '') + '">Consultation</button>' : '') +
+                        (!CAN_CONSULT ? ''
+                          : it.patient_id
+                            ? '<button type="button" class="btn btn-sm btn-primary" data-action="start" data-patient="' + it.patient_id + '" data-apt="' + (it.appointment_id || '') + '">Consultation</button>'
+                            // Patient arrivé sans dossier : créer sa fiche, puis enchaîner.
+                            : '<button type="button" class="btn btn-sm btn-primary" data-action="create-consult" data-id="' + it.id + '" data-first="' + attr(it.walkin_first) + '" data-last="' + attr(it.walkin_last) + '" data-reason="' + attr(it.reason) + '">Consulter</button>') +
                         '<button type="button" class="btn btn-sm btn-outline" data-action="status" data-id="' + it.id + '" data-status="termine">Terminer</button>' +
                         '<button type="button" class="btn btn-sm btn-outline" data-action="status" data-id="' + it.id + '" data-status="absent">Absent</button>' +
                     '</div>' +
@@ -408,9 +505,10 @@
             openModal('wr-call-modal');
             setTimeout(function () { document.getElementById('wr-call-room').focus(); }, 50);
         } else if (action === 'start') {
-            document.getElementById('wr-start-patient').value = btn.getAttribute('data-patient');
-            document.getElementById('wr-start-appointment').value = btn.getAttribute('data-apt') || '';
-            document.getElementById('wr-start-form').submit();
+            startConsultation(btn.getAttribute('data-patient'), btn.getAttribute('data-apt'));
+        } else if (action === 'create-consult') {
+            wrOpenNewPatientFor(id, btn.getAttribute('data-first'), btn.getAttribute('data-last'),
+                                btn.getAttribute('data-reason'));
         }
     });
 
@@ -452,6 +550,83 @@
         act('/salle-attente/checkin', payload, 'Patient ajouté à la file');
     };
 
+    // ------------------------------------------------- création d'une fiche
+
+    function startConsultation(patientId, appointmentId) {
+        document.getElementById('wr-start-patient').value = patientId;
+        document.getElementById('wr-start-appointment').value = appointmentId || '';
+        document.getElementById('wr-start-form').submit();
+    }
+
+    function npReset() {
+        ['wr-np-last', 'wr-np-first', 'wr-np-dob', 'wr-np-phone', 'wr-np-reason'].forEach(function (id) {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('wr-np-gender').value = '';
+        document.getElementById('wr-np-priority').checked = false;
+    }
+
+    function npMode(consult) {
+        document.getElementById('wr-np-title').textContent =
+            consult ? 'Nouveau patient — consultation' : 'Nouveau patient';
+        document.getElementById('wr-np-submit').textContent =
+            consult ? 'Créer la fiche et démarrer la consultation' : 'Créer et ajouter à la file';
+        // L'urgence ne concerne que l'ordre de la file : sans objet si on consulte.
+        document.getElementById('wr-np-priority-box').style.display = consult ? 'none' : '';
+    }
+
+    window.wrOpenNewPatient = function () {
+        npEntryId = null;
+        npReset();
+        npMode(false);
+        openModal('wr-newpatient-modal');
+        setTimeout(function () { document.getElementById('wr-np-last').focus(); }, 50);
+    };
+
+    // Depuis la colonne « appelés » : le nom libre est déjà découpé par le serveur.
+    window.wrOpenNewPatientFor = function (entryId, first, last, reason) {
+        npEntryId = entryId;
+        npReset();
+        document.getElementById('wr-np-first').value = first || '';
+        document.getElementById('wr-np-last').value = last || '';
+        document.getElementById('wr-np-reason').value = reason || '';
+        npMode(true);
+        openModal('wr-newpatient-modal');
+        setTimeout(function () { document.getElementById('wr-np-dob').focus(); }, 50);
+    };
+
+    window.wrSubmitNewPatient = function () {
+        var btn = document.getElementById('wr-np-submit');
+        var payload = {
+            entry_id: npEntryId,
+            last_name: document.getElementById('wr-np-last').value,
+            first_name: document.getElementById('wr-np-first').value,
+            date_of_birth: document.getElementById('wr-np-dob').value,
+            gender: document.getElementById('wr-np-gender').value,
+            phone: document.getElementById('wr-np-phone').value,
+            reason: document.getElementById('wr-np-reason').value,
+            priority: document.getElementById('wr-np-priority').checked ? 1 : 0
+        };
+        if (!payload.last_name.trim() || !payload.first_name.trim() || !payload.date_of_birth) {
+            if (window.showToast) window.showToast('Nom, prénom et date de naissance obligatoires', 'error');
+            return;
+        }
+        btn.disabled = true;
+        post('/salle-attente/patients', payload).then(function (data) {
+            window.wrCloseModal('wr-newpatient-modal');
+            if (npEntryId) {
+                // Le rattachement est fait : la consultation retrouvera l'entrée
+                // de la file et la passera en « en cours ».
+                startConsultation(data.patient_id, '');
+            } else {
+                if (window.showToast) window.showToast('Fiche créée, patient en attente');
+                refresh();
+            }
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        }).then(function () { btn.disabled = false; });
+    };
+
     // Recherche patient : réutilise l'endpoint de la recherche globale.
     var searchInput = document.getElementById('wr-walkin-search');
     var searchResults = document.getElementById('wr-walkin-results');
@@ -485,7 +660,34 @@
 
     // --------------------------------------------------------- réglages
 
-    window.wrOpenSettings = function () { openModal('wr-settings-modal'); };
+    // Saisir un lien sans cocher la case ne produisait rien, sans le moindre
+    // signal : le lien vaut desormais activation, et l'etat est rappele en clair.
+    var musicUrlInput = document.getElementById('wr-set-music-url');
+    var musicCheck = document.getElementById('wr-set-music');
+    var musicHint = document.getElementById('wr-music-hint');
+    var MUSIC_HINT_ON = musicHint.textContent;
+
+    function refreshMusicHint() {
+        var hasUrl = !!musicUrlInput.value.trim();
+        if (hasUrl && !musicCheck.checked) {
+            musicHint.textContent = 'Un lien est enregistré mais la musique est désactivée : cochez la case pour qu\'elle soit diffusée.';
+            musicHint.style.color = '#b45309';
+        } else if (!hasUrl && musicCheck.checked) {
+            musicHint.textContent = 'Indiquez un lien YouTube, sinon rien ne sera diffusé.';
+            musicHint.style.color = '#b45309';
+        } else {
+            musicHint.textContent = MUSIC_HINT_ON;
+            musicHint.style.color = '#6b7f9b';
+        }
+    }
+
+    musicUrlInput.addEventListener('input', function () {
+        if (this.value.trim()) musicCheck.checked = true;
+        refreshMusicHint();
+    });
+    musicCheck.addEventListener('change', refreshMusicHint);
+
+    window.wrOpenSettings = function () { refreshMusicHint(); openModal('wr-settings-modal'); };
 
     window.wrSaveSettings = function () {
         post('/salle-attente/reglages', {
@@ -495,10 +697,55 @@
             show_times: document.getElementById('wr-set-times').checked ? 1 : 0,
             sound_enabled: document.getElementById('wr-set-sound').checked ? 1 : 0,
             auto_checkin_on_confirm: document.getElementById('wr-set-auto').checked ? 1 : 0,
-            ticker: document.getElementById('wr-set-ticker').value
+            ticker: document.getElementById('wr-set-ticker').value,
+            // Indispensable : le serveur réécrit TOUS les réglages à chaque
+            // enregistrement, une clé omise serait remise à zéro.
+            music_enabled: document.getElementById('wr-set-music').checked ? 1 : 0,
+            music_url: document.getElementById('wr-set-music-url').value,
+            music_volume: document.getElementById('wr-set-music-volume').value
         }).then(function () {
             if (window.showToast) window.showToast('Réglages enregistrés');
             window.wrCloseModal('wr-settings-modal');
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        });
+    };
+
+    // Envoi multipart : il ne peut pas porter de jeton CSRF de formulaire, il
+    // est valide par la concordance d'Origin (cf. middleware de main.py). Ne pas
+    // fixer Content-Type a la main : le navigateur pose la frontiere multipart.
+    window.wrUploadLogo = function () {
+        var input = document.getElementById('wr-logo-file');
+        if (!input.files || !input.files[0]) {
+            if (window.showToast) window.showToast('Choisissez une image', 'error');
+            return;
+        }
+        var fd = new FormData();
+        fd.append('logo', input.files[0]);
+        fetch('/salle-attente/reglages/logo', { method: 'POST', body: fd })
+            .then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (d) {
+                    if (!r.ok || d.error) throw new Error(d.error || 'Erreur');
+                    return d;
+                });
+            })
+            .then(function (data) {
+                var img = document.getElementById('wr-logo-preview');
+                img.src = data.url;              // deja versionnee : pas de cache perime
+                img.style.display = '';
+                input.value = '';
+                if (window.showToast) window.showToast('Logo enregistre');
+            })
+            .catch(function (err) {
+                if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+            });
+    };
+
+    window.wrDeleteLogo = function () {
+        if (!confirm('Retirer le logo du cabinet de l\'ecran ?')) return;
+        post('/salle-attente/reglages/logo/delete', {}).then(function () {
+            document.getElementById('wr-logo-preview').style.display = 'none';
+            if (window.showToast) window.showToast('Logo retire');
         }).catch(function (err) {
             if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
         });
@@ -509,6 +756,9 @@
         post('/salle-attente/reglages/token', {}).then(function (data) {
             document.getElementById('wr-screen-url').textContent = data.screen_url;
             document.getElementById('wr-screen-btn').setAttribute('href', data.screen_url);
+            // L'URL de l'apercu contient le jeton : elle devient invalide.
+            var logo = document.getElementById('wr-logo-preview');
+            if (logo.style.display !== 'none') logo.src = data.screen_url + '/logo?v=' + Date.now();
             if (window.showToast) window.showToast('Nouveau lien généré');
         }).catch(function (err) {
             if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
@@ -542,6 +792,15 @@
     render(board);
     lastSignature = board.signature;
     setInterval(refresh, 10000);
+
+    // Retour de la fiche complète (/patients/new?next=/salle-attente/) : le
+    // patient créé est mis en attente, puis l'URL est nettoyée pour qu'un
+    // rechargement ne rejoue pas le pointage.
+    var _np = new URLSearchParams(window.location.search).get('patient_id');
+    if (_np) {
+        history.replaceState(null, '', window.location.pathname);
+        act('/salle-attente/checkin', { patient_id: _np }, 'Patient ajouté à la file');
+    }
 })();
 </script>
 {% endblock %}

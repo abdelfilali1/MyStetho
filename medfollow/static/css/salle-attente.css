@@ -216,22 +216,58 @@
     min-width: 0;
 }
 
+/* Logo Doctivo et logo du cabinet cote a cote. Ils partagent la MEME regle de
+   hauteur : c'est ce qui garantit qu'ils s'affichent a taille identique quelle
+   que soit la definition de l'image fournie par le cabinet. */
+.tv-logos {
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 2.2vw, 40px);
+    min-width: 0;
+}
+
 /* logo4-trim.png est detoure : sa hauteur est celle du dessin, pas d'un
    cadre vide. La valeur est donc bien plus basse qu'avant pour un logo
    visuellement bien plus grand. */
-.tv-brand img {
+.tv-logo {
     height: clamp(80px, 15vh, 200px);
     width: auto;
-    max-width: 46vw;
+    max-width: 23vw;   /* deux logos doivent tenir sur la meme ligne */
     object-fit: contain;
     flex-shrink: 1;
     min-width: 0;
     display: block;   /* supprime l'espace de ligne de base sous l'image */
+}
+
+/* Le logo Doctivo est affiche 30 % plus petit que la taille commune, a la
+   demande du cabinet : c'est sa propre marque qui doit dominer l'ecran.
+   ATTENTION : logo4-trim.png est tres large (1024x261, ratio 3.9). A la hauteur
+   commune sa largeur naturelle depasse max-width, c'est donc max-width qui fixe
+   sa taille reelle et la hauteur qui suit. Reduire la seule hauteur n'a aucun
+   effet visible : les DEUX bornes doivent etre ramenees a 70 %.
+   Le halo cyan est par ailleurs calibre pour la marque Doctivo, on ne
+   l'applique pas a un logo de cabinet quelconque. */
+.tv-logo:first-child {
+    height: clamp(56px, 10.5vh, 140px);   /* 70 % de clamp(80px, 15vh, 200px) */
+    max-width: 16.1vw;                    /* 70 % de 23vw — la borne qui agit */
     filter: drop-shadow(0 10px 34px rgba(34, 190, 255, .4));
 }
 
+.tv-logo + .tv-logo {
+    border-left: 1px solid rgba(255, 255, 255, .14);
+    padding-left: clamp(14px, 2.2vw, 40px);
+}
+
+/* Le slogan ne doit jamais depasser le logo Doctivo en largeur. Deux verrous :
+   - la taille de police suit la meme progression que le logo (facteur en vw),
+     dimensionnee pour que la ligne tienne dans la largeur du logo ;
+   - max-width reprend EXACTEMENT la formule de largeur rendue du logo
+     (min(hauteur max x ratio, max-width)), soit min(140px x 3.92, 16.1vw) :
+     si une police de secours s'averait plus large que prevu, le texte passe a
+     la ligne au lieu de deborder. */
 .tv-tagline {
-    font-size: clamp(16px, 2vw, 36px);
+    font-size: clamp(10px, 1.05vw, 34px);
+    max-width: min(549px, 16.1vw);
     font-weight: 600;
     line-height: 1.25;
     color: rgba(234, 243, 255, .65);
@@ -499,4 +535,41 @@
 
 @media (max-width: 900px) {
     .tv-main { grid-template-columns: 1fr; }
+}
+
+/* ---------- Modales du module : corps defilant ---------------------------- */
+/* .modal-box n'a pas de hauteur maximale : une modale plus haute que l'ecran
+   debordait sans qu'on puisse la faire defiler (l'overlay est en position
+   fixed, il ne scrolle pas). C'est arrive aux Reglages avec l'ajout du logo
+   du cabinet et de la musique. On plafonne donc la boite et on fait defiler
+   son corps, l'en-tete et la barre de boutons restant toujours visibles.
+   Portee limitee aux modales de cette page pour ne rien changer ailleurs. */
+.wr-modal .modal-box {
+    max-height: min(88vh, 900px);
+    display: flex;
+    flex-direction: column;
+}
+
+.wr-modal .modal-header { flex: 0 0 auto; }
+
+.wr-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;      /* sans ca un enfant flex refuse de defiler */
+    overflow-y: auto;
+    overscroll-behavior: contain;   /* ne pas entrainer la page derriere */
+    /* La boite porte un padding de 20px : on l'annule ici pour que l'ascenseur
+       et la barre de boutons collante aillent d'un bord a l'autre. */
+    margin: 0 -20px;
+    padding: 0 20px;
+}
+
+/* Le bouton « Enregistrer » doit rester atteignable sans avoir a derouler
+   toute la modale. */
+.wr-modal-body .form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: #fff;
+    margin: 18px -20px 0;
+    padding: 12px 20px;
 }

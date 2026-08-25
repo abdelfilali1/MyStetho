@@ -1026,4 +1026,44 @@ async def init_db():
     """)
     await db.commit()
 
+    # --- Remise commerciale sur les devis et les factures --------------------
+    # Placement volontaire en toute fin d'init_db : la reconstruction de la table
+    # `devis` (plus haut) la recree depuis une liste de colonnes explicite et
+    # effacerait silencieusement toute colonne ajoutee avant elle.
+    # total_amount reste le NET (ce que le patient doit) : les paiements, les
+    # indicateurs de chiffre d'affaires et le « reste du » continuent de s'y
+    # appuyer sans changement. Le sous-total se deduit (total + remise), il n'a
+    # donc pas de colonne : rien a reprendre sur les lignes existantes.
+    for _disc_tbl in ("devis", "invoices"):
+        for _disc_col in (
+            "discount_type TEXT DEFAULT 'montant'",       # 'montant' | 'pourcent'
+            "discount_value REAL NOT NULL DEFAULT 0",     # la valeur saisie (DH ou %)
+            "discount_amount REAL NOT NULL DEFAULT 0",    # la remise convertie en DH
+        ):
+            try:
+                await db.execute(f"ALTER TABLE {_disc_tbl} ADD COLUMN {_disc_col}")
+                await db.commit()
+            except Exception:
+                pass
+
+    # --- Ecran de la salle d'attente : logo du cabinet et musique d'ambiance --
+    # logo_path n'est jamais expose a l'ecran public (chemin serveur) ; seule
+    # l'URL tokenisee l'est. logo_version sert de casse-cache.
+    # music_url est conserve pour reafficher le champ des reglages, mais l'ecran
+    # ne recoit que l'identifiant extrait et valide cote serveur.
+    for _wr_col in (
+        "logo_path TEXT",
+        "logo_version INTEGER DEFAULT 0",
+        "music_enabled INTEGER DEFAULT 0",
+        "music_url TEXT",
+        "music_kind TEXT",                                # 'video' | 'playlist'
+        "music_id TEXT",
+        "music_volume INTEGER DEFAULT 25",
+    ):
+        try:
+            await db.execute(f"ALTER TABLE waiting_room_settings ADD COLUMN {_wr_col}")
+            await db.commit()
+        except Exception:
+            pass
+
     await db.close()

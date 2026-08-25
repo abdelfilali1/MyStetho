@@ -18,8 +18,10 @@ déjà anonymisés côté serveur (voir `format_display_name`).
 """
 from datetime import date, datetime
 import json
+import re
 import secrets
 from typing import Optional
+from urllib.parse import parse_qs, urlparse
 
 import aiosqlite
 
@@ -126,6 +128,56 @@ def format_display_name(row, mode: str) -> str:
     return first or ticket or "Patient"
 
 
+# --------------------------------------------------------- musique d'ambiance
+
+# Seul YouTube est accepté, et seul l'identifiant extrait ici part vers l'écran :
+# celui-ci est une page publique dont la charge utile est injectée telle quelle,
+# on ne lui laisse donc jamais définir une source arbitraire.
+_YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+             "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+_YT_VIDEO = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_YT_LIST = re.compile(r"^(PL|UU|OL|RD|FL|LL)[A-Za-z0-9_-]{10,48}$")
+
+
+def parse_youtube(raw) -> tuple:
+    """('video'|'playlist', identifiant) pour un lien YouTube, (None, None) sinon.
+
+    Une playlist l'emporte sur la vidéo : elle boucle nativement, alors qu'une
+    vidéo seule doit être redéclarée comme sa propre playlist côté lecteur.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None, None
+    if _YT_VIDEO.match(raw):          # identifiant collé seul
+        return "video", raw
+
+    try:
+        parts = urlparse(raw if "//" in raw else "https://" + raw)
+    except Exception:
+        return None, None
+    if parts.scheme not in ("http", "https"):
+        return None, None
+    host = (parts.hostname or "").lower()
+    if host not in _YT_HOSTS:
+        return None, None
+
+    segments = [seg for seg in (parts.path or "").split("/") if seg]
+    query = parse_qs(parts.query or "")
+    vid = (query.get("v") or [""])[0]
+    lst = (query.get("list") or [""])[0]
+
+    if host.endswith("youtu.be"):
+        vid = vid or (segments[0] if segments else "")
+    elif segments and segments[0] in ("embed", "shorts", "v", "live"):
+        vid = vid or (segments[1] if len(segments) > 1 else "")
+
+    if lst and _YT_LIST.match(lst):
+        return "playlist", lst
+    if vid and _YT_VIDEO.match(vid):
+        return "video", vid
+    return None, None
+
+
 # ----------------------------------------------------------------- réglages
 
 async def get_settings(db: aiosqlite.Connection, doctor_id: int) -> dict:
@@ -165,6 +217,15 @@ async def get_settings(db: aiosqlite.Connection, doctor_id: int) -> dict:
         s["call_banner_seconds"] = max(5, min(120, int(s.get("call_banner_seconds") or 20)))
     except (TypeError, ValueError):
         s["call_banner_seconds"] = 20
+    try:
+        s["logo_version"] = int(s.get("logo_version") or 0)
+    except (TypeError, ValueError):
+        s["logo_version"] = 0
+    s["music_enabled"] = 1 if s.get("music_enabled") else 0
+    try:
+        s["music_volume"] = max(0, min(100, int(s.get("music_volume") or 25)))
+    except (TypeError, ValueError):
+        s["music_volume"] = 25
     return s
 
 
@@ -178,10 +239,24 @@ async def save_settings(db: aiosqlite.Connection, doctor_id: int, data: dict) ->
         banner = max(5, min(120, int(data.get("call_banner_seconds") or 20)))
     except (TypeError, ValueError):
         banner = 20
+    # Musique : l'URL brute n'est conservée que pour réafficher le champ des
+    # réglages ; c'est l'identifiant extrait qui sera envoyé à l'écran.
+    music_kind, music_id = parse_youtube(data.get("music_url"))
+    try:
+        music_volume = max(0, min(100, int(data.get("music_volume") or 25)))
+    except (TypeError, ValueError):
+        music_volume = 25
+    music_enabled = 1 if (data.get("music_enabled") and music_id) else 0
+
+    # Les colonnes du logo ne figurent volontairement pas dans cet UPDATE :
+    # elles sont alimentées par l'envoi de fichier, un enregistrement des
+    # réglages ne doit jamais les effacer.
     await db.execute(
         """UPDATE waiting_room_settings
            SET name_mode = ?, show_times = ?, sound_enabled = ?, auto_checkin_on_confirm = ?,
-               call_banner_seconds = ?, clinic_name = ?, ticker_messages = ?, updated_at = ?
+               call_banner_seconds = ?, clinic_name = ?, ticker_messages = ?,
+               music_enabled = ?, music_url = ?, music_kind = ?, music_id = ?, music_volume = ?,
+               updated_at = ?
            WHERE doctor_id = ?""",
         (
             name_mode,
@@ -191,6 +266,11 @@ async def save_settings(db: aiosqlite.Connection, doctor_id: int, data: dict) ->
             banner,
             (data.get("clinic_name") or "").strip()[:120] or None,
             json.dumps(ticker, ensure_ascii=False),
+            music_enabled,
+            (data.get("music_url") or "").strip()[:400] if music_id else None,
+            music_kind,
+            music_id,
+            music_volume,
             now_ts(),
             doctor_id,
         ),
@@ -529,11 +609,17 @@ _ENTRY_SQL = """
 
 
 def _entry_dict(row) -> dict:
+    # walkin_* : le nom libre déjà découpé pour préremplir la création de fiche
+    # d'un patient sans dossier. `name` ne convient pas (nom en majuscules), et
+    # redécouper côté JS ferait diverger les deux conventions.
+    _first, _last = _name_parts(row) if not row["patient_id"] else ("", "")
     return {
         "id": row["id"],
         "patient_id": row["patient_id"],
         "appointment_id": row["appointment_id"],
         "name": full_name(row),
+        "walkin_first": _first,
+        "walkin_last": _last,
         "ticket": ticket_label(row["ticket_no"]),
         "status": row["status"],
         "priority": int(row["priority"] or 0),
@@ -675,9 +761,24 @@ async def public_board(db: aiosqlite.Connection, settings: dict, limit: int = 6)
                 "room": row["room"] or "",
             }
 
+    # logo_path (chemin serveur) et music_url (saisie libre) ne sortent JAMAIS :
+    # l'écran ne reçoit que l'URL tokenisée et l'identifiant déjà validé.
+    logo_url = ""
+    if settings.get("logo_path"):
+        logo_url = "/salle-attente/ecran/%s/logo?v=%d" % (
+            settings["display_token"], settings.get("logo_version") or 0)
+
     return {
         "clinic_name": settings.get("clinic_name") or "",
         "sound_enabled": bool(settings.get("sound_enabled")),
+        "logo_url": logo_url,
+        "logo_version": settings.get("logo_version") or 0,
+        "music": {
+            "enabled": bool(settings.get("music_enabled") and settings.get("music_id")),
+            "kind": settings.get("music_kind") or "video",
+            "id": settings.get("music_id") or "",
+            "volume": settings.get("music_volume") or 25,
+        },
         "call_banner_seconds": settings.get("call_banner_seconds") or 20,
         "ticker": settings.get("ticker") or [],
         "current": current,

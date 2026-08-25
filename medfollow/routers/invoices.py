@@ -373,6 +373,35 @@ def _parse_devis_items(form):
     return total, items
 
 
+def _parse_discount(form, subtotal: float) -> tuple:
+    """Lit la remise postee. Renvoie (type, valeur, montant_remise, net).
+
+    Le pourcentage est converti en dirhams a l'enregistrement : c'est le montant
+    qui fait foi ensuite (facture, PDF, encaissement), la valeur saisie n'etant
+    conservee que pour reafficher le formulaire tel que le praticien l'a rempli.
+    La remise est bornee a [0, sous-total] : un net negatif ne peut jamais etre
+    stocke, ni cote formulaire complet ni cote edition en place.
+    """
+    dtype = "pourcent" if (form.get("discount_type") or "") == "pourcent" else "montant"
+    try:
+        dvalue = float(form.get("discount_value") or 0)
+    except (TypeError, ValueError):
+        dvalue = 0.0
+    dvalue = max(0.0, dvalue)
+
+    subtotal = round(subtotal, 2)
+    if dtype == "pourcent":
+        dvalue = min(100.0, dvalue)
+        damount = round(subtotal * dvalue / 100, 2)
+    else:
+        damount = round(dvalue, 2)
+    damount = min(max(0.0, damount), subtotal)
+    if dtype == "montant":
+        # La valeur reaffichee est celle reellement appliquee (remise ecretee).
+        dvalue = damount
+    return dtype, round(dvalue, 2), damount, round(subtotal - damount, 2)
+
+
 @router.get("/devis/new", response_class=HTMLResponse)
 async def new_devis_form(request: Request, patient_id: Optional[int] = None, user: dict = Depends(require_login), db: aiosqlite.Connection = Depends(get_db)):
     ctx = await _devis_form_ctx(request, user, db, patient_id=patient_id)
@@ -424,7 +453,8 @@ async def create_devis(request: Request, user: dict = Depends(require_login), db
     doctor_id = user["sub"]
     today = date.today()
 
-    total, items = _parse_devis_items(form)
+    subtotal, items = _parse_devis_items(form)
+    dtype, dvalue, damount, total = _parse_discount(form, subtotal)
 
     from aiosqlite import IntegrityError
     devis_id = None
@@ -433,8 +463,10 @@ async def create_devis(request: Request, user: dict = Depends(require_login), db
         number = _devis_number(today.year, base_n + attempt)
         try:
             cursor = await db.execute(
-                "INSERT INTO devis (devis_number, patient_id, doctor_id, total_amount, status, notes, valid_until) VALUES (?, ?, ?, ?, 'propose', ?, ?)",
-                (number, patient_id, doctor_id, total, notes or None, valid_until),
+                "INSERT INTO devis (devis_number, patient_id, doctor_id, total_amount, "
+                "discount_type, discount_value, discount_amount, status, notes, valid_until) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'propose', ?, ?)",
+                (number, patient_id, doctor_id, total, dtype, dvalue, damount, notes or None, valid_until),
             )
             devis_id = cursor.lastrowid
             break
@@ -545,7 +577,8 @@ async def update_devis(request: Request, devis_id: int, user: dict = Depends(req
         return resp
 
     form = await request.form()
-    total, items = _parse_devis_items(form)
+    subtotal, items = _parse_devis_items(form)
+    dtype, dvalue, damount, total = _parse_discount(form, subtotal)
     if not items:
         resp = RedirectResponse(url=f"/invoices/devis/{devis_id}/edit", status_code=302)
         set_flash(resp, "Un devis doit comporter au moins un acte", "error")
@@ -563,14 +596,15 @@ async def update_devis(request: Request, devis_id: int, user: dict = Depends(req
             (devis_id, None, desc, qty, price, item_total, teeth, code),
         )
     await db.execute(
-        "UPDATE devis SET total_amount = ?, notes = ?, valid_until = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?",
-        (total, notes or None, valid_until, devis_id, user["sub"]),
+        "UPDATE devis SET total_amount = ?, discount_type = ?, discount_value = ?, discount_amount = ?, "
+        "notes = ?, valid_until = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND doctor_id = ?",
+        (total, dtype, dvalue, damount, notes or None, valid_until, devis_id, user["sub"]),
     )
     await db.commit()
     await log_audit(
         db, user, "devis_modifie", entity_type="devis", entity_id=devis_id,
         patient_id=devis["patient_id"], ip=client_ip(request),
-        details=f"{len(items)} ligne(s), total={total:.2f}",
+        details=f"{len(items)} ligne(s), total={total:.2f}, remise={damount:.2f}",
     )
     resp = RedirectResponse(url=f"/invoices/devis/{devis_id}", status_code=302)
     set_flash(resp, "Devis modifié")
@@ -616,8 +650,16 @@ async def convert_devis(request: Request, devis_id: int, user: dict = Depends(re
         number = _invoice_number(today.year, base_n + attempt)
         try:
             cursor = await db.execute(
-                "INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, status, notes) VALUES (?, ?, ?, ?, 'emise', ?)",
-                (number, devis["patient_id"], doctor_id, devis["total_amount"], f"Établie depuis le devis {devis['devis_number']}"),
+                "INSERT INTO invoices (invoice_number, patient_id, doctor_id, total_amount, "
+                "discount_type, discount_value, discount_amount, status, notes) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'emise', ?)",
+                # total_amount est deja le NET du devis : la facture reprend donc
+                # ce que le patient a signe, et les lignes recopiees restent au
+                # brut pour que le recapitulatif du PDF ait un sous-total a montrer.
+                (number, devis["patient_id"], doctor_id, devis["total_amount"],
+                 devis.get("discount_type") or "montant", devis.get("discount_value") or 0,
+                 devis.get("discount_amount") or 0,
+                 f"Établie depuis le devis {devis['devis_number']}"),
             )
             invoice_id = cursor.lastrowid
             break

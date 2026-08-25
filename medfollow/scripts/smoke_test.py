@@ -106,6 +106,22 @@ post("/invoices/devis/1/edit", {
     "item_desc_0": "Couronne", "item_teeth_0": "26", "item_qty_0": "1", "item_price_0": "1800",
     "item_desc_1": "Extraction", "item_teeth_1": "38", "item_qty_1": "1", "item_price_1": "400",
 })
+# Remise : le devis 1 ci-dessus n'envoie aucun champ de remise (non-regression du
+# cas « sans remise »). Celui-ci verifie la conversion du pourcentage, l'ecretage
+# a hauteur du sous-total, et le report de la remise sur la facture.
+post("/invoices/devis/new", {
+    "patient_id": "1", "valid_until": "2026-08-01", "notes": "",
+    "item_desc_0": "Couronne", "item_qty_0": "2", "item_price_0": "1000",
+    "discount_type": "pourcent", "discount_value": "10",
+}, label="/invoices/devis/new (remise 10 %)")
+get("/invoices/devis/2", label="/invoices/devis/2 (remise)")
+get("/invoices/devis/2/pdf", label="/invoices/devis/2/pdf (remise)")
+post("/invoices/devis/2/edit", {
+    "valid_until": "2026-09-01", "notes": "",
+    "item_desc_0": "Couronne", "item_qty_0": "2", "item_price_0": "1000",
+    "discount_type": "montant", "discount_value": "99999",
+}, label="/invoices/devis/2/edit (remise ecretee)")
+
 post("/invoices/devis/1/status", {"status": "accepte"})
 post("/invoices/devis/1/convert")
 # Un devis converti n'est plus modifiable : redirection, pas d'erreur serveur.
@@ -153,10 +169,37 @@ post(f"/salle-attente/{_entry}/priority", {}, expect=(200,), label="/salle-atten
 post(f"/salle-attente/{_entry}/move", {"direction": "down"}, expect=(200,), label="/salle-attente/{id}/move")
 post(f"/salle-attente/{_entry}/call", {"room": "Salle 1"}, expect=(200,), label="/salle-attente/{id}/call")
 post(f"/salle-attente/{_entry}/status", {"status": "termine"}, expect=(200,), label="/salle-attente/{id}/status")
+# Creation d'une fiche patient au comptoir, puis rattachement d'une fiche a un
+# patient arrive sous un simple nom (ce qui debloque « Consulter »).
+post("/salle-attente/patients", {"first_name": "Sara", "last_name": "Idrissi",
+                                 "date_of_birth": "1992-05-04", "gender": "F",
+                                 "phone": "0600000000", "reason": "Controle"},
+     expect=(200,), label="/salle-attente/patients (creation + file)")
+post("/salle-attente/patients", {"first_name": "", "last_name": "X",
+                                 "date_of_birth": "1990-01-01"},
+     expect=(400,), label="/salle-attente/patients (champs manquants -> 400)")
+_r = post("/salle-attente/checkin", {"name": "Karim Sans Dossier"}, expect=(200,),
+          label="/salle-attente/checkin (nom libre)")
+_walkin = (_r.json() or {}).get("id", 0)
+post(f"/salle-attente/{_walkin}/call", {"room": "Salle 2"}, expect=(200,),
+     label="/salle-attente/{id}/call (sans dossier)")
+post("/salle-attente/patients", {"entry_id": str(_walkin), "first_name": "Karim",
+                                 "last_name": "Sans Dossier", "date_of_birth": "1980-03-03"},
+     expect=(200,), label="/salle-attente/patients (rattachement)")
+post("/salle-attente/patients", {"entry_id": str(_walkin), "first_name": "Karim",
+                                 "last_name": "Sans Dossier", "date_of_birth": "1980-03-03"},
+     expect=(409,), label="/salle-attente/patients (deja rattache -> 409)")
+
 post("/salle-attente/reglages", {"name_mode": "initial", "clinic_name": "Cabinet test",
                                  "show_times": "1", "sound_enabled": "1",
                                  "auto_checkin_on_confirm": "1", "call_banner_seconds": "20",
-                                 "ticker": "Bienvenue"}, expect=(200,))
+                                 "ticker": "Bienvenue",
+                                 "music_enabled": "1", "music_volume": "30",
+                                 "music_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+     expect=(200,))
+post("/salle-attente/reglages", {"name_mode": "initial", "music_enabled": "1",
+                                 "music_url": "https://vimeo.com/1"},
+     expect=(400,), label="/salle-attente/reglages (lien non YouTube -> 400)")
 _r = post("/salle-attente/reglages/token", {}, expect=(200,))
 _screen = (_r.json() or {}).get("screen_url", "")
 get(_screen, expect=(200,), label="/salle-attente/ecran/{token}")

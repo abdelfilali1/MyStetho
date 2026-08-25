@@ -44,6 +44,13 @@
 .panel-total { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
 .panel-total span { font-size:.875rem; color:var(--gray-500); }
 .panel-total strong { font-size:1.1rem; font-weight:800; color:var(--gray-900); }
+/* Sous-total et remise sont secondaires : seul le net a payer reste en gras. */
+.panel-total.sub { margin-bottom:8px; }
+.panel-total.sub strong { font-size:.95rem; font-weight:600; color:var(--gray-600); }
+.disc-row { display:flex; gap:6px; }
+.panel-footer .disc-row input { flex:1; text-align:right; }
+.panel-footer .disc-row select { width:76px; flex:0 0 76px; }
+.disc-hint { display:block; font-size:.72rem; color:var(--gray-500); margin-top:4px; min-height:1em; }
 .panel-footer .form-group { margin-bottom:10px; }
 .panel-footer label { display:block; font-size:.75rem; color:var(--gray-500); margin-bottom:3px; }
 .panel-footer select, .panel-footer input, .panel-footer textarea { width:100%; box-sizing:border-box; border:1.5px solid var(--gray-200); border-radius:8px; padding:8px 10px; font-size:.85rem; }
@@ -103,7 +110,20 @@
             <div class="empty-panel" id="empty-state">Cliquez sur un acte pour l'ajouter au devis.</div>
         </div>
         <div class="panel-footer">
-            <div class="panel-total"><span>Total</span><strong id="panel-total">0,00 DH</strong></div>
+            <div class="panel-total sub"><span>Sous-total</span><strong id="panel-subtotal">0,00 DH</strong></div>
+            <div class="form-group">
+                <label>Remise</label>
+                <div class="disc-row">
+                    <input type="number" name="discount_value" id="disc-value" min="0" step="0.01"
+                           value="{{ '%.2f' | format(devis.discount_value) if devis and devis.discount_value else '' }}" placeholder="0">
+                    <select name="discount_type" id="disc-type">
+                        <option value="montant" {{ 'selected' if not devis or devis.discount_type != 'pourcent' }}>DH</option>
+                        <option value="pourcent" {{ 'selected' if devis and devis.discount_type == 'pourcent' }}>%</option>
+                    </select>
+                </div>
+                <small class="disc-hint" id="disc-hint"></small>
+            </div>
+            <div class="panel-total"><span>Net à payer</span><strong id="panel-total">0,00 DH</strong></div>
             <div class="form-group">
                 <label>Patient <span style="color:var(--danger)">*</span></label>
                 {% if devis %}
@@ -225,10 +245,29 @@ window.updSel = function(id, field, val) {
     updateTotal();
 };
 window.removeSel = function(id) { selected = selected.filter(x => String(x._id) !== String(id)); renderSelection(); };
+function money(n) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' DH'; }
+// Meme calcul que _parse_discount() cote serveur, ecretage compris : ce qui est
+// affiche ici est exactement ce qui sera enregistre.
 function updateTotal() {
-    const t = selected.reduce((sum,s) => sum + s.montant * s.qty, 0);
-    document.getElementById('panel-total').textContent = t.toFixed(2).replace('.',',') + ' DH';
+    const sub = selected.reduce((sum,s) => sum + s.montant * s.qty, 0);
+    const pct = document.getElementById('disc-type').value === 'pourcent';
+    let v = Math.max(0, parseFloat(document.getElementById('disc-value').value) || 0);
+    if (pct) v = Math.min(100, v);
+    let d = pct ? sub * v / 100 : v;
+    const clamped = d > sub;
+    d = Math.min(Math.max(0, d), sub);
+    document.getElementById('panel-subtotal').textContent = money(sub);
+    document.getElementById('panel-total').textContent = money(sub - d);
+    const hint = document.getElementById('disc-hint');
+    if (clamped) hint.textContent = 'Remise ramenée au sous-total (' + money(sub) + ').';
+    else if (pct && d > 0) hint.textContent = 'Soit ' + money(d) + ' de remise.';
+    else hint.textContent = '';
 }
+['disc-value', 'disc-type'].forEach(function (id) {
+    const el = document.getElementById(id);
+    el.addEventListener('input', updateTotal);
+    el.addEventListener('change', updateTotal);
+});
 
 // Catégories + recherche
 document.getElementById('cat-chips').addEventListener('click', e => {

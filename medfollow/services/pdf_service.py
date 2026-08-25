@@ -983,8 +983,14 @@ def generate_note_honoraires_pdf(
     return _stamp_on_template(out, template_path) if use_tpl else out
 
 
-def _amount_items_table(S, items):
-    """Tableau Désignation / Qté / Prix unit. / Total, avec ligne TOTAL. Renvoie (table, total)."""
+def _amount_items_table(S, items, total_label="TOTAL", total_emphasis=True):
+    """Tableau Désignation / Qté / Prix unit. / Total, avec ligne TOTAL. Renvoie (table, total).
+
+    `total_label` passe à « Sous-total » quand une remise suit : le total de la
+    dernière ligne reste la somme BRUTE des actes, le net étant donné par le
+    récapitulatif ajouté dessous. Dans ce cas `total_emphasis=False` allège cette
+    ligne — elle n'est plus qu'une étape de calcul, et ne doit pas concurrencer
+    visuellement le montant réellement dû."""
     cell = ParagraphStyle("_iCell", parent=S["_BodySm"], textColor=DARK, fontSize=9.5, leading=12)
     head = [Paragraph(f"<b>{h}</b>", ParagraphStyle("_iH", parent=cell, textColor=WHITE))
             for h in ("Désignation", "Qté", "Prix unit.", "Total")]
@@ -1014,9 +1020,12 @@ def _amount_items_table(S, items):
             Paragraph(f"{unit:.2f} DH", ParagraphStyle("_iU", parent=cell, alignment=TA_RIGHT)),
             Paragraph(f"{line_total:.2f} DH", ParagraphStyle("_iT", parent=cell, alignment=TA_RIGHT)),
         ])
+    _tl = f"<b>{total_label}</b>" if total_emphasis else total_label
+    _tv = f"<b>{total:.2f} DH</b>" if total_emphasis else f"{total:.2f} DH"
+    _tcolor = DARK if total_emphasis else GRAY
     data.append([
-        "", "", Paragraph("<b>TOTAL</b>", ParagraphStyle("_iTL", parent=cell, alignment=TA_RIGHT)),
-        Paragraph(f"<b>{total:.2f} DH</b>", ParagraphStyle("_iTV", parent=cell, alignment=TA_RIGHT)),
+        "", "", Paragraph(_tl, ParagraphStyle("_iTL", parent=cell, alignment=TA_RIGHT, textColor=_tcolor)),
+        Paragraph(_tv, ParagraphStyle("_iTV", parent=cell, alignment=TA_RIGHT, textColor=_tcolor)),
     ])
     tbl = Table(data, colWidths=[97 * mm, 18 * mm, 28 * mm, 28 * mm])
     tstyle = [
@@ -1028,7 +1037,7 @@ def _amount_items_table(S, items):
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("GRID", (0, 0), (-1, -2), 0.3, BORDER),
-        ("LINEABOVE", (0, -1), (-1, -1), 1.2, DARK),
+        ("LINEABOVE", (0, -1), (-1, -1), 1.2 if total_emphasis else 0.6, DARK if total_emphasis else BORDER),
         ("SPAN", (0, -1), (1, -1)),
     ]
     for i in range(1, len(data) - 1):
@@ -1036,6 +1045,54 @@ def _amount_items_table(S, items):
             tstyle.append(("BACKGROUND", (0, i), (-1, i), LIGHT))
     tbl.setStyle(TableStyle(tstyle))
     return tbl, total
+
+
+def _discount_of(doc_row) -> float:
+    """Montant de la remise, 0 pour un document antérieur à la migration."""
+    try:
+        return float(doc_row.get("discount_amount") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _discount_rows(S, doc_row, subtotal, emphasize_net=False):
+    """Lignes « Remise » / « Net à payer », ou [] si le document n'a pas de remise.
+
+    Renvoie aussi le net : `total_amount` est déjà le net en base, on ne le
+    recalcule que si la colonne manque (document antérieur à la migration).
+
+    `emphasize_net` met le net en vedette (devis) ; sur une facture on le laisse
+    discret, car c'est le « Reste dû » qui y est le chiffre à retenir."""
+    disc = _discount_of(doc_row)
+    try:
+        net = float(doc_row.get("total_amount"))
+    except (TypeError, ValueError):
+        net = subtotal - disc
+    if disc <= 0:
+        return [], net
+
+    label = "Remise"
+    if (doc_row.get("discount_type") or "") == "pourcent":
+        try:
+            label = "Remise (%g %%)" % float(doc_row.get("discount_value") or 0)
+        except (TypeError, ValueError):
+            pass
+    right = ParagraphStyle("_dcR", parent=S["_BodySm"], alignment=TA_RIGHT, textColor=GRAY)
+    disc_row = [Paragraph(label, ParagraphStyle("_dcL", parent=S["_BodySm"], textColor=GRAY)),
+                Paragraph(f"-{disc:.2f} DH", right)]
+
+    if emphasize_net:
+        # Le montant que le patient doit reellement payer : c'est le chiffre que
+        # l'on doit lire en premier sur la page, avant le sous-total brut.
+        net_l = ParagraphStyle("_dcNetL", parent=S["_BodySm"], fontName="Helvetica-Bold",
+                               fontSize=13, leading=16, textColor=DARK)
+        net_v = ParagraphStyle("_dcNetV", parent=net_l, alignment=TA_RIGHT)
+        net_row = [Paragraph("NET À PAYER", net_l), Paragraph(f"{net:.2f} DH", net_v)]
+    else:
+        net_row = [Paragraph("<b>Net à payer</b>", S["_BodySm"]),
+                   Paragraph(f"<b>{net:.2f} DH</b>",
+                             ParagraphStyle("_dcR2", parent=S["_BodySm"], alignment=TA_RIGHT))]
+    return [disc_row, net_row], net
 
 
 def generate_invoice_pdf(
@@ -1065,16 +1122,27 @@ def generate_invoice_pdf(
     els.append(meta)
     els.append(Spacer(1, 10))
 
-    tbl, total = _amount_items_table(S, items)
+    # La ligne de pied du tableau devient « Sous-total » dès qu'une remise
+    # s'intercale entre elle et le net à payer.
+    _has_disc = bool(_discount_of(invoice))
+    tbl, total = _amount_items_table(
+        S, items,
+        total_label="Sous-total" if _has_disc else "TOTAL",
+        total_emphasis=not _has_disc,
+    )
     els.append(tbl)
+
+    disc_rows, net = _discount_rows(S, invoice, total)
 
     try:
         paid = float(invoice.get("paid_amount") or 0)
     except (TypeError, ValueError):
         paid = 0.0
-    due = max(0.0, total - paid)
+    # Le reste du part du NET : sur une facture remisee, la somme brute des
+    # lignes le surestimerait du montant de la remise.
+    due = max(0.0, net - paid)
     els.append(Spacer(1, 10))
-    recap = Table([
+    recap = Table(disc_rows + [
         [Paragraph("Payé", S["_BodySm"]), Paragraph(f"{paid:.2f} DH", ParagraphStyle("_rP", parent=S["_BodySm"], alignment=TA_RIGHT))],
         [Paragraph("<b>Reste dû</b>", S["_BodySm"]), Paragraph(f"<b>{due:.2f} DH</b>", ParagraphStyle("_rD", parent=S["_BodySm"], alignment=TA_RIGHT))],
     ], colWidths=[143 * mm, 28 * mm])
@@ -1127,8 +1195,30 @@ def generate_devis_pdf(
         els.append(Paragraph(f"Valable jusqu'au {devis.get('valid_until')}", ParagraphStyle("_dVal", parent=S["_BodySm"], textColor=GRAY, spaceBefore=2)))
     els.append(Spacer(1, 10))
 
-    tbl, total = _amount_items_table(S, items)
+    _has_disc = bool(_discount_of(devis))
+    tbl, total = _amount_items_table(
+        S, items,
+        total_label="Sous-total" if _has_disc else "TOTAL",
+        total_emphasis=not _has_disc,
+    )
     els.append(tbl)
+
+    disc_rows, _net = _discount_rows(S, devis, total, emphasize_net=True)
+    if disc_rows:
+        els.append(Spacer(1, 8))
+        recap = Table(disc_rows, colWidths=[133 * mm, 38 * mm])
+        recap.setStyle(TableStyle([
+            ("TOPPADDING", (0, 0), (-1, 0), 2), ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+            ("RIGHTPADDING", (0, 0), (-1, 0), 0),
+            # Le net est encadré et posé sur un aplat : c'est le montant que le
+            # patient cherche des yeux sur un devis.
+            ("BACKGROUND", (0, -1), (-1, -1), PRIMARY_BG),
+            ("BOX", (0, -1), (-1, -1), 1.1, DARK),
+            ("VALIGN", (0, -1), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, -1), (-1, -1), 9), ("BOTTOMPADDING", (0, -1), (-1, -1), 9),
+            ("LEFTPADDING", (0, -1), (-1, -1), 10), ("RIGHTPADDING", (0, -1), (-1, -1), 10),
+        ]))
+        els.append(recap)
 
     if devis.get("notes"):
         els.append(Spacer(1, 10))

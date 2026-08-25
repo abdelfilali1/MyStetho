@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/salle-attente.css?v=20260824-5">
+    <link rel="stylesheet" href="/static/css/salle-attente.css?v=20260825-10">
 </head>
 <body class="tv-body">
 
@@ -16,7 +16,10 @@
 
 <header class="tv-header">
     <div class="tv-brand">
-        <img src="/static/img/logo4-trim.png" alt="Doctivo">
+        <div class="tv-logos" id="tv-logos">
+            <img class="tv-logo" src="/static/img/logo4-trim.png" alt="Doctivo">
+            {% if data.logo_url %}<img class="tv-logo" id="tv-logo-clinic" src="{{ data.logo_url }}" alt="{{ data.clinic_name or 'Cabinet' }}">{% endif %}
+        </div>
         <div class="tv-tagline">La santé, mieux organisée</div>
     </div>
     <div class="tv-clock">
@@ -46,12 +49,21 @@
     <div class="tv-call-text" id="tv-call-text"></div>
 </div>
 
+<!-- Hôte du lecteur de musique. L'API YouTube REMPLACE #tv-music par une
+     iframe : les styles doivent donc vivre sur le conteneur parent, qui lui
+     subsiste. Réduit à 1 px plutôt que display:none, qui ferait suspendre la
+     lecture sur certains navigateurs. -->
+<div id="tv-music-host" aria-hidden="true"
+     style="position:fixed;right:0;bottom:0;width:1px;height:1px;overflow:hidden;opacity:.01;pointer-events:none;z-index:-1;">
+    <div id="tv-music"></div>
+</div>
+
 <!-- Voile de démarrage : un clic est requis par les navigateurs avant de pouvoir
      jouer un son, passer en plein écran et empêcher la mise en veille. -->
 <div class="tv-gate" id="tv-gate">
     <img src="/static/img/logo4-trim.png" alt="Doctivo">
     <h1>Écran de la salle d'attente</h1>
-    <p>Un clic est nécessaire pour activer le plein écran, le carillon d'appel et empêcher la mise en veille de l'écran.</p>
+    <p>Un clic est nécessaire pour activer le plein écran, le carillon d'appel, la musique d'ambiance et empêcher la mise en veille de l'écran.</p>
     <button type="button" id="tv-gate-btn">▶ Lancer l'affichage</button>
 </div>
 
@@ -65,6 +77,18 @@
     var callTimer = null;
     var audioCtx = null;
     var wakeLock = null;
+    var lastLogoVersion = data.logo_version || 0;
+
+    // Musique d'ambiance : le serveur n'envoie qu'un identifiant YouTube déjà
+    // validé, jamais l'URL saisie dans les réglages.
+    var musicCfg = data.music || { enabled: false };
+    var ytPlayer = null;
+    var ytApiLoading = false;
+    var musicUnavailable = false;
+    var gateOpened = false;
+    var normalVol = musicCfg.volume != null ? musicCfg.volume : 25;
+    var ducked = false;
+    var duckTimer = null;
 
     function esc(value) {
         var d = document.createElement('div');
@@ -135,6 +159,179 @@
         } catch (e) { /* le visuel suffit si le son est indisponible */ }
     }
 
+    // ------------------------------------------------ musique d'ambiance
+
+    function musicLog(message, detail) {
+        // Le seul moyen de diagnostiquer un ecran muet a distance : ouvrir la
+        // console du navigateur de la TV.
+        try { console.info('[Doctivo musique] ' + message, detail !== undefined ? detail : ''); } catch (e) {}
+    }
+
+    function loadYouTubeApi(onReady) {
+        if (window.YT && window.YT.Player) { onReady(); return; }
+        if (ytApiLoading) return;
+        ytApiLoading = true;
+        var prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function () {
+            if (typeof prev === 'function') { try { prev(); } catch (e) {} }
+            onReady();
+        };
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.onerror = function () {
+            musicUnavailable = true;
+            musicLog('API YouTube injoignable (reseau ou filtrage).');
+        };
+        document.head.appendChild(tag);
+        musicLog('chargement de l\'API YouTube...');
+        // TV hors ligne ou YouTube filtré : on abandonne la musique sans
+        // toucher au reste de l'affichage, qui doit continuer de tourner.
+        setTimeout(function () {
+            if (!(window.YT && window.YT.Player)) {
+                musicUnavailable = true;
+                musicLog('API YouTube non chargee au bout de 8 s : musique abandonnee.');
+            }
+        }, 8000);
+    }
+
+    function destroyMusic() {
+        clearTimeout(duckTimer);
+        ducked = false;
+        if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} }
+        ytPlayer = null;
+        // destroy() retire l'iframe : on remet la cible que l'API attend.
+        var host = document.getElementById('tv-music-host');
+        if (host && !document.getElementById('tv-music')) {
+            var slot = document.createElement('div');
+            slot.id = 'tv-music';
+            host.appendChild(slot);
+        }
+    }
+
+    function buildPlayer() {
+        if (ytPlayer || musicUnavailable || !musicCfg.enabled || !musicCfg.id) {
+            musicLog('lecteur non cree', {
+                deja: !!ytPlayer, indisponible: musicUnavailable,
+                active: !!musicCfg.enabled, id: musicCfg.id || '(aucun)'
+            });
+            return;
+        }
+        var vars = {
+            autoplay: 1, controls: 0, disablekb: 1, fs: 0,
+            modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3,
+            origin: window.location.origin   // recommande des qu'on pilote le lecteur en JS
+        };
+        if (musicCfg.kind === 'playlist') {
+            vars.listType = 'playlist';
+            vars.list = musicCfg.id;
+            vars.loop = 1;
+        } else {
+            // Une vidéo seule ne boucle pas : il faut la redéclarer comme sa
+            // propre playlist pour que loop:1 prenne effet.
+            vars.loop = 1;
+            vars.playlist = musicCfg.id;
+        }
+        try {
+            ytPlayer = new YT.Player('tv-music', {
+                // Dimensions reelles : un lecteur de 0 px peut etre considere
+                // comme non rendu et voir sa lecture suspendue. Le conteneur
+                // #tv-music-host le rogne a 1 px.
+                width: 320, height: 180,
+                videoId: musicCfg.kind === 'playlist' ? undefined : musicCfg.id,
+                playerVars: vars,
+                events: {
+                    onReady: function (e) {
+                        try {
+                            e.target.setVolume(ducked ? duckLevel() : normalVol);
+                            e.target.playVideo();
+                            musicLog('lecteur pret, lecture demandee', { volume: normalVol });
+                        } catch (err) { musicLog('echec au demarrage', err); }
+                    },
+                    onStateChange: function (e) {
+                        // Ceinture et bretelles au-dessus de loop:1.
+                        if (e.data === YT.PlayerState.ENDED) { try { e.target.playVideo(); } catch (err) {} }
+                        if (e.data === YT.PlayerState.PLAYING) musicLog('lecture en cours');
+                    },
+                    onError: function (e) {
+                        // 2 identifiant invalide, 5 incompatible, 100 introuvable,
+                        // 101/150 lecture integree interdite par l'ayant droit.
+                        musicLog('erreur du lecteur (code YouTube)', e && e.data);
+                        musicUnavailable = true;
+                        destroyMusic();
+                    }
+                }
+            });
+            musicLog('lecteur cree', { kind: musicCfg.kind, id: musicCfg.id });
+        } catch (e) {
+            musicUnavailable = true;
+            musicLog('creation du lecteur impossible', e);
+        }
+    }
+
+    function startMusic() {
+        if (!musicCfg.enabled || !musicCfg.id) {
+            musicLog('musique desactivee dans les reglages : rien a lancer.');
+            return;
+        }
+        loadYouTubeApi(buildPlayer);
+    }
+
+    function duckLevel() { return Math.max(0, Math.round(normalVol * 0.15)); }
+
+    function restoreMusic() {
+        ducked = false;
+        if (ytPlayer) { try { ytPlayer.setVolume(normalVol); } catch (e) {} }
+    }
+
+    function duckMusic() {
+        if (!ytPlayer) return;
+        if (!ducked) {
+            ducked = true;
+            try { ytPlayer.setVolume(duckLevel()); } catch (e) {}
+        }
+        // Le carillon dure CHIME_SECONDS alors que le bandeau descend jusqu'à 5 s :
+        // sans ce plancher, la musique remonterait sur la fin du carillon.
+        // Un « Rappeler » pendant le bandeau ne fait que réarmer ce délai.
+        clearTimeout(duckTimer);
+        var hold = Math.max(data.call_banner_seconds || 20, CHIME_SECONDS + 1);
+        duckTimer = setTimeout(restoreMusic, hold * 1000);
+    }
+
+    // Réglages changés depuis le tableau praticien : pris en compte au sondage
+    // suivant, sans avoir à redémarrer la TV.
+    function syncMusic(next) {
+        next = next || { enabled: false };
+        var changed = next.id !== musicCfg.id || next.kind !== musicCfg.kind;
+        var wasEnabled = musicCfg.enabled;
+        musicCfg = next;
+        normalVol = next.volume != null ? next.volume : normalVol;
+
+        if (!next.enabled || !next.id) { destroyMusic(); return; }
+        if (changed) { destroyMusic(); musicUnavailable = false; }
+        if (!gateOpened) return;                       // rien ne joue avant le clic
+        if (!ytPlayer) { if (changed || !wasEnabled) startMusic(); return; }
+        if (!ducked) { try { ytPlayer.setVolume(normalVol); } catch (e) {} }
+    }
+
+    function syncLogo(payload) {
+        var version = payload.logo_version || 0;
+        if (version === lastLogoVersion) return;
+        lastLogoVersion = version;
+        var img = document.getElementById('tv-logo-clinic');
+        if (!payload.logo_url) {
+            if (img) img.remove();
+            return;
+        }
+        if (!img) {
+            img = document.createElement('img');
+            img.className = 'tv-logo';
+            img.id = 'tv-logo-clinic';
+            document.getElementById('tv-logos').appendChild(img);
+        }
+        img.alt = payload.clinic_name || 'Cabinet';
+        img.src = payload.logo_url;
+    }
+
     // -------------------------------------------------------------- rendu
 
     function renderCurrent(items) {
@@ -193,6 +390,7 @@
         document.getElementById('tv-call-text').textContent =
             call.label + (call.room ? ' — ' + call.room : '') + ', veuillez vous présenter';
         banner.classList.add('visible');
+        duckMusic();
         chime();
         clearTimeout(callTimer);
         callTimer = setTimeout(function () {
@@ -205,6 +403,8 @@
         renderCurrent(payload.current || []);
         renderNext(payload.next || [], payload.more || 0, payload.waiting_total || 0);
         renderTicker(payload.ticker || []);
+        syncLogo(payload);
+        syncMusic(payload.music);
     }
 
     // ------------------------------------------------------- interrogation
@@ -267,11 +467,18 @@
             var Ctx = window.AudioContext || window.webkitAudioContext;
             if (Ctx) { audioCtx = new Ctx(); audioCtx.resume(); }
         } catch (e) {}
+        // Démarrer la musique DANS le geste utilisateur : c'est la seule
+        // activation dont dispose la page, et les navigateurs l'exigent pour
+        // une lecture audible.
+        gateOpened = true;
+        startMusic();
         poll();
     });
 
     // ---------------------------------------------------------- démarrage
 
+    // render() est appelé une première fois avant le voile : syncMusic() ne
+    // lance rien tant que gateOpened est faux.
     render(data);
     tick();
     setInterval(tick, 1000);

@@ -15,6 +15,10 @@
 .dl-del:hover { color:var(--danger); }
 .dl-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:14px 16px; border-top:1px solid var(--gray-100); }
 .dl-hint { font-size:.78rem; color:var(--gray-500); margin-left:auto; }
+.dl-sub td { color:var(--gray-600); }
+.dl-disc-cell { display:flex; gap:6px; justify-content:flex-end; align-items:center; }
+.dl-disc-cell .dl-input { width:110px; }
+.dl-disc-cell select.dl-input { width:74px; }
 </style>
 {% endblock %}
 
@@ -92,10 +96,26 @@
                 {% endfor %}
             </tbody>
             <tfoot>
+                {# Sans remise, l'affichage reste rigoureusement celui d'avant. #}
+                {% if devis.discount_amount %}
+                <tr class="dl-sub" style="border-top:2px solid var(--gray-300);">
+                    <td colspan="5" style="text-align:right;">Sous-total</td>
+                    <td>{{ '%.2f' | format(devis.total_amount + devis.discount_amount) }} DH</td>
+                </tr>
+                <tr class="dl-sub">
+                    <td colspan="5" style="text-align:right;">Remise{% if devis.discount_type == 'pourcent' %} ({{ '%g' | format(devis.discount_value) }} %){% endif %}</td>
+                    <td>&minus; {{ '%.2f' | format(devis.discount_amount) }} DH</td>
+                </tr>
+                <tr>
+                    <td colspan="5" style="text-align:right;font-weight:700;">Net à payer</td>
+                    <td style="font-weight:700;font-size:16px;">{{ '%.2f' | format(devis.total_amount) }} DH</td>
+                </tr>
+                {% else %}
                 <tr style="border-top:2px solid var(--gray-300);">
                     <td colspan="5" style="text-align:right;font-weight:700;">Total</td>
                     <td style="font-weight:700;font-size:16px;">{{ '%.2f' | format(devis.total_amount) }} DH</td>
                 </tr>
+                {% endif %}
             </tfoot>
         </table>
 
@@ -110,8 +130,28 @@
                 <thead><tr><th>Code</th><th>Désignation</th><th>Dent(s)</th><th>Qté</th><th>Prix unit.</th><th>Total</th><th></th></tr></thead>
                 <tbody id="dl-rows"></tbody>
                 <tfoot>
-                    <tr style="border-top:2px solid var(--gray-300);">
-                        <td colspan="5" style="text-align:right;font-weight:700;">Total</td>
+                    <tr class="dl-sub" style="border-top:2px solid var(--gray-300);">
+                        <td colspan="5" style="text-align:right;">Sous-total</td>
+                        <td id="dl-subtotal">0.00 DH</td>
+                        <td></td>
+                    </tr>
+                    <tr class="dl-sub">
+                        <td colspan="5" style="text-align:right;">Remise</td>
+                        <td>
+                            <div class="dl-disc-cell">
+                                <input class="dl-input dl-num" type="number" min="0" step="0.01" id="dl-disc-value"
+                                       name="discount_value" value="{{ '%.2f' | format(devis.discount_value) if devis.discount_value else '' }}" placeholder="0">
+                                <select class="dl-input" id="dl-disc-type" name="discount_type">
+                                    <option value="montant" {{ 'selected' if devis.discount_type != 'pourcent' }}>DH</option>
+                                    <option value="pourcent" {{ 'selected' if devis.discount_type == 'pourcent' }}>%</option>
+                                </select>
+                            </div>
+                            <small class="dl-hint" style="margin:4px 0 0;display:block;text-align:right;" id="dl-disc-hint"></small>
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" style="text-align:right;font-weight:700;">Net à payer</td>
                         <td style="font-weight:700;font-size:16px;" id="dl-total">0.00 DH</td>
                         <td></td>
                     </tr>
@@ -155,6 +195,14 @@
     var view = document.getElementById('dl-view');
     var tbody = document.getElementById('dl-rows');
     var btnEdit = document.getElementById('btn-edit-lines');
+    var discValue = document.getElementById('dl-disc-value');
+    var discType = document.getElementById('dl-disc-type');
+    var discHint = document.getElementById('dl-disc-hint');
+
+    // Branchés ici et pas dans render() : render() ne redessine que les lignes,
+    // ces deux champs vivent dans le pied de tableau et ne sont jamais recréés.
+    discValue.addEventListener('input', function () { refreshTotals(); });
+    discType.addEventListener('change', function () { refreshTotals(); });
 
     function esc(v) {
         var d = document.createElement('div');
@@ -170,15 +218,28 @@
 
     // Les totaux se recalculent SANS reconstruire le tableau : le redessiner
     // ferait perdre le focus du champ à chaque frappe.
+    // Même calcul que _parse_discount() côté serveur, écrêtage compris.
     function refreshTotals() {
-        var total = 0;
+        var sub = 0;
         rows.forEach(function (r, i) {
             var line = (r.montant || 0) * (r.qty || 0);
-            total += line;
+            sub += line;
             var cell = document.getElementById('dl-line-' + i);
             if (cell) cell.textContent = money(line);
         });
-        document.getElementById('dl-total').textContent = money(total);
+
+        var pct = discType.value === 'pourcent';
+        var v = Math.max(0, parseFloat(discValue.value) || 0);
+        if (pct) v = Math.min(100, v);
+        var d = pct ? sub * v / 100 : v;
+        var clamped = d > sub;
+        d = Math.min(Math.max(0, d), sub);
+
+        document.getElementById('dl-subtotal').textContent = money(sub);
+        document.getElementById('dl-total').textContent = money(sub - d);
+        if (clamped) discHint.textContent = 'Ramenée au sous-total (' + money(sub) + ').';
+        else if (pct && d > 0) discHint.textContent = 'Soit ' + money(d) + '.';
+        else discHint.textContent = '';
     }
 
     // Les index des champs doivent rester contigus (le serveur lit item_desc_0,
@@ -238,8 +299,13 @@
         if (first) { first.focus(); first.select(); }
     });
 
+    // La remise saisie mais non enregistrée doit repartir comme les lignes.
+    var INITIAL_DISC = { value: discValue.value, type: discType.value };
+
     document.getElementById('dl-cancel').addEventListener('click', function () {
         rows = JSON.parse(JSON.stringify(INITIAL));
+        discValue.value = INITIAL_DISC.value;
+        discType.value = INITIAL_DISC.type;
         form.style.display = 'none';
         view.style.display = '';
         btnEdit.style.display = '';

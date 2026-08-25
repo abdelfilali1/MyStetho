@@ -39,10 +39,26 @@
                         {% endfor %}
                     </tbody>
                     <tfoot>
+                        {# Les lignes somment au brut : la remise est reprise du devis d'origine. #}
+                        {% if invoice.discount_amount %}
+                        <tr style="border-top: 2px solid var(--gray-300); color: var(--gray-600);">
+                            <td colspan="3" style="text-align: right;">Sous-total</td>
+                            <td>{{ '%.2f' | format(invoice.total_amount + invoice.discount_amount) }} DH</td>
+                        </tr>
+                        <tr style="color: var(--gray-600);">
+                            <td colspan="3" style="text-align: right;">Remise{% if invoice.discount_type == 'pourcent' %} ({{ '%g' | format(invoice.discount_value) }} %){% endif %}</td>
+                            <td>&minus; {{ '%.2f' | format(invoice.discount_amount) }} DH</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" style="text-align: right; font-weight: 700;">Net à payer</td>
+                            <td style="font-weight: 700; font-size: 16px;">{{ '%.2f' | format(invoice.total_amount) }} DH</td>
+                        </tr>
+                        {% else %}
                         <tr style="border-top: 2px solid var(--gray-300);">
                             <td colspan="3" style="text-align: right; font-weight: 700;">Total</td>
                             <td style="font-weight: 700; font-size: 16px;">{{ '%.2f' | format(invoice.total_amount) }} DH</td>
                         </tr>
+                        {% endif %}
                     </tfoot>
                 </table>
             </div>
