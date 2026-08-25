@@ -7,14 +7,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260824">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260825-2">
     <style>
     /* Recherche globale + badge messagerie (intégration) */
-    .sidebar-search { padding: 10px 14px 4px; position: relative; }
-    .sidebar-search input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 8px; color: #fff; padding: 8px 10px; font-size: 13px; }
-    .sidebar-search input::placeholder { color: rgba(255,255,255,.45); }
-    .sidebar-search input:focus { outline: none; border-color: #25b7ff; background: rgba(255,255,255,.12); }
-    #global-search-results { position: absolute; top: 100%; left: 14px; right: 14px; background: #fff; border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.35); z-index: 300; max-height: 320px; overflow-y: auto; }
+    /* Champ de recherche : loupe a gauche, raccourci en pastille a droite.
+       Le raccourci vivait dans le texte du placeholder (« … (Ctrl+K) »), ce qui
+       allongeait la phrase et disparaissait des qu'on tapait. */
+    .sidebar-search { padding: 12px 14px 6px; position: relative; }
+    .ss-field { position: relative; display: flex; align-items: center; }
+    .ss-field .ss-icon { position: absolute; left: 10px; width: 14px; height: 14px; color: rgba(174,219,245,.55); pointer-events: none; transition: color .15s ease; }
+    /* Le bandeau ne fait que 282 px : les retraits gauche/droite sont calcules
+       au plus juste pour que « Rechercher un patient… » tienne entre la loupe
+       et la pastille sans etre tronque. */
+    .sidebar-search input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.06); border: 1px solid rgba(160,220,255,.18); border-radius: 11px; color: #eaf6ff; padding: 9px 46px 9px 30px; font-size: 12.5px; font-family: inherit; box-shadow: inset 0 1px 2px rgba(3,18,37,.35); transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+    .sidebar-search input::placeholder { color: rgba(174,219,245,.5); }
+    .sidebar-search input:hover { background: rgba(255,255,255,.09); border-color: rgba(160,220,255,.3); }
+    .sidebar-search input:focus { outline: none; border-color: #25b7ff; background: rgba(255,255,255,.12); box-shadow: inset 0 1px 2px rgba(3,18,37,.2), 0 0 0 3px rgba(37,183,255,.16); }
+    .ss-field:focus-within .ss-icon { color: #25b7ff; }
+    /* La pastille s'efface des qu'on saisit : elle a rempli son role. */
+    .ss-kbd { position: absolute; right: 7px; font-family: inherit; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: rgba(174,219,245,.6); background: rgba(255,255,255,.07); border: 1px solid rgba(160,220,255,.2); border-radius: 5px; padding: 2px 5px; pointer-events: none; transition: opacity .15s ease; }
+    .ss-field:focus-within .ss-kbd { opacity: 0; }
+    #global-search-results { position: absolute; top: 100%; left: 14px; right: 14px; background: #fff; border: 1px solid rgba(160,220,255,.25); border-radius: 12px; box-shadow: 0 14px 36px rgba(3,18,37,.45); z-index: 300; max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 4px 0; }
     #global-search-results .gsr-section { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; padding: 8px 12px 2px; }
     #global-search-results .gsr-item { display: block; padding: 8px 12px; font-size: 13px; color: #0f172a; text-decoration: none; cursor: pointer; }
     #global-search-results .gsr-item:hover, #global-search-results .gsr-item.kbd-active { background: #eef6ff; }
@@ -36,7 +49,13 @@
         </div>
         {% if user.role != 'secretaire' %}
         <div class="sidebar-search no-print" id="sidebar-search">
-            <input type="text" id="global-search-input" placeholder="Rechercher un patient…  (Ctrl+K)" autocomplete="off" aria-label="Recherche patient">
+            <div class="ss-field">
+                <svg class="ss-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="global-search-input" placeholder="Rechercher un patient…" autocomplete="off" aria-label="Recherche patient">
+                <kbd class="ss-kbd">Ctrl K</kbd>
+            </div>
+            {# Le panneau de resultats reste un enfant direct de .sidebar-search,
+               qui porte le position:relative auquel il s'accroche. #}
             <div id="global-search-results" style="display:none;"></div>
         </div>
         {% endif %}

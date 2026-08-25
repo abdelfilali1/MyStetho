@@ -151,11 +151,14 @@ body.mobile-nav-open {
 }
 
 .sidebar .brand-logo {
-    width: 100%;
+    /* 70 % de la largeur disponible : le logo occupait tout le bandeau et
+       ecrasait la navigation. aspect-ratio garde le cadre carre, la hauteur
+       suit donc la meme reduction. Centre par .brand (flex column, center). */
+    width: 70%;
     height: auto;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 20px;
+    border-radius: 18px;
     padding: 0;
     border: 1px solid rgba(150, 211, 250, 0.34);
     background: rgba(5, 28, 50, 0.48);
