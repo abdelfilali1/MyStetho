@@ -1,0 +1,463 @@
+/* ==========================================================================
+   Odontogramme + Parodontogramme (port dentalpin) — styles
+   Chargé par templates/patients/detail.html et templates/dental/chart.html.
+   ========================================================================== */
+
+:root {
+  --odontogram-outline: rgba(15, 17, 22, 0.55);
+  --odontogram-outline-light: rgba(15, 17, 22, 0.35);
+  --odontogram-fill: #ffffff;
+  --odontogram-fill-shade: #f1f5f9;
+  --odontogram-root-fill: #fefefd;
+  --odontogram-detail: rgba(15, 17, 22, 0.2);
+  --odontogram-bg: #f6f9fd;
+  --odontogram-gum: #fda4af;
+  --odontogram-selected: var(--primary, #1c8cf8);
+
+  --perio-grid-line: #e5e7eb;
+  --perio-grid-line-bold: #cbd5e1;
+  --perio-pocket-band: #fee7e7;
+  --perio-pocket-band-opacity: 0.6;
+  --perio-gm-stroke: #0ea5e9;
+  --perio-pd-stroke: #dc2626;
+  --perio-implant-fill: #10b981;
+  --perio-cell-hover: #edf2fa;
+  --perio-cell-focus-ring: #dd8a08;
+  --perio-cell-toggle-border: #c5d2e2;
+  --perio-cell-toggle-bg: #ffffff;
+  --perio-vestibular-row: rgba(245, 158, 11, 0.06);
+  --perio-palatal-row: rgba(14, 165, 233, 0.06);
+
+  --odo-border: #dbe5f1;
+  --odo-text: #142033;
+  --odo-muted: #586d87;
+  --odo-subtle: #95a8c0;
+  --odo-surface: #ffffff;
+  --odo-surface-muted: #f6f9fd;
+  --odo-surface-sunken: #dbe5f1;
+}
+
+.odontogram-root, .periodontogram-root { font-family: 'Manrope', system-ui, sans-serif; color: var(--odo-text); }
+/* L'attribut hidden doit primer sur les display:flex/inline-flex des composants. */
+.odontogram-root [hidden], .periodontogram-root [hidden], .odo-multi-bar[hidden] { display: none !important; }
+.odonto-panel { background: var(--panel-strong, rgba(255,255,255,.95)); border: 1px solid var(--stroke, rgba(255,255,255,.55)); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow-soft, 0 10px 30px rgba(11,45,90,.12)); }
+
+/* --------------------------------------------------------------------------
+   Éléments génériques
+   -------------------------------------------------------------------------- */
+.odonto-muted { color: var(--odo-muted); }
+.odonto-subtle { color: var(--odo-subtle); }
+.odonto-small { font-size: 12px; }
+.odonto-strong { font-weight: 700; }
+.odonto-actions { display: flex; gap: 8px; align-items: center; }
+.odonto-actions.wrap { flex-wrap: wrap; }
+.odonto-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.odonto-title-row { display: flex; align-items: center; gap: 10px; }
+.odonto-title-row h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.odonto-color-chip { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.odonto-color-chip span { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.odonto-field { margin-bottom: 18px; }
+.odonto-field label { display: block; font-size: 13px; font-weight: 600; color: var(--odo-muted); margin-bottom: 8px; }
+.odonto-field-sep { padding-top: 14px; border-top: 1px solid var(--odo-border); }
+
+.odo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 9px; border: 1.5px solid transparent; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; line-height: 1.2; transition: background .15s, border-color .15s, color .15s, box-shadow .15s; background: transparent; color: var(--odo-text); white-space: nowrap; }
+.odo-btn:disabled { opacity: .5; cursor: not-allowed; }
+.odo-btn-xs { padding: 4px 10px; font-size: 11px; border-radius: 7px; }
+.odo-btn-sm { padding: 6px 12px; font-size: 12px; }
+.odo-btn-block { width: 100%; }
+.odo-btn-primary { background: var(--primary, #1c8cf8); color: #fff; }
+.odo-btn-primary:hover:not(:disabled) { background: var(--primary-dark, #0f61cf); }
+.odo-btn-outline { border-color: var(--odo-border); background: #fff; }
+.odo-btn-outline:hover:not(:disabled) { border-color: var(--primary, #1c8cf8); color: var(--primary-dark, #0f61cf); }
+.odo-btn-ghost { color: var(--odo-muted); }
+.odo-btn-ghost:hover:not(:disabled) { background: var(--odo-surface-muted); }
+.odo-btn-soft { background: var(--primary-light, #d9efff); color: var(--primary-dark, #0f61cf); }
+.odo-btn-soft:hover:not(:disabled) { background: #c3e3ff; }
+.odo-btn-danger { background: var(--danger, #d93a58); color: #fff; }
+.odo-btn-danger:hover:not(:disabled) { background: #b92a46; }
+.odo-btn-danger-text { color: var(--danger, #d93a58); }
+.odo-btn-danger-text:hover:not(:disabled) { background: var(--danger-light, #ffe0e6); }
+.odo-btn-warning { background: var(--warning, #dd8a08); color: #fff; }
+.odo-btn-dark { background: #142033; color: #fff; }
+.odo-btn-success { background: var(--success-light, #d6f8ec); color: #0a7a58; }
+.odo-btn-success:hover:not(:disabled) { background: #bff1de; }
+
+.odo-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+.odo-badge-xs { padding: 1px 6px; font-size: 10px; }
+.odo-badge-lg { padding: 6px 12px; font-size: 13px; border: none; cursor: default; font-family: inherit; }
+.odo-badge-lg.clickable { cursor: pointer; }
+.odo-badge-neutral { background: #edf2fa; color: #3f536d; }
+.odo-badge-primary { background: var(--primary-light, #d9efff); color: var(--primary-dark, #0f61cf); }
+.odo-badge-warning { background: var(--warning-light, #fff0cf); color: #a86300; }
+.odo-badge-success { background: var(--success-light, #d6f8ec); color: #0a7a58; }
+
+.odo-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 48px 0; color: var(--odo-subtle); }
+.odo-spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--odo-border); border-top-color: var(--primary, #1c8cf8); animation: odo-spin .8s linear infinite; display: inline-block; }
+.odo-spinner-xs { width: 10px; height: 10px; border-width: 2px; }
+@keyframes odo-spin { to { transform: rotate(360deg); } }
+.odo-alert { padding: 12px 14px; border-radius: 10px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.odo-alert-error { background: #fff1f2; border: 1px solid #fecaca; color: #991b1b; }
+
+.odo-segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--odo-surface-muted); border-radius: 9px; border: 1px solid var(--odo-border); }
+.odo-segmented button { border: none; background: transparent; padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--odo-muted); cursor: pointer; font-family: inherit; }
+.odo-segmented button.active { background: #fff; color: var(--odo-text); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+/* --------------------------------------------------------------------------
+   Odontogramme — squelette
+   -------------------------------------------------------------------------- */
+.odontogram-chart { display: flex; flex-direction: column; gap: 14px; }
+.odo-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.odo-chart-title { display: flex; align-items: center; gap: 8px; }
+.odo-chart-title h3 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+
+.odontogram-wrapper { container-type: inline-size; overflow: hidden; }
+.odontogram-grid { background: var(--odo-surface); border: 1px solid var(--odo-border); border-radius: 12px; padding: 16px; zoom: 1; }
+.odontogram-grid.cursor-crosshair { cursor: crosshair; }
+@container (max-width: 1000px) { .odontogram-grid { zoom: 0.9; } }
+@container (max-width: 900px) { .odontogram-grid { zoom: 0.8; } }
+@container (max-width: 800px) { .odontogram-grid { zoom: 0.7; } }
+@container (max-width: 700px) { .odontogram-grid { zoom: 0.6; } }
+@container (max-width: 600px) { .odontogram-grid { zoom: 0.5; } }
+
+.arch-container { position: relative; border-radius: 12px; }
+.odo-arch-label { font-size: 11px; color: var(--odo-subtle); text-align: center; margin: 4px 0 8px; }
+.odo-arch-row { display: flex; justify-content: center; gap: 4px; position: relative; }
+.odo-divider-v { width: 1px; background: var(--odo-surface-sunken); margin: 0 8px; }
+.odo-divider-h { height: 1px; background: var(--odo-surface-sunken); margin: 16px 0; }
+
+.midline-bridge { position: absolute; left: 50%; transform: translateX(-50%); width: 56px; height: 12px; border-radius: 2px; background: #f59e0b; pointer-events: none; z-index: 1; }
+.midline-bridge.upper { top: 88px; }
+.midline-bridge.lower { top: 78px; }
+.midline-bridge.status-planned, .bridge-connector.status-planned { background: repeating-linear-gradient(90deg, #f59e0b 0, #f59e0b 4px, transparent 4px, transparent 8px); }
+
+.odontogram-grid .tooth-row { display: flex; gap: 2px; align-items: center; position: relative; }
+.tooth-cell { width: 60px; height: 75px; display: flex; flex-direction: column; align-items: center; position: relative; }
+.tooth-cell-dual { height: 160px; }
+.tooth-cell.in-group::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: 2px; height: 2px; border-radius: 2px; background: #3b82f6; opacity: .6; }
+.tooth-cell.in-multi-selection { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 6px; animation: multi-tooth-pulse 1.2s ease-in-out infinite; }
+@keyframes multi-tooth-pulse { 0%, 100% { outline-color: #3b82f6; } 50% { outline-color: #60a5fa; } }
+.group-connector { width: 8px; height: 4px; border-radius: 2px; align-self: end; margin-bottom: 2px; background: #3b82f6; position: relative; }
+.group-connector.status-planned { background: repeating-linear-gradient(90deg, #3b82f6 0, #3b82f6 3px, transparent 3px, transparent 6px); }
+.bridge-connector { position: absolute; transform: translateX(-50%); width: 56px; height: 12px; border-radius: 2px; background: #f59e0b; pointer-events: none; z-index: 1; }
+.bridge-connector.upper { bottom: 62px; }
+.bridge-connector.lower { bottom: 72px; }
+
+/* --------------------------------------------------------------------------
+   Dent (ToothDualView)
+   -------------------------------------------------------------------------- */
+.tooth-dual-view-wrapper { display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform .15s ease, filter .15s ease; position: relative; }
+.tooth-dual-view-wrapper:hover { transform: translateY(-1px); }
+.tooth-dual-view-wrapper.readonly { cursor: default; }
+.tooth-dual-view-wrapper.readonly:hover { transform: none; }
+.tooth-dual-view-wrapper.has-preview { filter: drop-shadow(0 0 4px rgba(59,130,246,.5)); }
+.tooth-dual-view-wrapper.highlighted { filter: drop-shadow(0 0 6px rgba(245,158,11,.6)); animation: highlight-pulse 1s ease-in-out infinite; }
+@keyframes highlight-pulse { 0%, 100% { filter: drop-shadow(0 0 6px rgba(245,158,11,.6)); } 50% { filter: drop-shadow(0 0 10px rgba(245,158,11,.8)); } }
+.tooth-crown, .tooth-occlusal { fill: var(--odontogram-fill); stroke: var(--odontogram-outline); transition: fill .15s ease, stroke .15s ease; }
+.tooth-root { fill: var(--odontogram-root-fill); stroke: var(--odontogram-outline); }
+.tooth-highlight { stroke: var(--odontogram-detail); }
+.tooth-pulp { stroke: var(--odontogram-detail); transition: fill .2s ease; }
+.tooth-pulp.pulp-filled { stroke: none; }
+.implant-stroke { stroke: var(--odontogram-outline); }
+.tooth-number { font-size: 10px; color: #586d87; font-weight: 600; user-select: none; text-align: center; margin-top: 2px; }
+.tooth-number.selected { color: var(--odontogram-selected); }
+.lateral-view-container { position: relative; display: flex; justify-content: center; width: 100%; height: 110px; overflow: visible; }
+.lateral-view-container.upper { align-items: flex-end; padding-top: 10px; }
+.lateral-view-container.lower { align-items: flex-start; padding-bottom: 10px; }
+.lateral-view { display: block; flex-shrink: 0; overflow: visible; }
+.occlusal-view { display: block; margin: 5px 0; }
+.occlusal-view-container { position: relative; display: flex; align-items: center; justify-content: center; }
+.tooth-dual-view-wrapper.is-upper .lateral-view-container { order: 1; }
+.tooth-dual-view-wrapper.is-upper .occlusal-view-container { order: 2; }
+.tooth-dual-view-wrapper.is-lower .lateral-view-container { order: 2; }
+.tooth-dual-view-wrapper.is-lower .occlusal-view-container { order: 1; }
+.tooth-dual-view-wrapper .tooth-number { order: 3; }
+.treatment-overlays, .treatment-overlays-lateral { pointer-events: none; }
+.selection-ring { animation: pulse-ring 1.5s ease-in-out infinite; }
+@keyframes pulse-ring { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: .6; } }
+.preview-overlay { pointer-events: none; animation: preview-pulse 1s ease-in-out infinite; }
+@keyframes preview-pulse { 0%, 100% { opacity: .4; } 50% { opacity: .6; } }
+.implant-root .dental-implant { filter: drop-shadow(0 1px 2px rgba(0,0,0,.15)); }
+.planned-indicator-lateral, .planned-indicator-occlusal { position: absolute; pointer-events: none; z-index: 10; }
+.planned-indicator-lateral { top: 10px; left: 50%; transform: translateX(-50%); }
+.planned-indicator-occlusal { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.planned-p { color: #ef4444; font-size: 14px; font-weight: bold; font-family: Arial, sans-serif; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; }
+
+/* --------------------------------------------------------------------------
+   Barre de traitements
+   -------------------------------------------------------------------------- */
+.treatment-bar { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; background: linear-gradient(to bottom, #fafafa, #f4f4f5); border: 1px solid #e4e4e7; border-radius: 12px; }
+.treatment-bar .top-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.status-toggle { display: flex; gap: 4px; background: #e4e4e7; padding: 3px; border-radius: 8px; }
+.status-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; transition: all .15s; background: transparent; color: #71717a; border: none; cursor: pointer; font-family: inherit; }
+.status-btn:hover { background: rgba(255,255,255,.5); }
+.status-btn.selected { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.status-btn.selected.status-red { color: #dc2626; }
+.status-btn.selected.status-gray { color: #52525b; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.status-label { display: none; }
+@media (min-width: 768px) { .status-label { display: inline; } }
+.treatment-bar .divider { width: 1px; height: 32px; background: #e4e4e7; }
+.category-tabs { display: flex; gap: 2px; flex-wrap: wrap; padding: 2px; background: #edf2fa; border-radius: 8px; }
+.category-tab { padding: 6px 12px; font-size: 13px; font-weight: 500; color: var(--odo-muted); border-radius: 6px; border: none; background: transparent; cursor: pointer; font-family: inherit; transition: background-color .15s, color .15s; }
+.category-tab:hover:not(.active) { color: var(--odo-text); }
+.category-tab.active { background: #fff; color: var(--odo-text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.treatment-bar .spacer { flex: 1; }
+.cancel-section { flex-shrink: 0; }
+.instructions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--odo-muted); flex-shrink: 0; padding: 6px 12px; background: #edf2fa; border-radius: 8px; }
+.instructions.multi-tooth-hint { background: #dbeafe; color: #1d4ed8; font-weight: 500; }
+.treatment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; align-items: stretch; }
+.treatment-cell { display: flex; flex-direction: column; align-items: stretch; position: relative; }
+.treatment-btn { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; padding: 7px 6px; border-radius: 8px; border: 2px solid transparent; background: #fff; transition: background .15s, border-color .15s, box-shadow .15s, transform .15s; width: 100%; height: 100%; min-height: 72px; cursor: pointer; font-family: inherit; position: relative; }
+.treatment-btn.has-mode-selector { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.treatment-btn:hover { border-color: #93c5fd; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+.treatment-btn.selected { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+.treatment-btn.is-surface::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: #06b6d4; border-radius: 50%; }
+.treatment-btn.is-surface.atomic-multi-btn::after, .treatment-btn.is-surface .multi-tooth-badge ~ * { display: none; }
+.treatment-icon { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; }
+.treatment-label { font-size: 10.5px; font-weight: 500; color: #52525b; text-align: center; line-height: 1.3; word-break: break-word; overflow-wrap: anywhere; width: 100%; }
+.multi-tooth-badge { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; color: #3b82f6; background: #dbeafe; border-radius: 4px; padding: 1px; display: inline-flex; align-items: center; justify-content: center; }
+.multi-tooth-badge-hint { color: #a1a1aa; background: #f4f4f5; }
+.treatment-btn.selected .multi-tooth-badge-hint { color: #3b82f6; background: #dbeafe; }
+.mode-selector-inline { display: flex; flex-direction: column; gap: 2px; padding: 3px; background: #eff6ff; border: 2px solid #3b82f6; border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; box-shadow: 0 8px 18px -4px rgba(59,130,246,.35), 0 2px 4px rgba(0,0,0,.05); animation: mode-selector-reveal .18s ease-out; position: absolute; top: 100%; left: 0; right: 0; z-index: 20; }
+@keyframes mode-selector-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.mode-chip { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 6px; font-size: 10.5px; font-weight: 500; color: #1d4ed8; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; border: none; background: transparent; font-family: inherit; }
+.mode-chip:hover { background: rgba(255,255,255,.65); }
+.mode-chip.active { background: #fff; color: #1e40af; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+@media (max-width: 640px) {
+  .treatment-bar .top-row { flex-direction: column; align-items: stretch; }
+  .treatment-bar .divider { width: 100%; height: 1px; }
+  .category-tabs { justify-content: center; }
+  .treatment-bar .spacer { display: none; }
+  .cancel-section, .instructions { justify-content: center; }
+}
+
+/* --------------------------------------------------------------------------
+   Légende, liste, historique
+   -------------------------------------------------------------------------- */
+.odontogram-legend { background: #f6f9fd; border-radius: 8px; overflow: hidden; }
+.legend-header, .odo-section-header { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; background: transparent; border: none; cursor: pointer; font-family: inherit; color: var(--odo-muted); transition: background-color .15s; }
+.legend-header:hover { background: #edf2fa; }
+.header-content { display: flex; align-items: center; gap: 8px; }
+.header-title { font-size: 13px; font-weight: 500; }
+.legend-content { padding: 0 12px 12px; border-top: 1px solid var(--odo-border); }
+.legend-section { padding: 10px 0; }
+.legend-section + .legend-section { border-top: 1px solid var(--odo-border); }
+.section-title { font-size: 12px; font-weight: 600; color: var(--odo-muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 8px; }
+.status-list { display: flex; flex-wrap: wrap; gap: 12px; }
+.status-item, .legend-item { display: flex; align-items: center; gap: 6px; }
+.status-indicator { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.status-indicator.planned { opacity: .7; }
+.status-indicator .planned-p { font-size: 11px; text-shadow: none; }
+.legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px 12px; }
+.legend-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.legend-color { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
+.item-label { font-size: 12px; color: var(--odo-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.odo-section { border: 1px solid var(--odo-border); border-radius: 10px; overflow: hidden; }
+.odo-section-header { background: var(--odo-surface-muted); font-weight: 500; }
+.odo-section-header:hover { background: #edf2fa; }
+.odo-section-body { padding: 14px; background: #fff; }
+.odo-section-empty { text-align: center; padding: 16px; color: var(--odo-subtle); font-size: 13px; }
+.odo-treatment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.odo-treatment-list li { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; transition: background .15s; }
+.odo-treatment-list li:hover { background: var(--odo-surface-muted); }
+.odo-tl-main { flex: 1; min-width: 0; font-size: 13px; }
+.odo-tl-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.odo-history-list { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
+.odo-history-entry { display: flex; gap: 12px; padding: 10px 12px; background: var(--odo-surface-muted); border-radius: 8px; }
+.odo-history-rail { display: flex; flex-direction: column; align-items: center; }
+.odo-history-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.odo-history-dot.treatment { background: #0ea57a; }
+.odo-history-dot.history { background: var(--primary, #1c8cf8); }
+.odo-history-line { width: 2px; flex: 1; background: var(--odo-surface-sunken); margin-top: 4px; }
+.odo-history-content { flex: 1; min-width: 0; font-size: 13px; }
+.odo-history-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; }
+.odo-color-square { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--odo-border); display: inline-block; }
+.odo-text-warning { color: #a86300; }
+
+/* --------------------------------------------------------------------------
+   Chronologie
+   -------------------------------------------------------------------------- */
+.odo-timeline { width: 100%; padding: 8px; background: var(--odo-surface-muted); border-radius: 10px; }
+.odo-timeline.disabled { opacity: .5; pointer-events: none; }
+.odo-tl-header { display: flex; align-items: center; justify-content: space-between; height: 24px; }
+.odo-tl-title { font-size: 13px; font-weight: 500; color: var(--odo-muted); }
+.odo-tl-return { min-width: 128px; display: flex; justify-content: flex-end; }
+.odo-tl-track { position: relative; height: 40px; margin-top: 8px; cursor: pointer; user-select: none; border-radius: 6px; outline: none; }
+.odo-tl-track:focus-visible { box-shadow: 0 0 0 2px var(--primary, #1c8cf8); }
+.odo-tl-line { position: absolute; top: 16px; left: 0; right: 0; height: 4px; background: var(--odo-surface-sunken); border-radius: 999px; }
+.odo-tl-marker { position: absolute; top: 16px; transform: translateX(-50%); cursor: pointer; }
+.odo-tl-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; transform: translateY(-50%); transition: all .15s; background: var(--odo-subtle); }
+.odo-tl-dot.state-now { background: #0ea57a; transform: translateY(-50%) scale(1.25); }
+.odo-tl-dot.state-selected { background: var(--primary, #1c8cf8); transform: translateY(-50%) scale(1.25); }
+.odo-tl-dot.state-past { background: var(--odo-surface-sunken); }
+.odo-tl-marker:hover .odo-tl-dot:not(.state-now) { transform: translateY(-50%) scale(1.5); background: var(--primary, #1c8cf8); }
+.odo-tl-label { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; font-weight: 500; color: var(--odo-muted); }
+.odo-tl-label.state-now { color: #0ea57a; }
+.odo-tl-label.state-selected { color: var(--primary-dark, #0f61cf); }
+.odo-tl-thumb { position: absolute; top: 16px; transform: translateX(-50%); transition: left .15s ease-out; }
+.odo-tl-thumb.dragging { transition: none; }
+.odo-tl-badge { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: #fff; background: var(--primary, #1c8cf8); }
+.odo-tl-badge.now { background: #0ea57a; }
+.odo-tl-knob { width: 20px; height: 20px; transform: translateY(-50%); background: var(--primary, #1c8cf8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,.2); cursor: grab; border: 2px solid #fff; transition: transform .1s; }
+.odo-tl-knob:hover { transform: translateY(-50%) scale(1.1); }
+.odo-tl-knob:active { cursor: grabbing; transform: translateY(-50%) scale(1.25); }
+
+/* --------------------------------------------------------------------------
+   Barre flottante multi-dents, toast
+   -------------------------------------------------------------------------- */
+.odo-multi-bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 2500; display: flex; align-items: center; gap: 12px; border: 1px solid var(--odo-border); background: #fff; box-shadow: 0 12px 32px rgba(11,45,90,.18); padding: 8px 16px; border-radius: 10px; font-size: 13px; }
+.odo-multi-bar[hidden] { display: none; }
+.odo-multi-icon { color: var(--primary, #1c8cf8); }
+.odonto-toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 50px; font-size: 13px; font-weight: 600; z-index: 3200; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 92vw; }
+.odonto-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.odonto-toast-error { background: #b91c1c; }
+.odonto-toast-warning { background: #b45309; }
+.odonto-toast-neutral { background: #475569; }
+.odonto-toast-action { border: none; background: rgba(255,255,255,.18); color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.odonto-toast-action:hover { background: rgba(255,255,255,.3); }
+
+/* --------------------------------------------------------------------------
+   Modales
+   -------------------------------------------------------------------------- */
+body.odonto-modal-open { overflow: hidden; }
+.odonto-modal-overlay { position: fixed; inset: 0; background: rgba(5,17,33,.55); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; backdrop-filter: blur(2px); }
+.odonto-modal { background: #fff; border-radius: 16px; width: min(100%, 560px); max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.25); }
+.odonto-modal-sm { width: min(100%, 440px); }
+.odonto-modal-lg { width: min(100%, 640px); }
+.odonto-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--odo-border); }
+.odonto-modal-heading h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.odonto-modal-subtitle { margin: 4px 0 0; font-size: 12px; color: var(--odo-subtle); }
+.odonto-modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--odo-subtle); line-height: 1; padding: 4px; }
+.odonto-modal-close:hover { color: var(--odo-text); }
+.odonto-modal-body { padding: 20px 22px; overflow-y: auto; font-size: 14px; }
+.odonto-modal-body p { margin: 0 0 10px; }
+.odonto-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid var(--odo-border); }
+.odonto-modal-footer > :only-child { margin-left: auto; }
+
+.surface-selector { display: flex; flex-direction: column; gap: 20px; }
+.tooth-views { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+.view-container { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.view-label { font-size: 12px; font-weight: 500; color: var(--odo-subtle); text-transform: uppercase; letter-spacing: .05em; }
+.tooth-svg { background: var(--odontogram-bg); border-radius: 12px; padding: 8px; }
+.tooth-svg.lateral { transform-origin: center; }
+.surface-path { cursor: pointer; transition: all .15s ease; }
+.surface-path:hover { filter: brightness(.95); }
+.surface-label, .surface-label-center { font-size: 6px; font-weight: 600; fill: #6b7280; text-anchor: middle; cursor: pointer; user-select: none; }
+.surface-label-center { fill: #9ca3af; }
+.surface-buttons { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.surface-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; background: #fff; transition: all .15s; min-width: 80px; cursor: pointer; font-family: inherit; }
+.surface-btn:hover { border-color: #93c5fd; transform: translateY(-1px); }
+.surface-btn.selected { box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+.surface-letter { font-size: 18px; font-weight: 700; color: #374151; }
+.surface-name { font-size: 11px; color: #6b7280; }
+.selected-summary { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #f9fafb; border-radius: 8px; }
+.summary-label { font-size: 12px; font-weight: 500; color: #6b7280; }
+.summary-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.summary-badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.tooth-info { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; color: #6b7280; padding: 8px; background: #f4f4f5; border-radius: 6px; }
+
+/* --------------------------------------------------------------------------
+   Infobulle
+   -------------------------------------------------------------------------- */
+.odonto-tooltip { position: absolute; z-index: 2600; min-width: 200px; max-width: 280px; background: #fff; border: 1px solid var(--odo-border); border-radius: 10px; box-shadow: 0 12px 32px rgba(11,45,90,.18); padding: 12px; opacity: 0; pointer-events: none; transition: opacity .12s; font-size: 12px; }
+.odonto-tooltip.visible { opacity: 1; pointer-events: auto; }
+.odonto-tooltip .tooltip-header { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 8px; }
+.odonto-tooltip .tooth-number-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; padding: 0 6px; background: #3b82f6; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.odonto-tooltip .tooth-name { font-weight: 500; color: #374151; }
+.odonto-tooltip .treatments-section { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+.odonto-tooltip .treatment-group { display: flex; flex-direction: column; gap: 4px; }
+.odonto-tooltip .group-header { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.odonto-tooltip .group-planned { color: #d97706; }
+.odonto-tooltip .group-existing { color: #6b7280; }
+.odonto-tooltip .treatment-item { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; margin-left: 8px; border-radius: 4px; cursor: pointer; transition: background-color .15s; }
+.odonto-tooltip .treatment-item:hover { background: #f3f4f6; }
+.odonto-tooltip .treatment-main { display: flex; align-items: center; gap: 6px; }
+.odonto-tooltip .treatment-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.odonto-tooltip .treatment-name { font-weight: 500; color: #374151; }
+.odonto-tooltip .treatment-date { font-size: 10px; color: #9ca3af; margin-left: 14px; }
+.odonto-tooltip .empty-state { padding: 8px 0; text-align: center; }
+.odonto-tooltip .click-hint { padding-top: 8px; margin-top: 8px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #9ca3af; text-align: center; }
+
+/* --------------------------------------------------------------------------
+   Parodontogramme
+   -------------------------------------------------------------------------- */
+.periodontogram-view { display: flex; flex-direction: column; gap: 14px; }
+.perio-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 16px; text-align: center; }
+.perio-empty-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--primary-light, #d9efff); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.perio-empty h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.perio-empty p { margin: 0; max-width: 460px; font-size: 13px; color: var(--odo-muted); }
+.perio-history-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #fde68a; background: #fffbeb; color: #78350f; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.periodontogram-chart { display: flex; flex-direction: column; gap: 14px; }
+.perio-banner { border: 1px solid var(--odo-border); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.perio-banner-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.perio-banner-left { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.perio-save-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11px; }
+.perio-save-pill.state-saving { background: #f3f4f6; color: #4b5563; }
+.perio-save-pill.state-dirty { background: #fef3c7; color: #b45309; }
+.perio-save-pill.state-saved { background: #d1fae5; color: #047857; }
+.perio-indices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; border-top: 1px solid var(--odo-border); margin-top: 12px; padding-top: 12px; }
+@media (min-width: 640px) { .perio-indices { grid-template-columns: repeat(4, 1fr); } }
+.perio-index-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--odo-muted); }
+.perio-index-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.perio-scroll { overflow-x: auto; padding-bottom: 8px; }
+.perio-min { min-width: 1100px; display: flex; flex-direction: column; gap: 16px; }
+.perio-card-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--odo-border); border-radius: 12px; padding: 12px 14px; background: #fff; }
+
+.perio-arch-block { border: 1px solid var(--odo-border); border-radius: 10px; background: #fff; }
+.perio-arch-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; }
+.perio-arch-header h4 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--odo-muted); }
+.perio-arch-header span { font-size: 10px; color: var(--odo-subtle); }
+.perio-arch-table { table-layout: fixed; border-collapse: collapse; text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.25; }
+.perio-arch-table tbody tr { border-top: 1px solid #f1f5f9; }
+.perio-arch-table th, .perio-arch-table td { padding: 2px 4px; }
+.perio-arch-table .perio-label { text-align: right; font-weight: 500; color: var(--odo-muted); white-space: nowrap; }
+.perio-arch-table .perio-fdi { padding: 4px; font-weight: 600; color: var(--odo-text); }
+.perio-face-tag { font-size: 9px; opacity: .8; }
+.perio-row-vestibular { background: var(--perio-vestibular-row); }
+.perio-row-vestibular .perio-label, .perio-face-v { color: #b45309 !important; }
+.perio-row-palatal { background: var(--perio-palatal-row); }
+.perio-row-palatal .perio-label, .perio-face-p { color: #0369a1 !important; }
+.perio-face-v, .perio-face-p { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.perio-site-cells { display: flex; align-items: center; justify-content: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.perio-cell-cycle { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; padding: 0 4px; border-radius: 4px; border: 1px solid transparent; background: transparent; font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; transition: background-color .1s, border-color .1s; }
+.perio-cell-cycle:hover:not(:disabled) { background: var(--perio-cell-hover); }
+.perio-cell-cycle:focus-visible { outline: none; border-color: var(--primary, #1c8cf8); box-shadow: 0 0 0 1px var(--primary, #1c8cf8); }
+.perio-cell-cycle:disabled { cursor: not-allowed; opacity: .5; }
+.perio-cell-cycle.is-implant { color: #059669; }
+.perio-cell-input { width: 100%; padding: 0 2px; border: 1px solid transparent; background: transparent; font-family: inherit; font-size: inherit; color: var(--odo-text); text-align: center; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; border-radius: 3px; transition: background-color .1s, border-color .1s; }
+.perio-cell-input::-webkit-outer-spin-button, .perio-cell-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.perio-cell-input:hover:not(:disabled) { background: var(--perio-cell-hover); }
+.perio-cell-input:focus { outline: none; background: #fff; border-color: var(--perio-cell-focus-ring); box-shadow: 0 0 0 1px var(--perio-cell-focus-ring); }
+.perio-cell-input:disabled { cursor: not-allowed; color: var(--odo-subtle); }
+.perio-cell-input--site { width: 16px; padding: 0; font-weight: 600; }
+.perio-cell-toggle { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--perio-cell-toggle-border); background: var(--perio-cell-toggle-bg); cursor: pointer; transition: transform .1s, background-color .1s; padding: 0; }
+.perio-cell-toggle:hover:not(:disabled) { transform: scale(1.1); }
+.perio-cell-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--primary, #1c8cf8); }
+.perio-cell-toggle--bop.is-on { background: #ffe0e6; border-color: #d93a58; }
+.perio-cell-toggle--plaque.is-on { background: #d9efff; border-color: #1c8cf8; }
+.perio-cell-toggle:disabled { cursor: not-allowed; opacity: .5; }
+.perio-arch-table .perio-tooth-cell { padding: 4px 0; vertical-align: top; }
+.perio-arch-table .perio-row-anchor { position: relative; }
+.perio-profile-anchor { position: absolute; left: 96px; height: 60px; pointer-events: none; z-index: 5; }
+.perio-profile-anchor--top { top: 17px; }
+.perio-profile-anchor--bottom { top: 61px; }
+.perio-profile-strip { display: block; width: 100%; height: auto; }
+.perio-strip-grid { stroke: var(--perio-grid-line); stroke-width: .35; }
+.perio-strip-grid.bold { stroke: var(--perio-grid-line-bold); stroke-width: .6; }
+.perio-strip-band { fill: var(--perio-pocket-band); opacity: var(--perio-pocket-band-opacity); }
+.perio-strip-gm { fill: none; stroke: var(--perio-gm-stroke); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.perio-strip-pd { fill: none; stroke: var(--perio-pd-stroke); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.perio-tooth-lateral { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.perio-markers { display: flex; align-items: center; gap: 2px; }
+.perio-tooth-svg-wrap { position: relative; }
+.perio-tooth-svg { height: 112px; width: 60px; display: block; }
+.perio-roots path { fill: none; stroke: var(--odontogram-outline-light); stroke-width: 1.5; stroke-linejoin: round; }
+.perio-crown path { fill: var(--odontogram-fill); stroke: var(--odontogram-outline-light); stroke-width: 1.5; stroke-linejoin: round; }
+.perio-absent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-family: ui-monospace, monospace; font-size: 12px; }
+.perio-site-marker { display: inline-flex; align-items: center; justify-content: center; height: 16px; width: 16px; border-radius: 50%; font-family: ui-monospace, monospace; font-weight: 500; font-size: 10px; box-shadow: inset 0 0 0 1px currentColor; position: relative; }
+.perio-tone-neutral { background: #f3f4f6; color: #6b7280; box-shadow: inset 0 0 0 1px #d1d5db; }
+.perio-tone-success { background: #ecfdf5; color: #047857; box-shadow: inset 0 0 0 1px #34d399; }
+.perio-tone-warning-low { background: #fffbeb; color: #b45309; box-shadow: inset 0 0 0 1px #fbbf24; }
+.perio-tone-warning-high { background: #fff7ed; color: #c2410c; box-shadow: inset 0 0 0 1px #f97316; }
+.perio-tone-error { background: #fff1f2; color: #be123c; box-shadow: inset 0 0 0 1px #fb7185; }

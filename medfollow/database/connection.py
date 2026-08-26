@@ -1066,4 +1066,128 @@ async def init_db():
         except Exception:
             pass
 
+    # --- Odontogramme / parodontogramme (modèle dentalpin) --------------------
+    # Nouveau modèle : état de dent + actes cliniques (1..N dents) + journal ;
+    # examens parodontaux datés (brouillon -> clôturé). Les anciennes tables
+    # dental_* sont conservées (consultations, PDF) et alimentées en miroir ;
+    # `odo_synced` marque les lignes déjà reprises par la migration unique.
+    await db.executescript("""
+        CREATE TABLE IF NOT EXISTS odo_tooth_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            tooth_number INTEGER NOT NULL,
+            tooth_type TEXT NOT NULL CHECK(tooth_type IN ('permanent','deciduous')),
+            general_condition TEXT NOT NULL DEFAULT 'healthy',
+            surfaces_json TEXT NOT NULL DEFAULT '{"M":"healthy","D":"healthy","O":"healthy","V":"healthy","L":"healthy"}',
+            is_displaced INTEGER NOT NULL DEFAULT 0,
+            is_rotated INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(patient_id, tooth_number)
+        );
+        CREATE TABLE IF NOT EXISTS odo_treatments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            clinical_type TEXT NOT NULL,
+            scope TEXT NOT NULL DEFAULT 'tooth' CHECK(scope IN ('tooth','multi_tooth','global_mouth','global_arch')),
+            arch TEXT CHECK(arch IS NULL OR arch IN ('upper','lower')),
+            status TEXT NOT NULL CHECK(status IN ('planned','performed')),
+            recorded_at TEXT NOT NULL,
+            performed_at TEXT,
+            performed_by INTEGER REFERENCES users(id),
+            source_module TEXT NOT NULL DEFAULT 'odontogram',
+            consultation_id INTEGER REFERENCES consultations(id),
+            deleted_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_odo_treatments_patient ON odo_treatments(patient_id, deleted_at);
+        CREATE TABLE IF NOT EXISTS odo_treatment_teeth (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            treatment_id INTEGER NOT NULL REFERENCES odo_treatments(id) ON DELETE CASCADE,
+            tooth_record_id INTEGER NOT NULL REFERENCES odo_tooth_records(id),
+            tooth_number INTEGER NOT NULL,
+            role TEXT CHECK(role IS NULL OR role IN ('pillar','pontic')),
+            surfaces_json TEXT,
+            UNIQUE(treatment_id, tooth_number)
+        );
+        CREATE TABLE IF NOT EXISTS odo_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            tooth_number INTEGER NOT NULL,
+            change_type TEXT NOT NULL,
+            surface TEXT,
+            old_condition TEXT,
+            new_condition TEXT,
+            changed_by INTEGER REFERENCES users(id),
+            changed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_odo_history_patient ON odo_history(patient_id, changed_at);
+
+        CREATE TABLE IF NOT EXISTS perio_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            status TEXT NOT NULL CHECK(status IN ('draft','closed')),
+            recorded_at TEXT NOT NULL,
+            recorded_by INTEGER NOT NULL REFERENCES users(id),
+            closed_at TEXT,
+            closed_by INTEGER REFERENCES users(id),
+            indices_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_perio_one_draft ON perio_snapshots(patient_id) WHERE status = 'draft';
+        CREATE TABLE IF NOT EXISTS perio_teeth (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_id INTEGER NOT NULL REFERENCES perio_snapshots(id) ON DELETE CASCADE,
+            tooth_number INTEGER NOT NULL CHECK(tooth_number BETWEEN 11 AND 48 AND (tooth_number % 10) BETWEEN 1 AND 8),
+            is_present INTEGER NOT NULL DEFAULT 1,
+            is_implant INTEGER NOT NULL DEFAULT 0,
+            mobility INTEGER CHECK(mobility IS NULL OR mobility BETWEEN 0 AND 3),
+            prognosis TEXT CHECK(prognosis IS NULL OR prognosis IN ('good','fair','poor','hopeless')),
+            furcation_buccal TEXT CHECK(furcation_buccal IS NULL OR furcation_buccal IN ('0','I','II','III')),
+            furcation_lingual TEXT CHECK(furcation_lingual IS NULL OR furcation_lingual IN ('0','I','II','III')),
+            keratinized_gingiva_mm INTEGER CHECK(keratinized_gingiva_mm IS NULL OR keratinized_gingiva_mm BETWEEN 0 AND 20),
+            UNIQUE(snapshot_id, tooth_number)
+        );
+        CREATE TABLE IF NOT EXISTS perio_sites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_id INTEGER NOT NULL REFERENCES perio_snapshots(id) ON DELETE CASCADE,
+            tooth_id INTEGER NOT NULL REFERENCES perio_teeth(id) ON DELETE CASCADE,
+            tooth_number INTEGER NOT NULL,
+            site_code TEXT NOT NULL CHECK(site_code IN ('MV','V','DV','ML','L','DL')),
+            probing_depth_mm INTEGER CHECK(probing_depth_mm IS NULL OR probing_depth_mm BETWEEN 0 AND 15),
+            gingival_margin_mm INTEGER CHECK(gingival_margin_mm IS NULL OR gingival_margin_mm BETWEEN -5 AND 10),
+            bleeding_on_probing INTEGER NOT NULL DEFAULT 0,
+            plaque INTEGER NOT NULL DEFAULT 0,
+            suppuration INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(snapshot_id, tooth_number, site_code)
+        );
+    """)
+    await db.commit()
+    for _legacy_tbl, _legacy_col in (
+        ("dental_teeth", "odo_synced INTEGER DEFAULT 0"),
+        ("dental_tooth_surfaces", "odo_synced INTEGER DEFAULT 0"),
+        ("dental_condition_history", "odo_synced INTEGER DEFAULT 0"),
+        ("dental_treatments", "odo_synced INTEGER DEFAULT 0"),
+        ("dental_treatments", "odo_treatment_id INTEGER"),
+    ):
+        try:
+            await db.execute(f"ALTER TABLE {_legacy_tbl} ADD COLUMN {_legacy_col}")
+            await db.commit()
+        except Exception:
+            pass
+    # Reprise unique des anciennes conditions dentaires vers le nouveau modèle.
+    # Ne doit jamais empêcher le démarrage : toute erreur est tracée puis ignorée.
+    try:
+        from services.odonto_service import migrate_legacy_odontogram
+        await migrate_legacy_odontogram(db)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
     await db.close()

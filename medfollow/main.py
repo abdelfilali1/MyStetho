@@ -24,7 +24,7 @@ def _calc_age(dob_str):
         return ""
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, salle_attente, whatsapp_webhook, profile
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, salle_attente, whatsapp_webhook, profile, odontogram, periodontogram
 from services import reminder_scheduler
 
 
@@ -340,6 +340,8 @@ app.include_router(documents.router)
 app.include_router(messages.router)
 app.include_router(invoices.router)
 app.include_router(dental.router)
+app.include_router(odontogram.router)
+app.include_router(periodontogram.router)
 app.include_router(mutuelle.router)
 app.include_router(cephalo.router)
 app.include_router(radio.router)

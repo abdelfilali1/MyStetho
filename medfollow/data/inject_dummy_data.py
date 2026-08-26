@@ -37,7 +37,11 @@ def main():
         existing_ids = [row[0] for row in existing]
         ids_str = ",".join(str(i) for i in existing_ids)
         # Delete cascading data first
-        for tbl in ("dental_teeth", "dental_treatments"):
+        for tbl in (
+            "perio_sites", "perio_teeth", "perio_snapshots",
+            "odo_treatment_teeth", "odo_treatments", "odo_history", "odo_tooth_records",
+            "dental_teeth", "dental_treatments",
+        ):
             try:
                 c.execute(f"DELETE FROM {tbl} WHERE patient_id IN ({ids_str})")
                 print(f"  Deleted rows from {tbl} for those patients")

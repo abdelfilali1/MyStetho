@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 import aiosqlite
 
 from database.connection import get_db
-from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED, ADMIN_EMAIL
+from config import TEMPLATES_DIR, UPLOAD_DIR, HTTPS_ENABLED, ADMIN_EMAIL, PUBLIC_BASE_URL
 from services.auth_service import hash_password, verify_password, create_token, decode_token
 from services.rate_limit import retry_after, record_failure, reset as rate_limit_reset
 from services.audit import log_audit, client_ip
@@ -141,7 +141,7 @@ async def login(
 @router.get("/logout")
 async def logout():
     response = RedirectResponse(url="/login", status_code=302)
-    response.delete_cookie("access_token")
+    response.delete_cookie("access_token", path="/", samesite="lax", secure=HTTPS_ENABLED)
     return response
 
 
@@ -400,7 +400,7 @@ async def generate_reset_link(request: Request, user_id: int, current_user: dict
         (token, user_id, expires_at),
     )
     await db.commit()
-    base_url = str(request.base_url).rstrip("/")
+    base_url = PUBLIC_BASE_URL or str(request.base_url).rstrip("/")
     reset_link = f"{base_url}/reset-password/{token}"
     cursor = await db.execute("SELECT id, email, first_name, last_name, role, specialty, is_active, pdf_template_path FROM users ORDER BY created_at")
     rows = await cursor.fetchall()
@@ -480,7 +480,7 @@ async def reset_password(
         "token": token, "email": row[3], "still_signed_in": still_signed_in,
     })
     if not still_signed_in:
-        response.delete_cookie("access_token")
+        response.delete_cookie("access_token", path="/", samesite="lax", secure=HTTPS_ENABLED)
     return response
 
 
@@ -534,7 +534,7 @@ async def create_invite(
         (token, email.strip() or None, role, specialty or None, user["sub"], expires_at),
     )
     await db.commit()
-    base_url = str(request.base_url).rstrip("/")
+    base_url = PUBLIC_BASE_URL or str(request.base_url).rstrip("/")
     new_link = f"{base_url}/register/{token}"
     invitations = await _get_invitations(db)
     return templates.TemplateResponse("admin/invite.html", {

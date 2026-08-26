@@ -400,14 +400,11 @@ async def view_patient(
     user_specialty = user.get("specialty", "") or ""
     is_dentist = "dent" in user_specialty.lower()
 
+    # L'odontogramme (module static/js/odonto) charge ses données via /odonto/{id} ;
+    # seul le résumé endodontique est encore injecté dans le template.
     teeth_data_json = "{}"
     endo_summary_json = "{}"
     if is_dentist:
-        cursor = await db.execute("SELECT * FROM dental_teeth WHERE patient_id = ?", (patient_id,))
-        teeth_rows = await cursor.fetchall()
-        teeth_data = {str(r["tooth_number"]): dict(r) for r in teeth_rows}
-        teeth_data_json = json.dumps(teeth_data)
-
         cursor = await db.execute(
             "SELECT tooth_number, status FROM endo_canals WHERE patient_id = ?", (patient_id,)
         )

@@ -142,6 +142,110 @@ for _needle, _label in (
 print("== Dental (item 24) ==")
 post("/dental/1/tooth/26/condition", {"condition": "carie"})
 post("/dental/1/tooth/26/condition", {"condition": "obturation", "surface": "occlusal"}, label="/dental tooth surface")
+post("/dental/1/tooth/18/condition", {"condition": "extraction"}, label="/dental tooth 18 extraction")
+
+
+def json_call(method, path, body=None, expect=(200,), label=None):
+    """Appel JSON (X-Requested-With + CSRF) vers les API /odonto et /perio."""
+    token = csrf()
+    headers = {"X-CSRF-Token": token, "X-Requested-With": "fetch"}
+    r = client.request(method, path, json=body, headers=headers)
+    ok = r.status_code in expect
+    tag = label or path
+    print(f"  {'OK ' if ok else 'XX '} {method} {tag} -> {r.status_code}")
+    if not ok:
+        failures.append(f"{method} {tag} -> {r.status_code} (attendu {expect}) {r.text[:200]}")
+    try:
+        return r.json()
+    except Exception:
+        return None
+
+
+def check(cond, label):
+    print(f"  {'OK ' if cond else 'XX '} {label}")
+    if not cond:
+        failures.append(label)
+
+
+print("== Odontogramme (modele dentalpin) ==")
+# Migration unique des anciennes conditions -> nouveau modele (normalement au demarrage).
+import asyncio  # noqa: E402
+import aiosqlite  # noqa: E402
+from services.odonto_service import migrate_legacy_odontogram  # noqa: E402
+
+
+async def _migrate():
+    db = await aiosqlite.connect(_TMP_DB)
+    db.row_factory = aiosqlite.Row
+    await db.execute("PRAGMA foreign_keys=ON")
+    try:
+        return await migrate_legacy_odontogram(db)
+    finally:
+        await db.close()
+
+
+print("  migration legacy :", asyncio.run(_migrate()))
+_odo = json_call("GET", "/odonto/1") or {}
+_types = {(t["clinical_type"], tuple(x["tooth_number"] for x in t["teeth"])): t for t in _odo.get("treatments", [])}
+check(("caries", (26,)) in _types, "migration : carie sur 26")
+_fc = _types.get(("filling_composite", (26,)))
+check(bool(_fc) and _fc["teeth"][0]["surfaces"] == ["O"], "migration : obturation composite face O sur 26")
+check(("missing", (18,)) in _types, "migration : dent 18 absente")
+_t1 = json_call("POST", "/odonto/1/treatments", {"clinical_type": "crown", "tooth_numbers": [16], "status": "performed"}, expect=(201,), label="/odonto couronne 16") or {}
+_t2 = json_call("POST", "/odonto/1/treatments", {"clinical_type": "bridge", "status": "planned", "teeth": [
+    {"tooth_number": 14, "role": "pillar"}, {"tooth_number": 15, "role": "pontic"}, {"tooth_number": 16, "role": "pillar"}]},
+    expect=(201,), label="/odonto bridge 14-16") or {}
+check([x.get("role") for x in _t2.get("teeth", [])] == ["pillar", "pontic", "pillar"], "bridge : roles pilier/pont")
+json_call("POST", "/odonto/1/treatments", {"clinical_type": "bridge", "tooth_numbers": [11]}, expect=(400,), label="/odonto bridge 1 dent (refuse)")
+_t3 = json_call("POST", "/odonto/1/treatments", {"clinical_type": "filling_composite", "tooth_numbers": [36], "surfaces": ["M", "O"], "status": "planned"}, expect=(201,), label="/odonto composite 36 M-O") or {}
+json_call("PATCH", f"/odonto/1/treatments/{_t3.get('id')}/perform", {}, label="/odonto perform")
+json_call("PUT", f"/odonto/1/treatments/{_t3.get('id')}", {"surfaces": ["M", "O", "D"]}, label="/odonto update surfaces")
+json_call("GET", "/odonto/1/timeline")
+_at = json_call("GET", "/odonto/1/at?date=2020-01-01") or {}
+check(_at.get("treatments") == [], "/odonto at 2020 : vide")
+json_call("GET", "/odonto/1/history")
+json_call("PUT", "/odonto/1/teeth/18", {"general_condition": "healthy"}, label="/odonto tooth 18 healthy")
+json_call("DELETE", f"/odonto/1/treatments/{_t1.get('id')}", expect=(204,), label="/odonto delete couronne")
+# Miroir legacy : les consultations / le PDF patient lisent toujours dental_teeth.
+import sqlite3  # noqa: E402
+_con = sqlite3.connect(_TMP_DB)
+_rows = dict(_con.execute("SELECT tooth_number, condition FROM dental_teeth").fetchall())
+_con.close()
+check(_rows.get(36) == "obturation", "miroir legacy : dent 36 = obturation")
+check(_rows.get(16) == "sain", "miroir legacy : dent 16 revenue a sain apres suppression")
+get("/patients/1/brochure.pdf", label="/patients/1/brochure.pdf (etat bucco-dentaire)")
+
+print("== Parodontogramme ==")
+_d = json_call("POST", "/perio/1/draft") or {}
+_sid = _d.get("id")
+check(len(_d.get("teeth", [])) == 32, "brouillon : 32 dents permanentes")
+json_call("PATCH", f"/perio/1/snapshots/{_sid}/teeth/16", {"mobility": 2, "prognosis": "fair"}, label="/perio tooth 16")
+json_call("PATCH", f"/perio/1/snapshots/{_sid}/teeth/16/sites/MV", {"probing_depth_mm": 6, "bleeding_on_probing": True}, label="/perio site 16 MV")
+json_call("PATCH", f"/perio/1/snapshots/{_sid}/teeth/16/sites/MV", {"probing_depth_mm": 99}, expect=(422,), label="/perio site hors plage (422)")
+_ind = json_call("GET", f"/perio/1/snapshots/{_sid}/indices") or {}
+check(_ind.get("deep_pockets_count") == 1, "indices : 1 poche >= 5 mm")
+_closed = json_call("POST", f"/perio/1/snapshots/{_sid}/close", {}) or {}
+check(_closed.get("status") == "closed", "session cloturee")
+json_call("PATCH", f"/perio/1/snapshots/{_sid}/teeth/16", {"mobility": 1}, expect=(409,), label="/perio modif apres cloture (409)")
+json_call("DELETE", f"/perio/1/snapshots/{_sid}", expect=(409,), label="/perio suppression session close (409)")
+_tl = json_call("GET", "/perio/1/timeline") or {}
+check(len(_tl.get("dates", [])) == 1 and _tl.get("draft") is None, "timeline : 1 date, pas de brouillon")
+_d2 = json_call("POST", "/perio/1/draft") or {}
+json_call("DELETE", f"/perio/1/snapshots/{_d2.get('id')}", expect=(204,), label="/perio abandon brouillon")
+
+print("== Pages odontogramme / parodontogramme ==")
+# Le jeton pose par /setup ne porte pas la specialite : on se reconnecte pour
+# obtenir la vue dentiste (onglets Odontogramme / Endodontie).
+post("/login", {"email": "admin@smoke.test", "password": "Password123!"}, label="/login (vue dentiste)")
+_r = get("/patients/1?tab=odontogram", label="/patients/1?tab=odontogram")
+for _needle, _label in (('id="odonto-root"', "racine odontogramme"), ('id="perio-root"', "racine parodontogramme"),
+                        ("Parodontogramme", "slider Parodontogramme"), ("/static/js/odonto/index.js", "module odonto")):
+    check(_needle in _r.text, f"fiche patient : {_label}")
+_r = get("/dental/1", label="/dental/1")
+for _needle, _label in (('id="btn-perio"', "bouton Parodontogramme"), ('id="btn-endo"', "bouton Endodontie"), ('id="perio-root"', "racine parodontogramme")):
+    check(_needle in _r.text, f"/dental : {_label}")
+get("/static/js/odonto/index.js", expect=(200,), label="/static/js/odonto/index.js")
+get("/static/css/odonto.css", expect=(200,), label="/static/css/odonto.css")
 
 print("== Rappels (item 31) ==")
 post("/rappels/new", {"patient_id": "1", "description": "Détartrage", "due_date": "2026-09-01"})

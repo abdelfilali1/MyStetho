@@ -74,9 +74,8 @@ async def dental_chart(request: Request, patient_id: int, consultation_id: Optio
     if not row:
         return RedirectResponse(url="/patients", status_code=302)
     patient = dict(row)
-    cursor = await db.execute("SELECT * FROM dental_teeth WHERE patient_id = ?", (patient_id,))
-    teeth_rows = await cursor.fetchall()
-    teeth_data = {str(r["tooth_number"]): dict(r) for r in teeth_rows}
+    # L'odontogramme (module static/js/odonto) charge ses données via /odonto/{id}.
+    teeth_data = {}
 
     # Endo summary: best (highest-priority) status per tooth
     cursor = await db.execute(
