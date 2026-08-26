@@ -2,7 +2,7 @@
 {% block title %}Odontogramme — {{ patient.last_name | upper }} {{ patient.first_name }}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/odonto.css?v=20260826-1">
+<link rel="stylesheet" href="/static/css/odonto.css?v=20260826-2">
 <style>
 /* ===========================
    ODONTOGRAM PAGE
@@ -561,7 +561,7 @@ function escapeHtml(str) {
 let _odontoMod = null, _odontoChart = null, _perioChart = null;
 const ODONTO_OPTS = { patientId: PATIENT_ID, consultationId: {% if consultation_id %}{{ consultation_id }}{% else %}null{% endif %} };
 function loadOdonto() {
-    return _odontoMod || (_odontoMod = import('/static/js/odonto/index.js?v=20260826-1'));
+    return _odontoMod || (_odontoMod = import('/static/js/odonto/index.js?v=20260826-2'));
 }
 function switchView(view) {
     const views = { odontogram: 'view-odontogram', perio: 'view-perio', endo: 'view-endo' };

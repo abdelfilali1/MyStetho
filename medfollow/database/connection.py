@@ -1171,6 +1171,8 @@ async def init_db():
         ("dental_condition_history", "odo_synced INTEGER DEFAULT 0"),
         ("dental_treatments", "odo_synced INTEGER DEFAULT 0"),
         ("dental_treatments", "odo_treatment_id INTEGER"),
+        # Acte du catalogue (ex. REST-CROWN-ZIR) à l'origine du traitement ; NULL = type de base.
+        ("odo_treatments", "catalog_code TEXT"),
     ):
         try:
             await db.execute(f"ALTER TABLE {_legacy_tbl} ADD COLUMN {_legacy_col}")

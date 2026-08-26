@@ -461,3 +461,24 @@ body.odonto-modal-open { overflow: hidden; }
 .perio-tone-warning-low { background: #fffbeb; color: #b45309; box-shadow: inset 0 0 0 1px #fbbf24; }
 .perio-tone-warning-high { background: #fff7ed; color: #c2410c; box-shadow: inset 0 0 0 1px #f97316; }
 .perio-tone-error { background: #fff1f2; color: #be123c; box-shadow: inset 0 0 0 1px #fb7185; }
+
+/* --- Catalogue : sélecteur d'arcade (traitements globaux) --------------------- */
+.arch-picker { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; }
+.arch-picker-label { font-size: 13px; font-weight: 500; color: #1d4ed8; }
+.arch-picker-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.arch-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: #1e3a8a; background: #fff; border: 1px solid #93c5fd; border-radius: 6px; transition: all .15s ease; cursor: pointer; flex: 1; min-width: 120px; font-family: inherit; }
+.arch-btn:hover:not(:disabled) { background: #dbeafe; border-color: #3b82f6; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(59,130,246,.2); }
+.arch-btn:disabled { opacity: .5; cursor: not-allowed; }
+.arch-btn-cancel { background: transparent; color: #71717a; border-color: #d4d4d8; flex: 0 0 auto; min-width: 90px; }
+.arch-btn-cancel:hover:not(:disabled) { background: #f4f4f5; }
+.treatment-btn.is-global .treatment-label { font-style: normal; }
+
+/* --- Bandeau « Bouche complète » (port de GlobalTreatmentsStrip) --------------- */
+.global-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; margin-top: 8px; background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 8px; }
+.global-strip-label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #71717a; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
+.global-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 500; color: #3f3f46; background: #fff; border: 1px solid #d4d4d8; border-radius: 999px; cursor: pointer; font-family: inherit; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.global-chip:hover, .global-chip.highlighted { border-color: #3b82f6; background: #eff6ff; color: #1e40af; box-shadow: 0 2px 6px rgba(59,130,246,.2); transform: translateY(-1px); }
+.global-chip.global-chip-planned { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #f4f4f5 3px, #f4f4f5 6px); }
+/* Halo d'arcade au survol d'une chip « arcade » */
+.odontogram-grid.arch-hover-upper .arch-container:first-child,
+.odontogram-grid.arch-hover-lower .arch-container:last-child { outline: 2px solid rgba(59,130,246,.55); outline-offset: 4px; border-radius: 12px; background: rgba(59,130,246,.05); }

@@ -4,11 +4,19 @@
  */
 
 import {
-  PLANNED_INDICATOR_COLOR, T, TREATMENT_CATEGORIES, esc, formatDate, formatDateTime,
-  getTreatmentColor, toothName, typeLabel,
+  PLANNED_INDICATOR_COLOR, T, TREATMENT_CATEGORIES, archLabel, esc, formatDate, formatDateTime,
+  getTreatmentColor, toothName, treatmentLabel, typeLabel,
 } from './constants.js';
 import { TREATMENT_ICONS, iconSvg } from './icons.js';
-import { viewForTooth } from './tooth.js';
+import { isGlobalTreatment, viewForGlobal, viewForTooth } from './tooth.js';
+
+/** Colonne « dent » d'une ligne : numéro + nom, ou « Bouche complète · arcade » pour un traitement global. */
+function toothCell(v) {
+  if (v.tooth_number === null || v.tooth_number === undefined) {
+    return `<span class="odonto-strong">${T.globals.category}</span>${v.arch ? ` <span class="odonto-muted">${archLabel(v.arch)}</span>` : ''}`;
+  }
+  return `<span class="odonto-strong">${v.tooth_number}</span> <span class="odonto-muted">${esc(toothName(v.tooth_number))}</span>`;
+}
 
 function chevron(open) {
   return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${open ? 'm18 15-6-6-6 6' : 'm6 9 6 6 6-6'}"/></svg>`;
@@ -43,6 +51,10 @@ export function createLegend(el) {
 function flatten(treatments) {
   const rows = [];
   for (const t of treatments) {
+    if (isGlobalTreatment(t) || !(t.teeth || []).length) {
+      rows.push(viewForGlobal(t));
+      continue;
+    }
     for (const tooth of t.teeth || []) {
       const v = viewForTooth(t, tooth.tooth_number);
       if (v) rows.push(v);
@@ -62,8 +74,8 @@ export function createTreatmentList(el) {
       <div class="odo-section-body"${expanded ? '' : ' hidden'}>
         ${rows.length === 0 ? `<div class="odo-section-empty">${T.treatmentList.noTreatments}</div>` : `<ul class="odo-treatment-list">${rows.map((v) => `<li>
           <span class="odonto-dot" style="background:${getTreatmentColor(v.treatment_type)}"></span>
-          <div class="odo-tl-main"><div><span class="odonto-strong">${v.tooth_number}</span> <span class="odonto-muted">${esc(toothName(v.tooth_number))}</span></div>
-            <div class="odonto-small"><span class="odonto-muted">${esc(typeLabel(v.treatment_type))}</span>${v.surfaces && v.surfaces.length ? ` <span class="odonto-subtle">(${v.surfaces.join(', ')})</span>` : ''}</div></div>
+          <div class="odo-tl-main"><div>${toothCell(v)}</div>
+            <div class="odonto-small"><span class="odonto-muted">${esc(treatmentLabel(v))}</span>${v.surfaces && v.surfaces.length ? ` <span class="odonto-subtle">(${v.surfaces.join(', ')})</span>` : ''}</div></div>
           <div class="odo-tl-side"><span class="odo-badge odo-badge-xs ${v.status === 'planned' ? 'odo-badge-warning' : 'odo-badge-neutral'}">${T.status[v.status]}</span><span class="odonto-small odonto-subtle">${esc(formatDate(v.performed_at || v.recorded_at))}</span></div>
         </li>`).join('')}</ul>`}
       </div></div>`;
@@ -114,8 +126,8 @@ export function createChangeHistory(el, { loadHistory }) {
           const v = e.v;
           return `<div class="odo-history-entry"><div class="odo-history-rail"><div class="odo-history-dot treatment"></div><div class="odo-history-line"></div></div>
             <div class="odo-history-content">
-              <div class="odo-history-row"><span class="odonto-strong">${v.tooth_number}</span><span class="odonto-muted">${esc(toothName(v.tooth_number))}</span>${v.surfaces && v.surfaces.length ? `<span class="odonto-subtle">(${v.surfaces.join(', ')})</span>` : ''}<span class="odo-badge odo-badge-success odo-badge-xs">${T.changeHistory.treatmentAdded}</span></div>
-              <div class="odo-history-row odonto-small"><span class="odo-color-square" style="background:${getTreatmentColor(v.treatment_type)}"></span><span class="odonto-muted odonto-strong">${esc(typeLabel(v.treatment_type))}</span><span class="${v.status === 'planned' ? 'odo-text-warning' : 'odonto-muted'}">(${T.status[v.status]})</span></div>
+              <div class="odo-history-row">${toothCell(v)}${v.surfaces && v.surfaces.length ? `<span class="odonto-subtle">(${v.surfaces.join(', ')})</span>` : ''}<span class="odo-badge odo-badge-success odo-badge-xs">${T.changeHistory.treatmentAdded}</span></div>
+              <div class="odo-history-row odonto-small"><span class="odo-color-square" style="background:${getTreatmentColor(v.treatment_type)}"></span><span class="odonto-muted odonto-strong">${esc(treatmentLabel(v))}</span><span class="${v.status === 'planned' ? 'odo-text-warning' : 'odonto-muted'}">(${T.status[v.status]})</span></div>
               <div class="odo-history-row odonto-small odonto-subtle">📅 ${esc(formatDateTime(e.date))}${v.performed_by_name ? ` • 👤 ${esc(v.performed_by_name)}` : ''}</div>
             </div></div>`;
         }

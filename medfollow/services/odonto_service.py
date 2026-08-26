@@ -24,6 +24,7 @@ import aiosqlite
 
 from services.odonto_constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
+    CATALOG_BY_CODE,
     CLINICAL_TO_LEGACY_PRIORITY,
     LEGACY_SURFACE_MAP,
     LEGACY_TO_CLINICAL,
@@ -33,6 +34,7 @@ from services.odonto_constants import (
     SURFACES,
     TOOTH_CONDITIONS,
     TREATMENT_LABELS_FR,
+    catalog_label,
     contiguous_runs,
     get_tooth_type,
     is_valid_tooth_number,
@@ -327,6 +329,8 @@ async def list_treatments(
     for r in rows:
         if r.get("performed_by") is None:
             r["performed_by_name"] = None
+        r["catalog_code"] = r.get("catalog_code") or None
+        r["catalog_label"] = catalog_label(r["catalog_code"], r["clinical_type"])
     return await _attach_teeth(db, rows)
 
 
@@ -342,10 +346,22 @@ async def get_odontogram(db: aiosqlite.Connection, patient_id: int) -> dict:
 
 
 def _validate_shape(data: dict) -> tuple[str, str, list[dict], str]:
-    """Reprise de `TreatmentCreate.validate_shape` + `_build_teeth_inputs`.
+    """Reprise de `TreatmentCreate.validate_shape` + `_build_teeth_inputs` et de la
+    résolution catalogue de dentalpin (`_resolve_clinical_type`).
 
     Retourne (clinical_type, scope, teeth_inputs, status)."""
+    catalog_code = data.get("catalog_code") or None
+    catalog_item = None
+    if catalog_code is not None:
+        catalog_item = CATALOG_BY_CODE.get(catalog_code)
+        if catalog_item is None:
+            raise ApiError(400, f"Acte du catalogue inconnu : {catalog_code}")
     clinical_type = data.get("clinical_type")
+    if catalog_item is not None:
+        if clinical_type and clinical_type != catalog_item["clinical_type"]:
+            raise ApiError(400, f"clinical_type={clinical_type} incompatible avec l'acte {catalog_code} "
+                                f"({catalog_item['clinical_type']})")
+        clinical_type = catalog_item["clinical_type"]
     if not clinical_type or not is_valid_treatment_type(clinical_type):
         raise ApiError(400, f"Type de traitement invalide : {clinical_type}")
     status = data.get("status") or "planned"
@@ -385,20 +401,36 @@ def _validate_shape(data: dict) -> tuple[str, str, list[dict], str]:
     count = len(teeth_inputs)
     scope = data.get("scope")
     if scope is None:
-        if count == 0:
+        if count == 0 and catalog_item is not None and catalog_item["scope"] in ("global_mouth", "global_arch"):
+            scope = catalog_item["scope"]
+        elif count == 0:
             raise ApiError(400, "Aucune dent sélectionnée")
-        scope = "tooth" if count == 1 else "multi_tooth"
+        else:
+            scope = "tooth" if count == 1 else "multi_tooth"
     if scope not in SCOPES:
         raise ApiError(400, f"Portée invalide : {scope}")
+    arch = data.get("arch") or None
     if scope in ("global_mouth", "global_arch"):
-        raise ApiError(400, "Traitements globaux non pris en charge")
+        # Traitements globaux (bouche complète / arcade) : uniquement via un acte du catalogue
+        # prévu pour cela (ex. gouttière d'occlusion), sans dent.
+        if catalog_item is None or catalog_item["scope"] != scope:
+            raise ApiError(400, "Portée globale réservée aux actes du catalogue de portée globale")
+        if count:
+            raise ApiError(400, "Un traitement global ne cible pas de dent")
+        if scope == "global_arch":
+            if arch not in ("upper", "lower"):
+                raise ApiError(400, "arch doit valoir upper ou lower")
+        else:
+            arch = None
+        return clinical_type, scope, teeth_inputs, status, arch
+    arch = None
     if scope == "tooth" and count != 1:
         raise ApiError(400, "scope=tooth requiert exactement une dent")
     if scope == "multi_tooth" and count < 2:
         raise ApiError(400, "scope=multi_tooth requiert au moins deux dents")
     if clinical_type in ATOMIC_MULTI_TOOTH_TYPES and count < 2:
-        raise ApiError(400, f"{TREATMENT_LABELS_FR.get(clinical_type, clinical_type)} : au moins deux dents requises")
-    return clinical_type, scope, teeth_inputs, status
+        raise ApiError(400, f"{catalog_label(catalog_code, clinical_type)} : au moins deux dents requises")
+    return clinical_type, scope, teeth_inputs, status, arch
 
 
 def _assign_roles(teeth_inputs: list[dict], clinical_type: str) -> list[dict]:
@@ -422,18 +454,19 @@ async def _insert_treatment(
     db: aiosqlite.Connection, patient_id: int, user_id: int | None, clinical_type: str, scope: str,
     teeth_inputs: list[dict], status: str, *, recorded_at: str | None = None, performed_at: str | None = None,
     performed_by: int | None = None, consultation_id: int | None = None, source_module: str = "odontogram",
+    catalog_code: str | None = None, arch: str | None = None,
 ) -> int:
     ts = recorded_at or now_iso()
     is_performed = status == "performed"
     cur = await db.execute(
         """INSERT INTO odo_treatments
            (patient_id, clinical_type, scope, arch, status, recorded_at, performed_at, performed_by,
-            source_module, consultation_id, created_at, updated_at)
-           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (patient_id, clinical_type, scope, status, ts,
+            source_module, consultation_id, catalog_code, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (patient_id, clinical_type, scope, arch, status, ts,
          (performed_at or ts) if is_performed else None,
          (performed_by if performed_by is not None else user_id) if is_performed else None,
-         source_module, consultation_id, ts, ts),
+         source_module, consultation_id, catalog_code, ts, ts),
     )
     treatment_id = cur.lastrowid
     for t in teeth_inputs:
@@ -448,15 +481,18 @@ async def _insert_treatment(
 
 
 async def create_treatment(db: aiosqlite.Connection, patient_id: int, user_id: int, data: dict) -> dict:
-    clinical_type, scope, teeth_inputs, status = _validate_shape(data)
+    clinical_type, scope, teeth_inputs, status, arch = _validate_shape(data)
     teeth_inputs = _assign_roles(teeth_inputs, clinical_type)
     consultation_id = data.get("consultation_id")
     tid = await _insert_treatment(db, patient_id, user_id, clinical_type, scope, teeth_inputs, status,
-                                  consultation_id=consultation_id)
+                                  consultation_id=consultation_id, catalog_code=data.get("catalog_code") or None,
+                                  arch=arch)
     treatment = await get_treatment(db, patient_id, tid)
     assert treatment is not None
-    await mirror_to_legacy(db, patient_id, user_id, [t["tooth_number"] for t in teeth_inputs],
-                           consultation_id, created_treatment=treatment)
+    # Les traitements globaux (sans dent) n'ont pas de miroir dental_* (tables par dent).
+    if teeth_inputs:
+        await mirror_to_legacy(db, patient_id, user_id, [t["tooth_number"] for t in teeth_inputs],
+                               consultation_id, created_treatment=treatment)
     return treatment
 
 
@@ -564,7 +600,7 @@ async def mirror_to_legacy(
                 (patient_id, n, condition, user_id, consultation_id),
             )
     if created_treatment:
-        label = TREATMENT_LABELS_FR.get(created_treatment["clinical_type"], created_treatment["clinical_type"])
+        label = catalog_label(created_treatment.get("catalog_code"), created_treatment["clinical_type"])
         tdate = (created_treatment.get("performed_at") or created_treatment.get("recorded_at") or now_iso())[:10]
         for t in created_treatment["teeth"]:
             await db.execute(

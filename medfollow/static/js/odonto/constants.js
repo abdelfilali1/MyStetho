@@ -94,10 +94,22 @@ export const T = {
   status: { existing: 'Existant', planned: 'Planifié' },
   categories: {
     diagnostico: 'Diagnostic',
-    restauradora: 'Restauratrice',
+    preventivo: 'Préventif',
+    restauradora: 'Restauration',
     cirugia: 'Chirurgie',
     endodoncia: 'Endodontie',
+    periodoncia: 'Parodontie',
     ortodoncia: 'Orthodontie',
+    estetica: 'Esthétique',
+    protesis: 'Prothèses',
+    pediatrica: 'Odontologie pédiatrique',
+  },
+  globals: {
+    category: 'Bouche complète',
+    applied: (name) => `${name} ajouté`,
+    archPickerTitle: (name) => `Quelle arcade pour « ${name} » ?`,
+    upperArch: 'Arcade supérieure',
+    lowerArch: 'Arcade inférieure',
   },
   types: {
     pulpitis: 'Pulpite',
@@ -239,6 +251,19 @@ export const T = {
 
 export function typeLabel(type) {
   return T.types[type] || type;
+}
+
+/** Libellé d'un traitement : nom de l'acte du catalogue si présent, sinon le type clinique
+ *  (port de `getTreatmentDisplayName`). Accepte un traitement brut ou une vue par dent. */
+export function treatmentLabel(v) {
+  if (!v) return '';
+  return v.catalog_label || typeLabel(v.treatment_type || v.clinical_type);
+}
+
+export function archLabel(arch) {
+  if (arch === 'upper') return T.globals.upperArch;
+  if (arch === 'lower') return T.globals.lowerArch;
+  return '';
 }
 
 export function getToothNameKey(n) {

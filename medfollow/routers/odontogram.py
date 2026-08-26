@@ -18,7 +18,10 @@ from routers.dental import _owns_patient
 from routers.deps import deny_secretaire
 from services import odonto_service as svc
 from services.audit import client_ip, log_audit
-from services.odonto_constants import CONDITION_COLORS, SURFACES, TOOTH_CONDITIONS, TREATMENT_LABELS_FR
+from services.odonto_constants import (
+    CATALOG_CATEGORIES, CONDITION_COLORS, ODONTO_CATALOG, SURFACES, TOOTH_CONDITIONS, TREATMENT_DESCRIPTIONS_FR,
+    catalog_label,
+)
 from services.odonto_service import ApiError
 
 router = APIRouter(prefix="/odonto", dependencies=[Depends(deny_secretaire)])
@@ -45,8 +48,11 @@ class ToothInput(BaseModel):
 
 
 class TreatmentCreate(BaseModel):
-    clinical_type: str
+    # Soit un type clinique de base, soit un acte du catalogue (qui fixe le type clinique).
+    clinical_type: Optional[str] = None
+    catalog_code: Optional[str] = None
     scope: Optional[str] = None
+    arch: Optional[str] = None  # global_arch uniquement : upper | lower
     tooth_numbers: list[int] = Field(default_factory=list)
     teeth: Optional[list[ToothInput]] = None
     surfaces: Optional[list[str]] = None
@@ -77,8 +83,10 @@ async def _guard(db: aiosqlite.Connection, patient_id: int, user: dict) -> JSONR
 
 
 def _treatment_details(t: dict) -> str:
-    label = TREATMENT_LABELS_FR.get(t["clinical_type"], t["clinical_type"])
+    label = catalog_label(t.get("catalog_code"), t["clinical_type"])
     teeth = "-".join(str(x["tooth_number"]) for x in t.get("teeth", []))
+    if not teeth and t.get("arch"):
+        teeth = "arcade supérieure" if t["arch"] == "upper" else "arcade inférieure"
     return f"{label} {teeth} ({t['status']})"
 
 
@@ -93,6 +101,10 @@ async def get_odontogram(request: Request, patient_id: int, user: dict = Depends
     return JSONResponse(content={
         "patient_id": patient_id, "teeth": data["teeth"], "treatments": data["treatments"],
         "condition_colors": CONDITION_COLORS, "available_conditions": TOOTH_CONDITIONS, "surfaces": SURFACES,
+        # Catalogue d'actes pour la barre de traitements (équivalent de /catalog/odontogram-treatments).
+        "catalog": ODONTO_CATALOG, "catalog_categories": CATALOG_CATEGORIES,
+        # Descriptions cliniques des types de base (infobulles des boutons hors catalogue : Diagnostic).
+        "type_descriptions": TREATMENT_DESCRIPTIONS_FR,
     })
 
 

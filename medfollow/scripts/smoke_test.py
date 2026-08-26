@@ -206,13 +206,43 @@ check(_at.get("treatments") == [], "/odonto at 2020 : vide")
 json_call("GET", "/odonto/1/history")
 json_call("PUT", "/odonto/1/teeth/18", {"general_condition": "healthy"}, label="/odonto tooth 18 healthy")
 json_call("DELETE", f"/odonto/1/treatments/{_t1.get('id')}", expect=(204,), label="/odonto delete couronne")
+
+print("== Odontogramme : catalogue d'actes ==")
+_cat = _odo.get("catalog") or []
+_cats = [c["key"] for c in (_odo.get("catalog_categories") or [])]
+check(len(_cat) == 60, f"catalogue : 60 actes mappes ({len(_cat)})")
+check(_cats == ["diagnostico", "restauradora", "cirugia", "endodoncia", "ortodoncia", "preventivo", "periodoncia", "pediatrica"],
+      f"catalogue : 8 categories dans l'ordre dentalpin ({_cats})")
+check(sum(1 for c in _cat if c["category"] == "restauradora") == 29, "catalogue : 29 actes en Restauration")
+check(sum(1 for c in _cat if c["category"] == "cirugia") == 9, "catalogue : 9 actes en Chirurgie")
+_c1 = json_call("POST", "/odonto/1/treatments", {"catalog_code": "REST-CROWN-ZIR", "tooth_numbers": [27], "status": "performed"},
+                expect=(201,), label="/odonto acte catalogue Couronne zircone 27") or {}
+check(_c1.get("clinical_type") == "crown" and _c1.get("catalog_label") == "Couronne zircone", "acte catalogue : type crown + libelle")
+json_call("POST", "/odonto/1/treatments", {"catalog_code": "NOPE-1", "tooth_numbers": [27]}, expect=(400,), label="/odonto code inconnu (400)")
+json_call("POST", "/odonto/1/treatments", {"catalog_code": "REST-CROWN-ZIR", "clinical_type": "bridge", "tooth_numbers": [27]},
+          expect=(400,), label="/odonto code/type incompatibles (400)")
+json_call("POST", "/odonto/1/treatments", {"catalog_code": "REST-SPLINT-OCC", "status": "planned"}, expect=(400,), label="/odonto arcade manquante (400)")
+_g1 = json_call("POST", "/odonto/1/treatments", {"catalog_code": "REST-SPLINT-OCC", "arch": "upper", "status": "planned"},
+                expect=(201,), label="/odonto gouttiere d'occlusion arcade sup.") or {}
+check(_g1.get("scope") == "global_arch" and _g1.get("arch") == "upper" and _g1.get("teeth") == [], "traitement global : scope/arch, sans dent")
+_b1 = json_call("POST", "/odonto/1/treatments", {"catalog_code": "REST-BRIDGE-MARY", "status": "planned", "tooth_numbers": [21, 22, 23]},
+                expect=(201,), label="/odonto Pont du Maryland 21-23") or {}
+check(_b1.get("clinical_type") == "bridge" and [x.get("role") for x in _b1.get("teeth", [])] == ["pillar", "pontic", "pillar"], "pont catalogue : roles auto")
+_all = json_call("GET", "/odonto/1") or {}
+check(any(t.get("id") == _g1.get("id") for t in _all.get("treatments", [])), "traitement global renvoye par GET /odonto")
+json_call("DELETE", f"/odonto/1/treatments/{_g1.get('id')}", expect=(204,), label="/odonto delete traitement global")
+json_call("DELETE", f"/odonto/1/treatments/{_b1.get('id')}", expect=(204,), label="/odonto delete pont Maryland")
+
 # Miroir legacy : les consultations / le PDF patient lisent toujours dental_teeth.
 import sqlite3  # noqa: E402
 _con = sqlite3.connect(_TMP_DB)
 _rows = dict(_con.execute("SELECT tooth_number, condition FROM dental_teeth").fetchall())
+_mirror = _con.execute("SELECT treatment_type FROM dental_treatments WHERE tooth_number = 27 AND odo_treatment_id = ?", (_c1.get("id"),)).fetchone()
 _con.close()
 check(_rows.get(36) == "obturation", "miroir legacy : dent 36 = obturation")
 check(_rows.get(16) == "sain", "miroir legacy : dent 16 revenue a sain apres suppression")
+check(_rows.get(27) == "couronne", "miroir legacy : dent 27 = couronne (acte catalogue)")
+check(bool(_mirror) and _mirror[0] == "Couronne zircone", "miroir legacy : dental_treatments porte le libelle de l'acte")
 get("/patients/1/brochure.pdf", label="/patients/1/brochure.pdf (etat bucco-dentaire)")
 
 print("== Parodontogramme ==")

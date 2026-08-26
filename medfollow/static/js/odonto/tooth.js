@@ -33,9 +33,42 @@ export function viewForTooth(treatment, toothNumber) {
     performed_by: treatment.performed_by,
     performed_by_name: treatment.performed_by_name,
     created_at: treatment.created_at,
+    catalog_code: treatment.catalog_code || null,
+    catalog_label: treatment.catalog_label || null,
+    scope: treatment.scope || null,
+    arch: treatment.arch || null,
     is_multi: (treatment.teeth || []).length > 1,
     teeth_count: (treatment.teeth || []).length,
   };
+}
+
+/** Vue d'un traitement global (bouche complète / arcade) : pas de dent. */
+export function viewForGlobal(treatment) {
+  return {
+    id: `${treatment.id}:g`,
+    treatment_id: treatment.id,
+    tooth_number: null,
+    treatment_type: treatment.clinical_type,
+    clinical_type: treatment.clinical_type,
+    surfaces: null,
+    role: null,
+    status: treatment.status,
+    recorded_at: treatment.recorded_at,
+    performed_at: treatment.performed_at,
+    performed_by: treatment.performed_by,
+    performed_by_name: treatment.performed_by_name,
+    created_at: treatment.created_at,
+    catalog_code: treatment.catalog_code || null,
+    catalog_label: treatment.catalog_label || null,
+    scope: treatment.scope || null,
+    arch: treatment.arch || null,
+    is_multi: false,
+    teeth_count: 0,
+  };
+}
+
+export function isGlobalTreatment(treatment) {
+  return treatment.scope === 'global_mouth' || treatment.scope === 'global_arch';
 }
 
 export function viewsForTooth(treatments, toothNumber) {

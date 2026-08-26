@@ -7,14 +7,17 @@
 
 import { odontoApi, toast } from './api.js';
 import {
-  DECIDUOUS_TEETH, PERMANENT_TEETH, T, TREATMENT_SHORTCUTS, calculateToothRange, esc,
-  getMultiToothConfig, isSameArch, isSurfaceTreatment, isUpperTooth, typeLabel,
+  DECIDUOUS_TEETH, PERMANENT_TEETH, T, TREATMENT_SHORTCUTS, archLabel, calculateToothRange, esc,
+  getMultiToothConfig, isSameArch, isSurfaceTreatment, isUpperTooth, treatmentLabel, typeLabel,
 } from './constants.js';
 import { createTooltipManager, openMultiToothConfirm, openSurfaceSelector, openTreatmentEditModal } from './popups.js';
 import { createChangeHistory, createLegend, createTreatmentList } from './sections.js';
 import { createTimeline } from './timeline.js';
-import { renderTooth, viewsForTooth } from './tooth.js';
+import { isGlobalTreatment, renderTooth, viewForGlobal, viewsForTooth } from './tooth.js';
 import { createTreatmentBar } from './treatment-bar.js';
+
+const ICON_ARCH = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16.02 12 5.48 3.13a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74L7.98 12"/><path d="M13 2.26a2 2 0 0 0-2 0L2.5 7.13a1 1 0 0 0 0 1.74L11 13.74a2 2 0 0 0 2 0l8.5-4.87a1 1 0 0 0 0-1.74z"/></svg>';
+const ICON_MOUTH = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>';
 
 export function mountOdontogram(root, opts) {
   const api = odontoApi(opts.patientId);
@@ -23,6 +26,9 @@ export function mountOdontogram(root, opts) {
   const state = {
     teeth: [],
     treatments: [],
+    catalog: [],
+    catalogCategories: [],
+    typeDescriptions: {},
     timelineDates: [],
     viewingDate: null,
     historical: null,
@@ -30,6 +36,7 @@ export function mountOdontogram(root, opts) {
     selectedTooth: null,
     hoveredTooth: null,
     selectedType: null,
+    selectedCode: null,
     selectedStatus: 'existing',
     multiSel: { teeth: [], anchor: null },
     multiConfirmOpen: false,
@@ -54,6 +61,7 @@ export function mountOdontogram(root, opts) {
     <div class="odo-alert odo-alert-error" data-role="error" hidden></div>
     <div data-role="body" hidden>
       <div class="odontogram-wrapper"><div class="odontogram-grid" data-role="grid"></div></div>
+      <div data-role="global-strip" hidden></div>
       <div data-role="treatment-bar"></div>
       <div data-role="legend"></div>
       <div data-role="treatment-list"></div>
@@ -177,7 +185,8 @@ export function mountOdontogram(root, opts) {
     const cfg = multiConfig();
     if (isClickToApply()) {
       mb.hidden = false;
-      mb.textContent = cfg ? cfg.label : typeLabel(state.selectedType);
+      const item = state.selectedCode ? state.catalog.find((c) => c.code === state.selectedCode) : null;
+      mb.textContent = item ? item.label : cfg ? cfg.label : typeLabel(state.selectedType);
     } else mb.hidden = true;
     q('dentition').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.dentition === state.dentition));
   }
@@ -205,8 +214,14 @@ export function mountOdontogram(root, opts) {
     bodyEl.hidden = state.loading || !!state.error;
     if (!bodyEl.hidden) {
       renderGrid();
+      renderGlobalStrip();
       q('treatment-bar').hidden = isReadonly();
-      if (bar) bar.update({ selectedType: state.selectedType, selectedStatus: state.selectedStatus });
+      if (bar) {
+        bar.update({
+          selectedType: state.selectedType, selectedCode: state.selectedCode, selectedStatus: state.selectedStatus,
+          catalog: state.catalog, categories: state.catalogCategories, typeDescriptions: state.typeDescriptions,
+        });
+      }
       list.update(state.treatments);
       history.update(state.treatments);
     }
@@ -236,10 +251,56 @@ export function mountOdontogram(root, opts) {
   });
   let bar = null;
   bar = createTreatmentBar(q('treatment-bar'), {
-    onSelect: (type) => { state.selectedType = type; resetMultiSelection(); renderHeader(); renderGrid(); renderMultiBar(); },
+    onSelect: (type, code) => {
+      state.selectedType = type; state.selectedCode = code || null;
+      resetMultiSelection(); renderHeader(); renderGrid(); renderMultiBar();
+    },
     onStatus: (s) => { state.selectedStatus = s; },
     onCancel: () => cancelClickToApply(),
+    onGlobal: (item, arch) => applyGlobalTreatment(item, arch),
   });
+
+  // ------------------------------------------------------------ traitements globaux
+  // Bandeau « Bouche complète » (port de `GlobalTreatmentsStrip.vue`) : gouttière d'occlusion…
+  function globalTreatments() {
+    const source = state.viewingDate ? (state.historical ? state.historical.treatments : []) : state.treatments;
+    return source.filter(isGlobalTreatment);
+  }
+
+  function renderGlobalStrip() {
+    const el = q('global-strip');
+    const globals = globalTreatments();
+    if (!globals.length) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `<div class="global-strip" role="list" aria-label="${T.globals.category}">
+      <span class="global-strip-label">${ICON_MOUTH} ${T.globals.category}</span>
+      ${globals.map((t) => {
+        const label = t.scope === 'global_arch' && t.arch ? `${treatmentLabel(t)} · ${archLabel(t.arch)}` : treatmentLabel(t);
+        return `<button type="button" class="global-chip global-chip-${t.status}" role="listitem" data-global="${t.id}" data-arch="${t.arch || ''}" title="${esc(T.tooltip.clickToEdit)}">${t.scope === 'global_arch' ? ICON_ARCH : ICON_MOUTH}<span>${esc(label)}</span></button>`;
+      }).join('')}
+    </div>`;
+  }
+
+  async function applyGlobalTreatment(item, arch) {
+    if (isReadonly()) return;
+    const payload = { catalog_code: item.code, scope: item.scope, status: state.selectedStatus, consultation_id: consultationId };
+    if (item.scope === 'global_arch') payload.arch = arch;
+    try {
+      const created = await api.createTreatment(payload);
+      state.undoStack.push({ id: created.id, type: created.clinical_type });
+      const name = arch ? `${treatmentLabel(created)} · ${archLabel(arch)}` : treatmentLabel(created);
+      toast(`${T.globals.applied(name)} · ${T.treatments.treatmentAdded}`, { action: { label: T.common.undo, onClick: handleUndo } });
+      state.selectedType = null; state.selectedCode = null;
+      await refreshData();
+    } catch (e) {
+      toast(e.message || T.messages.error, { type: 'error' });
+    }
+  }
+
+  function setArchHalo(arch) {
+    gridEl.classList.toggle('arch-hover-upper', arch === 'upper');
+    gridEl.classList.toggle('arch-hover-lower', arch === 'lower');
+  }
 
   // ------------------------------------------------------------ data
   async function loadAll() {
@@ -248,6 +309,9 @@ export function mountOdontogram(root, opts) {
       const [odo, tl] = await Promise.all([api.get(), api.timeline()]);
       state.teeth = odo.teeth || [];
       state.treatments = odo.treatments || [];
+      state.catalog = odo.catalog || [];
+      state.catalogCategories = odo.catalog_categories || [];
+      state.typeDescriptions = odo.type_descriptions || {};
       state.timelineDates = tl.dates || [];
     } catch (e) {
       state.error = T.messages.loadError;
@@ -261,6 +325,9 @@ export function mountOdontogram(root, opts) {
       const [odo, tl] = await Promise.all([api.get(), api.timeline()]);
       state.teeth = odo.teeth || [];
       state.treatments = odo.treatments || [];
+      state.catalog = odo.catalog || [];
+      state.catalogCategories = odo.catalog_categories || [];
+      state.typeDescriptions = odo.type_descriptions || {};
       state.timelineDates = tl.dates || [];
     } catch (e) {
       toast(T.messages.error, { type: 'error' });
@@ -297,6 +364,7 @@ export function mountOdontogram(root, opts) {
       openSurfaceSelector({
         toothNumber: n,
         treatmentType: state.selectedType,
+        label: bar ? bar.selectedLabel() : null,
         status: state.selectedStatus,
         onConfirm: (surfaces) => { const tooth = state.selectedTooth; state.selectedTooth = null; applyTreatment(tooth, surfaces); },
         onCancel: () => { const tooth = state.selectedTooth; state.selectedTooth = null; if (tooth) rerenderTooth(tooth); },
@@ -370,12 +438,13 @@ export function mountOdontogram(root, opts) {
     if (cfg.mode === 'bridge' && teethRoles && teethRoles.length) payload.teeth = teethRoles;
     else payload.tooth_numbers = sorted;
     payload.clinical_type = cfg.mode === 'uniform' ? cfg.key : 'bridge';
+    if (state.selectedCode) payload.catalog_code = state.selectedCode;
     try {
       const created = await api.createTreatment(payload);
       state.undoStack.push({ id: created.id, type: cfg.key });
       resetMultiSelection();
-      state.selectedType = null;
-      toast(`${cfg.label} - ${sorted.join(', ')} · ${T.treatments.treatmentAdded}`, { action: { label: T.common.undo, onClick: handleUndo } });
+      state.selectedType = null; state.selectedCode = null;
+      toast(`${created.catalog_label || cfg.label} - ${sorted.join(', ')} · ${T.treatments.treatmentAdded}`, { action: { label: T.common.undo, onClick: handleUndo } });
       await refreshData();
     } catch (e) {
       toast(e.message || T.messages.error, { type: 'error' });
@@ -392,12 +461,13 @@ export function mountOdontogram(root, opts) {
   async function applyTreatment(n, surfaces) {
     if (!state.selectedType) return;
     const payload = { tooth_numbers: [n], status: state.selectedStatus, scope: 'tooth', clinical_type: state.selectedType, consultation_id: consultationId };
+    if (state.selectedCode) payload.catalog_code = state.selectedCode;
     if (surfaces && surfaces.length) payload.surfaces = surfaces;
     try {
       const created = await api.createTreatment(payload);
       state.undoStack.push({ id: created.id, type: created.clinical_type });
-      toast(`${typeLabel(created.clinical_type)} - ${T.tooth} ${n} · ${T.treatments.treatmentAdded}`, { action: { label: T.common.undo, onClick: handleUndo } });
-      state.selectedType = null;
+      toast(`${treatmentLabel(created)} - ${T.tooth} ${n} · ${T.treatments.treatmentAdded}`, { action: { label: T.common.undo, onClick: handleUndo } });
+      state.selectedType = null; state.selectedCode = null;
       await refreshData();
     } catch (e) {
       toast(e.message || T.messages.error, { type: 'error' });
@@ -419,9 +489,10 @@ export function mountOdontogram(root, opts) {
 
   function cancelClickToApply() {
     state.selectedType = null;
+    state.selectedCode = null;
     state.hoveredTooth = null;
     resetMultiSelection();
-    if (bar) bar.update({ selectedType: null, selectedStatus: state.selectedStatus });
+    if (bar) bar.update({ selectedType: null, selectedCode: null, selectedStatus: state.selectedStatus });
     renderHeader(); renderGrid(); renderMultiBar();
   }
 
@@ -452,11 +523,19 @@ export function mountOdontogram(root, opts) {
     if (dent) { state.dentition = dent.dataset.dentition; resetMultiSelection(); renderHeader(); renderGrid(); renderMultiBar(); return; }
     if (e.target.closest('[data-act="multi-cancel"]')) { resetMultiSelection(); renderGrid(); renderMultiBar(); return; }
     if (e.target.closest('[data-act="multi-confirm"]')) { requestMultiConfirm(false); return; }
+    const chip = e.target.closest('[data-global]');
+    if (chip) {
+      const t = globalTreatments().find((x) => String(x.id) === chip.dataset.global);
+      if (t) handleEdit(viewForGlobal(t));
+      return;
+    }
     const w = e.target.closest('.tooth-dual-view-wrapper');
     if (w && gridEl.contains(w)) handleToothClick(Number(w.dataset.tooth));
   }
 
   function onOver(e) {
+    const chip = e.target.closest('[data-global]');
+    if (chip) { setArchHalo(chip.dataset.arch || null); return; }
     const w = e.target.closest('.tooth-dual-view-wrapper');
     if (!w || !gridEl.contains(w)) return;
     const n = Number(w.dataset.tooth);
@@ -467,6 +546,8 @@ export function mountOdontogram(root, opts) {
   }
 
   function onOut(e) {
+    const chip = e.target.closest('[data-global]');
+    if (chip && !(e.relatedTarget && chip.contains(e.relatedTarget))) { setArchHalo(null); return; }
     const w = e.target.closest('.tooth-dual-view-wrapper');
     if (!w) return;
     if (e.relatedTarget && w.contains(e.relatedTarget)) return;
@@ -495,8 +576,9 @@ export function mountOdontogram(root, opts) {
     const shortcut = TREATMENT_SHORTCUTS[e.key];
     if (shortcut && !isReadonly()) {
       state.selectedType = shortcut;
+      state.selectedCode = null;
       resetMultiSelection();
-      bar.update({ selectedType: shortcut, selectedStatus: state.selectedStatus });
+      bar.update({ selectedType: shortcut, selectedCode: null, selectedStatus: state.selectedStatus });
       renderHeader(); renderGrid(); renderMultiBar();
     }
   }

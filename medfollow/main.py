@@ -121,6 +121,10 @@ async def _security_headers(request, call_next):
         response.headers.setdefault("Content-Security-Policy", _CSP)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
+    # Modules ES de l'odontogramme : les imports relatifs (`./chart.js`…) n'ont pas de
+    # cache-buster, on force la revalidation pour que les mises à jour soient vues.
+    if request.url.path.startswith("/static/js/odonto/") or request.url.path == "/static/css/odonto.css":
+        response.headers["Cache-Control"] = "no-cache"
     if _HTTPS_ENABLED:
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=63072000; includeSubDomains"

@@ -4,8 +4,8 @@
  */
 
 import {
-  SURFACES, T, esc, formatDate, getAllowedStatusesForTreatment, getTreatmentColor,
-  isSurfaceTreatment, toothName, typeLabel,
+  SURFACES, T, archLabel, esc, formatDate, getAllowedStatusesForTreatment, getTreatmentColor,
+  isSurfaceTreatment, toothName, treatmentLabel, typeLabel,
 } from './constants.js';
 import { getLateralPath, getOcclusalPath, getToothTransform } from './paths.js';
 
@@ -66,7 +66,7 @@ export function confirmDialog({ title, text, confirmLabel = T.common.confirm, ca
 // Sélecteur de faces
 // ============================================================================
 
-export function openSurfaceSelector({ toothNumber, treatmentType, status, onConfirm, onCancel }) {
+export function openSurfaceSelector({ toothNumber, treatmentType, label, status, onConfirm, onCancel }) {
   const selected = new Set();
   const occlusal = getOcclusalPath(toothNumber);
   const lateral = getLateralPath(toothNumber);
@@ -127,7 +127,7 @@ export function openSurfaceSelector({ toothNumber, treatmentType, status, onConf
 
   const m = openModal({
     title: `<div class="odonto-title-row"><span class="odonto-color-chip" style="background:${color}20"><span style="background:${color}"></span></span><div><h3>${T.selectSurfaces}</h3></div></div>`,
-    subtitle: `${esc(typeLabel(treatmentType))} - ${T.tooth} ${toothNumber}`,
+    subtitle: `${esc(label || typeLabel(treatmentType))} - ${T.tooth} ${toothNumber}`,
     body: bodyHtml(),
     footer: `<span class="odonto-muted odonto-small" data-role="count">0 ${T.surfacesSelected}</span>
       <div class="odonto-actions"><button type="button" class="odo-btn odo-btn-ghost" data-act="cancel">${T.common.cancel}</button>
@@ -185,8 +185,10 @@ export function openTreatmentEditModal({ treatment, onUpdate, onDelete, onPerfor
   }
 
   const m = openModal({
-    title: `<div class="odonto-title-row"><span class="odonto-dot" style="background:${color}"></span><span class="odonto-strong">${esc(typeLabel(treatment.treatment_type))}</span>
-      <span class="odo-badge ${status === 'planned' ? 'odo-badge-warning' : 'odo-badge-neutral'}">${T.tooth} ${treatment.tooth_number}${treatment.is_multi ? ` (+${treatment.teeth_count - 1})` : ''}</span></div>`,
+    title: `<div class="odonto-title-row"><span class="odonto-dot" style="background:${color}"></span><span class="odonto-strong">${esc(treatmentLabel(treatment))}</span>
+      <span class="odo-badge ${status === 'planned' ? 'odo-badge-warning' : 'odo-badge-neutral'}">${treatment.tooth_number === null || treatment.tooth_number === undefined
+        ? esc(treatment.arch ? archLabel(treatment.arch) : T.globals.category)
+        : `${T.tooth} ${treatment.tooth_number}${treatment.is_multi ? ` (+${treatment.teeth_count - 1})` : ''}`}</span></div>`,
     body: bodyHtml(),
     footer: `<button type="button" class="odo-btn odo-btn-ghost odo-btn-danger-text" data-act="delete">🗑 ${T.common.delete}</button>
       <div class="odonto-actions"><button type="button" class="odo-btn odo-btn-outline" data-act="close">${T.common.cancel}</button>
@@ -310,7 +312,7 @@ export function createTooltipManager(rootEl, { getTreatments, onEdit, enabled })
     const existing = views.filter((v) => v.status === 'existing');
     const item = (v) => `<div class="treatment-item" data-view="${esc(v.id)}"><div class="treatment-main">
       <span class="treatment-dot" style="background:${getTreatmentColor(v.treatment_type)}"></span>
-      <span class="treatment-name">${esc(typeLabel(v.treatment_type))}${v.role ? ` <span class="odonto-muted odonto-small">(${T.multiTooth[v.role]})</span>` : ''}</span>
+      <span class="treatment-name">${esc(treatmentLabel(v))}${v.role ? ` <span class="odonto-muted odonto-small">(${T.multiTooth[v.role]})</span>` : ''}</span>
       ${v.surfaces && v.surfaces.length ? `<span class="odo-badge odo-badge-neutral odo-badge-xs">${v.surfaces.join('-')}</span>` : ''}</div>
       ${v.performed_at ? `<div class="treatment-date">${esc(formatDate(v.performed_at))}</div>` : ''}</div>`;
     let html = `<div class="tooltip-header"><span class="tooth-number-badge">${n}</span><span class="tooth-name">${esc(toothName(n))}</span></div>`;
