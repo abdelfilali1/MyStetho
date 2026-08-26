@@ -24,6 +24,10 @@ run_whatsapp_local.ps1
 Token Whatsapp
 Token*Whatsapp*
 
+# Rapport d'audit sécurité : cartographie fichier:ligne de failles non corrigées
+# de l'app en production. Le dépôt est public — ce fichier reste local.
+2. Improvments/Doctivo_Security_Audit.md
+
 # Node
 node_modules/
 
