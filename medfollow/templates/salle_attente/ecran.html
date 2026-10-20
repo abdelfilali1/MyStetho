@@ -83,6 +83,7 @@
     // validé, jamais l'URL saisie dans les réglages.
     var musicCfg = data.music || { enabled: false };
     var ytPlayer = null;
+    var ytReady = false;
     var ytApiLoading = false;
     var musicUnavailable = false;
     var gateOpened = false;
@@ -161,10 +162,109 @@
 
     // ------------------------------------------------ musique d'ambiance
 
+    // Stratégie de lecture, pensée pour les navigateurs de TV :
+    //  1. dès le chargement, le lecteur est créé et lancé SANS SON — la lecture
+    //     muette est autorisée partout, sans clic ;
+    //  2. le clic « Lancer l'affichage » ne fait plus que rétablir le son, de
+    //     façon synchrone dans le geste. Sur PC, Chrome tolère un son lancé
+    //     plusieurs secondes après le clic ; les navigateurs de TV non ;
+    //  3. si la musique reste muette malgré tout, un bouton propose un second
+    //     geste (touche OK de la télécommande).
+    var DEBUG = /[?&]debug=1\b/.test(window.location.search);
+    var debugLines = [];
+
     function musicLog(message, detail) {
-        // Le seul moyen de diagnostiquer un ecran muet a distance : ouvrir la
-        // console du navigateur de la TV.
         try { console.info('[Doctivo musique] ' + message, detail !== undefined ? detail : ''); } catch (e) {}
+        if (!DEBUG) return;
+        // ?debug=1 : la console d'une TV est inaccessible, le journal s'affiche à l'écran.
+        var d = '';
+        try { d = detail === undefined ? '' : ' ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)); } catch (e) {}
+        debugLines.push(new Date().toLocaleTimeString('fr-FR') + ' ' + message + d);
+        if (debugLines.length > 12) debugLines.shift();
+        var box = document.getElementById('tv-music-debug');
+        if (!box) {
+            box = document.createElement('pre');
+            box.id = 'tv-music-debug';
+            box.style.cssText = 'position:fixed;left:8px;bottom:56px;z-index:9999;max-width:70vw;margin:0;padding:8px 10px;' +
+                'background:rgba(0,0,0,.8);color:#9fe870;font:12px/1.4 monospace;white-space:pre-wrap;border-radius:6px;';
+            document.body.appendChild(box);
+        }
+        box.textContent = debugLines.join('\n');
+    }
+
+    var YT_STATES = { '-1': 'non demarre', 0: 'termine', 1: 'lecture', 2: 'pause', 3: 'chargement', 5: 'en file' };
+
+    function applyVolume() {
+        if (!ytPlayer || !ytReady) return;
+        try { ytPlayer.setVolume(ducked ? duckLevel() : normalVol); } catch (e) {}
+    }
+
+    // Rétablit le son. Appelé dans un geste utilisateur (clic du voile ou du
+    // bouton de secours) : c'est ce qui l'autorise sur les navigateurs stricts.
+    function unmuteMusic() {
+        if (!ytPlayer || !ytReady) return false;
+        try {
+            ytPlayer.unMute();
+            applyVolume();
+            ytPlayer.playVideo();
+            musicLog('son retabli', { volume: normalVol });
+            return true;
+        } catch (e) { musicLog('echec du retablissement du son', String(e)); return false; }
+    }
+
+    // Secours quand le son reste bloqué. Sur les navigateurs stricts (TV), un
+    // clic sur la page n'autorise PAS le son du lecteur YouTube, qui est une
+    // iframe d'un autre site : le navigateur met la vidéo en pause dès qu'on
+    // lui rend le son. Seul un clic DANS l'iframe l'autorise. On dévoile donc
+    // le lecteur le temps de ce clic, puis on le rétrécit de nouveau.
+    var MUSIC_HOST_HIDDEN = null;
+    var musicRetryShown = false;
+
+    function hideMusicRetry() {
+        if (!musicRetryShown) return;
+        musicRetryShown = false;
+        var host = document.getElementById('tv-music-host');
+        if (host && MUSIC_HOST_HIDDEN !== null) host.style.cssText = MUSIC_HOST_HIDDEN;
+        var panel = document.getElementById('tv-music-retry');
+        if (panel) panel.style.display = 'none';
+        musicLog('musique active : lecteur masque');
+    }
+
+    function showMusicRetry() {
+        var host = document.getElementById('tv-music-host');
+        if (!host) return;
+        if (MUSIC_HOST_HIDDEN === null) MUSIC_HOST_HIDDEN = host.style.cssText;
+        host.style.cssText = 'position:fixed;right:24px;bottom:72px;width:320px;height:180px;overflow:hidden;' +
+            'opacity:1;pointer-events:auto;z-index:9999;border-radius:10px;box-shadow:0 0 0 4px #1f6feb,0 8px 24px rgba(0,0,0,.45);';
+        var panel = document.getElementById('tv-music-retry');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'tv-music-retry';
+            panel.style.cssText = 'position:fixed;right:24px;bottom:264px;width:320px;z-index:9999;padding:10px 12px;border-radius:10px;' +
+                'background:#1f6feb;color:#fff;font-size:17px;font-weight:600;line-height:1.35;text-align:center;';
+            panel.textContent = '🔇 Le navigateur de la TV bloque le son : cliquez une fois sur la vidéo ci-dessous';
+            document.body.appendChild(panel);
+        }
+        panel.style.display = '';
+        if (!musicRetryShown) musicLog('son bloque : lecteur devoile pour un clic');
+        musicRetryShown = true;
+    }
+
+    var musicCheckTimer = null;
+
+    // Vérifie quelques secondes après le geste que la musique joue vraiment avec le son.
+    function scheduleMusicCheck() {
+        clearTimeout(musicCheckTimer);
+        musicCheckTimer = setTimeout(function () {
+            if (!gateOpened || !musicCfg.enabled || !musicCfg.id) return;
+            if (musicUnavailable) { musicLog('musique indisponible (voir les messages precedents)'); return; }
+            if (!ytPlayer || !ytReady) { musicLog('lecteur pas encore pret, nouvelle verification'); scheduleMusicCheck(); return; }
+            var state = null, muted = null;
+            try { state = ytPlayer.getPlayerState(); muted = ytPlayer.isMuted(); } catch (e) {}
+            musicLog('verification', { etat: YT_STATES[state] || state, muet: muted });
+            if (state === 1 && !muted) hideMusicRetry();
+            else showMusicRetry();
+        }, 4000);
     }
 
     function loadYouTubeApi(onReady) {
@@ -197,8 +297,11 @@
     function destroyMusic() {
         clearTimeout(duckTimer);
         ducked = false;
+        clearTimeout(musicCheckTimer);
+        hideMusicRetry();
         if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} }
         ytPlayer = null;
+        ytReady = false;
         // destroy() retire l'iframe : on remet la cible que l'API attend.
         var host = document.getElementById('tv-music-host');
         if (host && !document.getElementById('tv-music')) {
@@ -217,7 +320,8 @@
             return;
         }
         var vars = {
-            autoplay: 1, controls: 0, disablekb: 1, fs: 0,
+            // Muet au départ : seule lecture automatique autorisée sans clic.
+            autoplay: 1, mute: 1, controls: 0, disablekb: 1, fs: 0,
             modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3,
             origin: window.location.origin   // recommande des qu'on pilote le lecteur en JS
         };
@@ -241,16 +345,32 @@
                 playerVars: vars,
                 events: {
                     onReady: function (e) {
+                        ytReady = true;
                         try {
-                            e.target.setVolume(ducked ? duckLevel() : normalVol);
+                            applyVolume();
+                            if (gateOpened) {
+                                // Lecteur recréé après le clic (réglages modifiés) : on
+                                // tente le son, la vérification proposera un geste sinon.
+                                e.target.unMute();
+                                scheduleMusicCheck();
+                            } else {
+                                e.target.mute();
+                            }
                             e.target.playVideo();
-                            musicLog('lecteur pret, lecture demandee', { volume: normalVol });
-                        } catch (err) { musicLog('echec au demarrage', err); }
+                            musicLog('lecteur pret', { son: gateOpened, volume: normalVol });
+                        } catch (err) { musicLog('echec au demarrage', String(err)); }
                     },
                     onStateChange: function (e) {
                         // Ceinture et bretelles au-dessus de loop:1.
                         if (e.data === YT.PlayerState.ENDED) { try { e.target.playVideo(); } catch (err) {} }
-                        if (e.data === YT.PlayerState.PLAYING) musicLog('lecture en cours');
+                        musicLog('etat du lecteur', YT_STATES[e.data] || e.data);
+                        // Un clic dans le lecteur dévoilé ne remonte pas jusqu'à la
+                        // page : c'est ce changement d'état qui le signale.
+                        if (gateOpened && e.data === YT.PlayerState.PLAYING) {
+                            var muted = true;
+                            try { muted = e.target.isMuted(); } catch (err) {}
+                            if (!muted) { applyVolume(); hideMusicRetry(); }
+                        }
                     },
                     onError: function (e) {
                         // 2 identifiant invalide, 5 incompatible, 100 introuvable,
@@ -280,14 +400,14 @@
 
     function restoreMusic() {
         ducked = false;
-        if (ytPlayer) { try { ytPlayer.setVolume(normalVol); } catch (e) {} }
+        applyVolume();
     }
 
     function duckMusic() {
         if (!ytPlayer) return;
         if (!ducked) {
             ducked = true;
-            try { ytPlayer.setVolume(duckLevel()); } catch (e) {}
+            applyVolume();
         }
         // Le carillon dure CHIME_SECONDS alors que le bandeau descend jusqu'à 5 s :
         // sans ce plancher, la musique remonterait sur la fin du carillon.
@@ -308,9 +428,9 @@
 
         if (!next.enabled || !next.id) { destroyMusic(); return; }
         if (changed) { destroyMusic(); musicUnavailable = false; }
-        if (!gateOpened) return;                       // rien ne joue avant le clic
+        // Avant le clic, le lecteur se prépare quand même (muet).
         if (!ytPlayer) { if (changed || !wasEnabled) startMusic(); return; }
-        if (!ducked) { try { ytPlayer.setVolume(normalVol); } catch (e) {} }
+        applyVolume();
     }
 
     function syncLogo(payload) {
@@ -467,19 +587,21 @@
             var Ctx = window.AudioContext || window.webkitAudioContext;
             if (Ctx) { audioCtx = new Ctx(); audioCtx.resume(); }
         } catch (e) {}
-        // Démarrer la musique DANS le geste utilisateur : c'est la seule
-        // activation dont dispose la page, et les navigateurs l'exigent pour
-        // une lecture audible.
+        // Le lecteur, préparé muet au chargement, est en principe prêt : le son
+        // est rétabli ici, DANS le geste. S'il ne l'est pas encore, onReady s'en
+        // charge et la vérification proposera un second geste au besoin.
         gateOpened = true;
-        startMusic();
+        if (!unmuteMusic()) startMusic();
+        if (musicCfg.enabled && musicCfg.id) scheduleMusicCheck();
         poll();
     });
 
     // ---------------------------------------------------------- démarrage
 
-    // render() est appelé une première fois avant le voile : syncMusic() ne
-    // lance rien tant que gateOpened est faux.
+    if (DEBUG) musicLog('navigateur', navigator.userAgent);
     render(data);
+    // Préparation muette, sans attendre le clic sur le voile.
+    startMusic();
     tick();
     setInterval(tick, 1000);
     setInterval(poll, 5000);
