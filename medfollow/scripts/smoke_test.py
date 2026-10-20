@@ -8,6 +8,7 @@ Utilise une base SQLite temporaire (MEDFOLLOW_DATABASE_PATH) et le TestClient
 Starlette (pas de serveur à lancer). Gère le jeton CSRF double-submit.
 """
 import os
+import re
 import sys
 import tempfile
 
@@ -339,6 +340,12 @@ _screen = (_r.json() or {}).get("screen_url", "")
 get(_screen, expect=(200,), label="/salle-attente/ecran/{token}")
 get("/salle-attente/api/ecran/" + _screen.rsplit("/", 1)[-1], expect=(200,), label="/salle-attente/api/ecran/{token}")
 get("/salle-attente/ecran/jeton-invalide", expect=(404,), label="/salle-attente/ecran/{jeton invalide}")
+_short = (_r.json() or {}).get("short_url", "")
+if not re.match(r"^/SA/[A-Z]{1,3}-[A-Z2-9]{4}$", _short):
+    failures.append("short_url au mauvais format : %r" % _short)
+get(_short, expect=(200,), label="/SA/{code}")
+get(_short.lower(), expect=(200,), label="/sa/{code en minuscules}")
+get("/SA/ZZ-0000", expect=(404,), label="/SA/{code invalide}")
 
 print("== Mon compte ==")
 get("/mon-compte")

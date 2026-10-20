@@ -352,6 +352,7 @@ app.include_router(radio.router)
 app.include_router(learning.router)
 app.include_router(rappels.router)
 app.include_router(salle_attente.router)
+app.include_router(salle_attente.short_router)
 app.include_router(whatsapp_webhook.router)
 app.include_router(profile.router)
 

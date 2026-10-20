@@ -5,7 +5,8 @@ Deux interfaces :
 - `/salle-attente` : le tableau praticien/secrétaire (RDV attendus, file d'attente,
   patients appelés/en cours). Ouvert au rôle secrétaire, comme l'agenda et les
   rappels — c'est son poste de travail principal.
-- `/salle-attente/ecran/{token}` : l'écran diffusé sur la TV de la salle d'attente.
+- `/salle-attente/ecran/{token}` (et son alias court `/SA/{token}`) : l'écran
+  diffusé sur la TV de la salle d'attente. Le jeton a la forme `INITIALES-XXXX`.
   Volontairement **hors session** : une TV laissée allumée ne doit pas porter un
   JWT donnant accès aux dossiers. Elle lit une URL en lecture seule dont le JSON
   est déjà anonymisé côté serveur.
@@ -24,9 +25,12 @@ from config import TEMPLATES_DIR, UPLOAD_DIR
 from database.connection import get_db
 from routers.deps import require_login, require_login_api, effective_doctor_id
 from services.audit import log_audit, client_ip
+from services.rate_limit import record_failure, retry_after
 from services import waiting_room as wr
 
 router = APIRouter(prefix="/salle-attente")
+# Lien court à taper sur la TV : doctivo.org/SA/AF-7K2Q. Monté hors préfixe.
+short_router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # --- Logo du cabinet affiché sur l'écran ------------------------------------
@@ -71,6 +75,31 @@ _TV_CSP = (
 )
 
 
+def _screen_url(token: str) -> str:
+    return "/salle-attente/ecran/%s" % token
+
+
+def _short_url(token: str) -> str:
+    return "/SA/%s" % token
+
+
+async def _screen_settings(request: Request, db, token: str) -> dict:
+    """Résout le jeton d'un écran public, avec anti force-brute par IP.
+
+    Le code court (`AF-7K2Q`) n'a qu'environ 900 000 valeurs par jeu d'initiales :
+    sans limite, il s'énumérerait. Les requêtes de la TV, toujours valides, ne
+    consomment rien."""
+    key = "wr-screen:ip:%s" % client_ip(request)
+    wait = retry_after(key, max_attempts=30, window_seconds=900)
+    if wait:
+        raise HTTPException(status_code=429, detail="Trop de tentatives", headers={"Retry-After": str(wait)})
+    settings = await wr.settings_by_token(db, token)
+    if not settings:
+        record_failure(key)
+        raise HTTPException(status_code=404, detail="Écran introuvable")
+    return settings
+
+
 async def _body(request: Request) -> dict:
     """Accepte indifféremment un corps JSON ou un formulaire."""
     ctype = (request.headers.get("content-type") or "").lower()
@@ -112,7 +141,8 @@ async def salle_attente(
             "active": "salle_attente",
             "board": board,
             "settings": settings,
-            "screen_url": "/salle-attente/ecran/%s" % settings["display_token"],
+            "screen_url": _screen_url(settings["display_token"]),
+            "short_url": _short_url(settings["display_token"]),
         },
     )
 
@@ -443,7 +473,8 @@ async def save_reglages(
     })
     await log_audit(db, user, "salle_attente_reglages", entity_type="waiting_room_settings",
                     entity_id=uid, ip=client_ip(request))
-    return JSONResponse(content={"ok": True, "screen_url": "/salle-attente/ecran/%s" % settings["display_token"]})
+    return JSONResponse(content={"ok": True, "screen_url": _screen_url(settings["display_token"]),
+                                 "short_url": _short_url(settings["display_token"])})
 
 
 @router.post("/reglages/logo")
@@ -526,7 +557,7 @@ async def rotate_token(
     token = await wr.regenerate_token(db, uid)
     await log_audit(db, user, "salle_attente_token", entity_type="waiting_room_settings",
                     entity_id=uid, ip=client_ip(request))
-    return JSONResponse(content={"ok": True, "screen_url": "/salle-attente/ecran/%s" % token})
+    return JSONResponse(content={"ok": True, "screen_url": _screen_url(token), "short_url": _short_url(token)})
 
 
 # ---------------------------------------------------------------- écran TV
@@ -538,18 +569,18 @@ async def screen_redirect(
 ):
     """Raccourci authentifié vers l'URL tokenisée de l'écran."""
     settings = await wr.get_settings(db, effective_doctor_id(user))
-    return RedirectResponse(url="/salle-attente/ecran/%s" % settings["display_token"], status_code=302)
+    return RedirectResponse(url=_screen_url(settings["display_token"]), status_code=302)
 
 
 @router.get("/ecran/{token}", response_class=HTMLResponse)
+@short_router.get("/SA/{token}", response_class=HTMLResponse)
+@short_router.get("/sa/{token}", response_class=HTMLResponse, include_in_schema=False)
 async def screen(request: Request, token: str, db: aiosqlite.Connection = Depends(get_db)):
-    settings = await wr.settings_by_token(db, token)
-    if not settings:
-        raise HTTPException(status_code=404, detail="Écran introuvable")
+    settings = await _screen_settings(request, db, token)
     data = await wr.public_board(db, settings)
     resp = templates.TemplateResponse(
         "salle_attente/ecran.html",
-        {"request": request, "user": None, "token": token, "data": data, "settings": settings},
+        {"request": request, "user": None, "token": settings["display_token"], "data": data, "settings": settings},
     )
     if data["music"]["enabled"]:
         resp.headers["Content-Security-Policy"] = _TV_CSP
@@ -557,13 +588,13 @@ async def screen(request: Request, token: str, db: aiosqlite.Connection = Depend
 
 
 @router.get("/ecran/{token}/logo")
-async def screen_logo(token: str, db: aiosqlite.Connection = Depends(get_db)):
+async def screen_logo(request: Request, token: str, db: aiosqlite.Connection = Depends(get_db)):
     """Logo du cabinet, servi au seul porteur du jeton de l'écran.
 
     Le cache est agressif parce que l'URL porte toujours `?v={logo_version}` :
     remplacer le logo change l'URL, donc casse le cache de la TV."""
-    settings = await wr.settings_by_token(db, token)
-    path = (settings or {}).get("logo_path")
+    settings = await _screen_settings(request, db, token)
+    path = settings.get("logo_path")
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Aucun logo")
     ext = os.path.splitext(path)[1].lower()
@@ -575,8 +606,6 @@ async def screen_logo(token: str, db: aiosqlite.Connection = Depends(get_db)):
 
 
 @router.get("/api/ecran/{token}")
-async def screen_data(token: str, db: aiosqlite.Connection = Depends(get_db)):
-    settings = await wr.settings_by_token(db, token)
-    if not settings:
-        raise HTTPException(status_code=404, detail="Écran introuvable")
+async def screen_data(request: Request, token: str, db: aiosqlite.Connection = Depends(get_db)):
+    settings = await _screen_settings(request, db, token)
     return JSONResponse(content=await wr.public_board(db, settings))

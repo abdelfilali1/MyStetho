@@ -20,6 +20,7 @@ from datetime import date, datetime
 import json
 import re
 import secrets
+import unicodedata
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -29,6 +30,13 @@ TS_FMT = "%Y-%m-%d %H:%M:%S"
 
 NAME_MODES = ("full", "initial", "ticket")
 QUEUE_STATUSES = ("attente", "appele", "en_cours", "termine", "absent", "parti")
+
+# Code de l'écran TV : `INITIALES-XXXX` (ex. `AF-7K2Q`), assez court pour être
+# tapé à la télécommande, assez aléatoire pour ne pas se deviner à partir des
+# seules initiales. Alphabet sans 0/O ni 1/I/L, qui se confondent à l'écran.
+SCREEN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+SCREEN_CODE_SUFFIX_LEN = 4
+_SCREEN_CODE_RE = re.compile(r"^[A-Z]{1,3}-[%s]{%d}$" % (SCREEN_CODE_ALPHABET, SCREEN_CODE_SUFFIX_LEN))
 
 DEFAULT_TICKER = [
     "Merci de patienter, vous serez appelé(e) par votre nom.",
@@ -180,6 +188,34 @@ def parse_youtube(raw) -> tuple:
 
 # ----------------------------------------------------------------- réglages
 
+def _initial(name) -> str:
+    """Première lettre A-Z d'un nom, accents retirés (« Élodie » → « E »)."""
+    folded = unicodedata.normalize("NFKD", str(name or "")).upper()
+    for ch in folded:
+        if "A" <= ch <= "Z":
+            return ch
+    return ""
+
+
+def normalize_screen_code(raw) -> str:
+    """Le code se tape à la main sur la TV : la casse et les espaces ne comptent pas."""
+    return str(raw or "").strip().upper()
+
+
+async def _new_screen_code(db: aiosqlite.Connection, doctor_id: int) -> str:
+    cur = await db.execute("SELECT first_name, last_name FROM users WHERE id = ?", (doctor_id,))
+    row = await cur.fetchone()
+    prefix = (_initial(row["first_name"]) + _initial(row["last_name"])) if row else ""
+    prefix = prefix or "DR"
+    for _ in range(20):
+        suffix = "".join(secrets.choice(SCREEN_CODE_ALPHABET) for _ in range(SCREEN_CODE_SUFFIX_LEN))
+        code = "%s-%s" % (prefix, suffix)
+        cur = await db.execute("SELECT 1 FROM waiting_room_settings WHERE display_token = ?", (code,))
+        if not await cur.fetchone():
+            return code
+    raise RuntimeError("Impossible de générer un code d'écran unique")
+
+
 async def get_settings(db: aiosqlite.Connection, doctor_id: int) -> dict:
     """Lit les réglages du médecin, en créant la ligne (et le jeton d'écran) au
     premier appel."""
@@ -189,14 +225,15 @@ async def get_settings(db: aiosqlite.Connection, doctor_id: int) -> dict:
         await db.execute(
             """INSERT INTO waiting_room_settings (doctor_id, display_token, ticker_messages, updated_at)
                VALUES (?, ?, ?, ?)""",
-            (doctor_id, secrets.token_urlsafe(24), json.dumps(DEFAULT_TICKER, ensure_ascii=False), now_ts()),
+            (doctor_id, await _new_screen_code(db, doctor_id), json.dumps(DEFAULT_TICKER, ensure_ascii=False), now_ts()),
         )
         await db.commit()
         cur = await db.execute("SELECT * FROM waiting_room_settings WHERE doctor_id = ?", (doctor_id,))
         row = await cur.fetchone()
     s = dict(row)
-    if not s.get("display_token"):
-        token = secrets.token_urlsafe(24)
+    # Les anciens jetons longs (token_urlsafe) sont convertis au format court.
+    if not _SCREEN_CODE_RE.match(s.get("display_token") or ""):
+        token = await _new_screen_code(db, doctor_id)
         await db.execute(
             "UPDATE waiting_room_settings SET display_token = ? WHERE doctor_id = ?", (token, doctor_id)
         )
@@ -281,7 +318,7 @@ async def save_settings(db: aiosqlite.Connection, doctor_id: int, data: dict) ->
 
 async def regenerate_token(db: aiosqlite.Connection, doctor_id: int) -> str:
     await get_settings(db, doctor_id)
-    token = secrets.token_urlsafe(24)
+    token = await _new_screen_code(db, doctor_id)
     await db.execute(
         "UPDATE waiting_room_settings SET display_token = ?, updated_at = ? WHERE doctor_id = ?",
         (token, now_ts(), doctor_id),
@@ -714,7 +751,8 @@ async def waiting_count(db: aiosqlite.Connection, doctor_id: int) -> int:
 
 async def settings_by_token(db: aiosqlite.Connection, token: str):
     """Résout un jeton d'écran vers les réglages du médecin (None si inconnu)."""
-    if not token:
+    token = normalize_screen_code(token)
+    if not _SCREEN_CODE_RE.match(token):
         return None
     cur = await db.execute("SELECT doctor_id FROM waiting_room_settings WHERE display_token = ?", (token,))
     row = await cur.fetchone()

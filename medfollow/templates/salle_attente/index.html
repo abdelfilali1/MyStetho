@@ -289,11 +289,11 @@
             <div class="form-group">
                 <label>Lien de l'écran (à ouvrir sur la TV)</label>
                 <div class="wr-screen-link">
-                    <code id="wr-screen-url">{{ screen_url }}</code>
+                    <code id="wr-screen-url" data-path="{{ short_url }}">{{ short_url }}</code>
                     <button type="button" class="btn btn-sm btn-outline" onclick="wrCopyScreenUrl()">Copier</button>
                     <button type="button" class="btn btn-sm btn-outline" onclick="wrRotateToken()">Régénérer</button>
                 </div>
-                <small style="color:#6b7f9b;">Ce lien ouvre l'écran sans connexion : il n'affiche que la file anonymisée, jamais un dossier. Régénérez-le si la TV change ou si le lien a été partagé.</small>
+                <small style="color:#6b7f9b;">Ce lien court (vos initiales + un code) ouvre l'écran sans connexion : il n'affiche que la file anonymisée, jamais un dossier. Régénérez-le si la TV change ou si le lien a été partagé.</small>
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-settings-modal')">Fermer</button>
@@ -754,7 +754,7 @@
     window.wrRotateToken = function () {
         if (!confirm('Régénérer le lien ? L\'ancien lien cessera immédiatement de fonctionner sur la TV.')) return;
         post('/salle-attente/reglages/token', {}).then(function (data) {
-            document.getElementById('wr-screen-url').textContent = data.screen_url;
+            wrShowShortUrl(data.short_url);
             document.getElementById('wr-screen-btn').setAttribute('href', data.screen_url);
             // L'URL de l'apercu contient le jeton : elle devient invalide.
             var logo = document.getElementById('wr-logo-preview');
@@ -765,8 +765,16 @@
         });
     };
 
+    // Affiché sans « https:// » ni « www. » : c'est ce que l'on tape sur la TV.
+    function wrShowShortUrl(path) {
+        var el = document.getElementById('wr-screen-url');
+        el.setAttribute('data-path', path);
+        el.textContent = window.location.host.replace(/^www\./, '') + path;
+    }
+    wrShowShortUrl(document.getElementById('wr-screen-url').getAttribute('data-path'));
+
     window.wrCopyScreenUrl = function () {
-        var url = window.location.origin + document.getElementById('wr-screen-url').textContent;
+        var url = window.location.origin + document.getElementById('wr-screen-url').getAttribute('data-path');
         if (navigator.clipboard) {
             navigator.clipboard.writeText(url).then(function () {
                 if (window.showToast) window.showToast('Lien copié');
