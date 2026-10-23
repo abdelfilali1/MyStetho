@@ -57,6 +57,7 @@
 </style>
 {% if is_dentist %}
 <link rel="stylesheet" href="/static/css/odonto.css?v=20260826-2">
+<link rel="stylesheet" href="/static/css/model3d.css?v=20261022-3">
 <style>
 /* ===== CSS dentiste — copié depuis dental/chart.html ===== */
 .legend-pill { display: flex; align-items: center; gap: 6px; background: transparent; border: none; border-radius: 0; padding: 0; font-size: 11px; color: var(--gray-700); font-weight: 500; white-space: normal; }
@@ -356,6 +357,10 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         <button class="view-btn" id="btn-endo" onclick="switchTab('endo')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v6m0 4v10M8 22c0-6 1-10 4-14M16 22c0-6-1-10-4-14"/><circle cx="12" cy="5" r="3"/></svg>
             Endodontie
+        </button>
+        <button class="view-btn" id="btn-model3d" onclick="switchTab('model3d')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12M21 7l-9 5-9-5"/></svg>
+            Modèle 3D
         </button>
         {% endif %}
     </div>
@@ -890,6 +895,11 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         <span class="legend-pill"><span class="legend-dot" style="background:#8b5cf6;"></span>Préparé</span>
         <span class="legend-pill"><span class="legend-dot" style="background:#22c55e;"></span>Obturé</span>
     </div>
+</div>
+
+<!-- ===== ONGLET : MODÈLE 3D (fichiers .ply, module static/js/model3d) ===== -->
+<div id="view-model3d" style="display:none;">
+    <div id="model3d-root"></div>
 </div>
 
 <!-- Endo Modal — copié depuis chart.html -->
@@ -1430,11 +1440,12 @@ document.addEventListener('keydown', (e) => {
 
 // ===== Tab switching — available for all users =====
 const PATIENT_TABS = ['info','appts','ordonnance','documents','mutuelle','facturation','analyses'];
-const DENTAL_TABS  = ['odontogram','endo'];
+const DENTAL_TABS  = ['odontogram','endo','model3d'];
 const ALL_TABS = [...PATIENT_TABS, ...DENTAL_TABS];
 let endoGridBuilt = false;
 let currentOdontoView = 'odonto';   // 'odonto' = Odontogramme (défaut), 'perio' = Parodontogramme
 let _odontoMod = null, _odontoChart = null, _perioChart = null;
+let _model3dView = null, _model3dLoading = false;
 
 function switchTab(tab) {
     if (tab === 'layout') tab = 'odontogram';   // ancien onglet fusionné
@@ -1447,6 +1458,21 @@ function switchTab(tab) {
     });
     if (tab === 'odontogram') toggleOdontoView(currentOdontoView);
     if (tab === 'endo' && !endoGridBuilt) { buildEndoGrid(); }
+    if (tab === 'model3d') showModel3D();
+}
+
+// ===== Modèle 3D (module static/js/model3d, chargé à la première ouverture) =====
+function showModel3D() {
+    if (_model3dView) { _model3dView.refresh(); return; }
+    if (_model3dLoading) return;
+    _model3dLoading = true;
+    import('/static/js/model3d/viewer.js?v=20261022-3').then(m => {
+        _model3dView = m.mountModel3D(document.getElementById('model3d-root'), { patientId: {{ patient.id }} });
+    }).catch(err => {
+        _model3dLoading = false;
+        console.error('Modèle 3D : chargement du module impossible', err);
+        if (window.showToast) window.showToast('Erreur de chargement du visualiseur 3D', 'error');
+    });
 }
 
 // ===== Odontogramme / Parodontogramme (module static/js/odonto) =====

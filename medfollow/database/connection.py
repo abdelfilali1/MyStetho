@@ -1,5 +1,7 @@
 import aiosqlite
+import hashlib
 import os
+import re
 from config import DATABASE_PATH
 
 async def get_db():
@@ -964,6 +966,75 @@ async def init_db():
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    await db.commit()
+
+    # Modèle 3D : un fichier .ply (empreinte optique / scan de la bouche) daté
+    # du jour de l'acquisition. Plusieurs modèles le même jour = un seul cran de
+    # la frise chronologique (ex. arcade supérieure + arcade inférieure).
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS dental_models_3d (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            scan_date DATE NOT NULL,
+            file_path TEXT NOT NULL,
+            original_name TEXT,
+            file_size INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_models3d_patient ON dental_models_3d(patient_id, scan_date)"
+    )
+    await db.commit()
+    # Couleurs du scan : beaucoup de scanners les exportent dans une image à part
+    # (« comment TextureFile xxx.png » dans l'en-tête PLY + coordonnées UV par face).
+    # texture_ref = nom attendu lu dans l'en-tête ; texture_path = image importée.
+    # file_sha256 : empreinte du .ply, pour ignorer un fichier déjà importé à la même date.
+    for col in ("texture_ref TEXT", "texture_path TEXT", "texture_name TEXT", "file_sha256 TEXT"):
+        try:
+            await db.execute(f"ALTER TABLE dental_models_3d ADD COLUMN {col}")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
+    # Image de couleurs importée avant son .ply : gardée en attente, puis
+    # rattachée automatiquement au modèle dont l'en-tête la nomme.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS dental_model_pending_textures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL REFERENCES patients(id),
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            name TEXT NOT NULL,
+            path TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.commit()
+    # Modèles importés avant la prise en charge des textures : on relit l'en-tête
+    # une fois ('' = vérifié, aucune texture référencée).
+    cur = await db.execute("SELECT id, file_path FROM dental_models_3d WHERE texture_ref IS NULL")
+    for model_id, file_path in await cur.fetchall():
+        ref = ""
+        try:
+            with open(file_path, "rb") as f:
+                header = f.read(64 * 1024).split(b"end_header", 1)[0]
+            m = re.search(rb"^comment\s+TextureFile\s+(.+?)\s*$", header, re.MULTILINE)
+            if m:
+                ref = os.path.basename(m.group(1).decode("utf-8", "replace"))[:255]
+        except OSError:
+            pass
+        await db.execute("UPDATE dental_models_3d SET texture_ref = ? WHERE id = ?", (ref, model_id))
+    await db.commit()
+    cur = await db.execute("SELECT id, file_path FROM dental_models_3d WHERE file_sha256 IS NULL")
+    for model_id, file_path in await cur.fetchall():
+        digest = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                while chunk := f.read(1024 * 1024):
+                    digest.update(chunk)
+        except OSError:
+            continue
+        await db.execute("UPDATE dental_models_3d SET file_sha256 = ? WHERE id = ?", (digest.hexdigest(), model_id))
     await db.commit()
 
     # Salle d'attente : une ligne = un passage de patient dans la journee.

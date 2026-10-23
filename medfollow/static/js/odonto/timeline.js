@@ -16,16 +16,23 @@ function todayIso() {
 
 /**
  * @param {HTMLElement} el
- * @param {{dates:Array<{date:string,change_count:number}>, currentDate:string|null, disabled?:boolean, onChange:(date:string|null)=>void}} opts
+ * @param {{dates:Array<{date:string,change_count:number}>, currentDate:string|null, disabled?:boolean, onChange:(date:string|null)=>void,
+ *          title?:string, returnLabel?:string, countLabel?:(n:number)=>string, showNow?:boolean}} opts
+ *   showNow=false (onglet Modèle 3D) : pas de nœud « Maintenant », la dernière date est l'état courant.
  */
 export function createTimeline(el, opts) {
+  const title = opts.title || T.timeline.title;
+  const returnLabel = opts.returnLabel || T.timeline.returnToNow;
+  const countLabel = opts.countLabel || T.common.change;
+  const showNow = opts.showNow !== false;
   let dates = opts.dates || [];
   let currentDate = opts.currentDate || null;
   let disabled = !!opts.disabled;
   let dragging = false;
   let track = null;
 
-  const lastDateIsToday = () => dates.length > 0 && dates[dates.length - 1].date === todayIso();
+  const lastDateIsToday = () => dates.length > 0 && (!showNow || dates[dates.length - 1].date === todayIso());
+  const lastLabel = () => (showNow ? T.common.now : formatShortDate(dates[dates.length - 1].date));
   const currentIndex = () => (currentDate ? dates.findIndex((d) => d.date === currentDate) : null);
   const totalPositions = () => (lastDateIsToday() ? dates.length : dates.length + 1);
   const positionPercent = (i) => (totalPositions() <= 1 ? 100 : (i / (totalPositions() - 1)) * 100);
@@ -79,14 +86,14 @@ export function createTimeline(el, opts) {
     const ci = currentIndex();
     const viewingHistory = currentDate !== null;
     const thumbPos = ci === null ? (lastDateIsToday() ? positionPercent(dates.length - 1) : 100) : positionPercent(ci);
-    const thumbLabel = ci === null || !dates[ci] ? T.common.now : formatShortDate(dates[ci].date);
+    const thumbLabel = ci === null || !dates[ci] ? (dates.length ? lastLabel() : T.common.now) : formatShortDate(dates[ci].date);
 
     let markers = '';
     dates.forEach((entry, i) => {
       const st = markerState(i);
       const isLastAndToday = lastDateIsToday() && i === dates.length - 1;
-      const label = isLastAndToday ? T.common.now : formatShortDate(entry.date);
-      markers += `<div class="odo-tl-marker" data-index="${i}" style="left:${positionPercent(i)}%" title="${esc(formatShortDate(entry.date))} (${entry.change_count} ${T.common.change(entry.change_count)})">
+      const label = isLastAndToday ? lastLabel() : formatShortDate(entry.date);
+      markers += `<div class="odo-tl-marker" data-index="${i}" style="left:${positionPercent(i)}%" title="${esc(formatShortDate(entry.date))} (${entry.change_count} ${countLabel(entry.change_count)})">
         <div class="odo-tl-dot state-${st}"></div>
         <span class="odo-tl-label state-${st}">${esc(label)}</span>
       </div>`;
@@ -100,8 +107,8 @@ export function createTimeline(el, opts) {
 
     el.innerHTML = `<div class="odo-timeline${disabled ? ' disabled' : ''}">
       <div class="odo-tl-header">
-        <span class="odo-tl-title">${T.timeline.title}</span>
-        <div class="odo-tl-return">${viewingHistory ? `<button type="button" class="odo-btn odo-btn-soft odo-btn-xs" data-act="now">${T.timeline.returnToNow}</button>` : ''}</div>
+        <span class="odo-tl-title">${esc(title)}</span>
+        <div class="odo-tl-return">${viewingHistory ? `<button type="button" class="odo-btn odo-btn-soft odo-btn-xs" data-act="now">${esc(returnLabel)}</button>` : ''}</div>
       </div>
       <div class="odo-tl-track" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="${dates.length}" aria-valuenow="${ci === null ? dates.length : ci}">
         <div class="odo-tl-line"></div>

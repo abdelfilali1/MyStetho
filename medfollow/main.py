@@ -24,7 +24,7 @@ def _calc_age(dob_str):
         return ""
 from database.connection import init_db
 from database.seed import seed_db
-from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, salle_attente, whatsapp_webhook, profile, odontogram, periodontogram
+from routers import auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, salle_attente, whatsapp_webhook, profile, odontogram, periodontogram, model3d
 from services import reminder_scheduler
 
 
@@ -123,7 +123,7 @@ async def _security_headers(request, call_next):
     response.headers.setdefault("Referrer-Policy", "same-origin")
     # Modules ES de l'odontogramme : les imports relatifs (`./chart.js`…) n'ont pas de
     # cache-buster, on force la revalidation pour que les mises à jour soient vues.
-    if request.url.path.startswith("/static/js/odonto/") or request.url.path == "/static/css/odonto.css":
+    if request.url.path.startswith(("/static/js/odonto/", "/static/js/model3d/")) or request.url.path == "/static/css/odonto.css":
         response.headers["Cache-Control"] = "no-cache"
     if _HTTPS_ENABLED:
         response.headers.setdefault(
@@ -346,6 +346,7 @@ app.include_router(invoices.router)
 app.include_router(dental.router)
 app.include_router(odontogram.router)
 app.include_router(periodontogram.router)
+app.include_router(model3d.router)
 app.include_router(mutuelle.router)
 app.include_router(cephalo.router)
 app.include_router(radio.router)

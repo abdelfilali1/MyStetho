@@ -278,6 +278,86 @@ for _needle, _label in (('id="btn-perio"', "bouton Parodontogramme"), ('id="btn-
 get("/static/js/odonto/index.js", expect=(200,), label="/static/js/odonto/index.js")
 get("/static/css/odonto.css", expect=(200,), label="/static/css/odonto.css")
 
+print("== Modele 3D (.ply) ==")
+_r = get("/patients/1?tab=model3d", label="/patients/1?tab=model3d")
+for _needle, _label in (('id="btn-model3d"', "bouton Modele 3D"), ('id="model3d-root"', "racine Modele 3D"),
+                        ("/static/js/model3d/viewer.js", "module model3d")):
+    check(_needle in _r.text, f"fiche patient : {_label}")
+for _p in ("/static/js/model3d/viewer.js", "/static/js/model3d/anatomy.js", "/static/js/three/three.module.min.js", "/static/js/three/PLYLoader.js",
+           "/static/js/three/TrackballControls.js", "/static/css/model3d.css"):
+    get(_p, expect=(200,), label=_p)
+_PLY = (b"ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\n"
+        b"element face 1\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n")
+
+
+def upload_ply(name, content, scan_date, expect=(201,), label=None):
+    # Multipart : le middleware CSRF exige un Origin concordant (pas de jeton lisible).
+    r = client.post("/modele-3d/1", data={"scan_date": scan_date}, files={"file": (name, content)},
+                    headers={"Origin": "http://testserver", "X-Requested-With": "fetch"})
+    ok = r.status_code in expect
+    print(f"  {'OK ' if ok else 'XX '} POST {label or name} -> {r.status_code}")
+    if not ok:
+        failures.append(f"POST /modele-3d {label or name} -> {r.status_code} (attendu {expect}) {r.text[:200]}")
+    return r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+
+
+def _variant(content, tag):
+    """Contenu distinct (commentaire d'en-tête) : deux fichiers identiques seraient dédoublonnés."""
+    return content.replace(b"format ascii 1.0\n", f"format ascii 1.0\ncomment {tag}\n".encode(), 1)
+
+
+_m1 = upload_ply("arcade-sup.ply", _variant(_PLY, "sup"), "2026-03-12")
+_m2 = upload_ply("arcade-inf.ply", _variant(_PLY, "inf"), "2026-03-12")
+_dup = upload_ply("arcade-sup (1).ply", _variant(_PLY, "sup"), "2026-03-12", expect=(200,), label="meme fichier, meme date (doublon)")
+check(_dup.get("duplicate") is True and _dup.get("id") == _m1.get("id"), "modele 3D : doublon ignore (pas de nouveau modele)")
+_other = upload_ply("arcade-sup.ply", _variant(_PLY, "sup"), "2026-03-13", label="meme fichier, autre date (nouveau modele)")
+json_call("DELETE", f"/modele-3d/1/{_other.get('id')}", expect=(204,), label="/modele-3d suppression (autre date)")
+upload_ply("scan.stl", _PLY, "2026-03-12", expect=(422,), label="extension .stl (422)")
+upload_ply("faux.ply", b"solid not a ply", "2026-03-12", expect=(422,), label="contenu non PLY (422)")
+upload_ply("futur.ply", _PLY, "2999-01-01", expect=(422,), label="date future (422)")
+upload_ply("date.ply", _PLY, "12/03/2026", expect=(422,), label="date invalide (422)")
+_l = json_call("GET", "/modele-3d/1") or {}
+check([m["scan_date"] for m in _l.get("models", [])] == ["2026-03-12", "2026-03-12"], "modele 3D : 2 modeles le 12/03")
+_rf = client.get(f"/modele-3d/1/{_m1.get('id')}/fichier?download=1")
+check(_rf.status_code == 200 and _rf.content == _variant(_PLY, "sup") and "attachment" in _rf.headers.get("content-disposition", ""),
+      "modele 3D : telechargement du fichier")
+json_call("GET", "/modele-3d/999", expect=(404,), label="/modele-3d patient d'un autre (404)")
+for _m in (_m1, _m2):
+    json_call("DELETE", f"/modele-3d/1/{_m.get('id')}", expect=(204,), label=f"/modele-3d suppression {_m.get('id')}")
+check(client.get(f"/modele-3d/1/{_m1.get('id')}/fichier").status_code == 404, "modele 3D : fichier supprime (404)")
+
+# Couleurs automatiques (image PNG nommee dans l'en-tete), quel que soit l'ordre d'import.
+_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+
+def _ply_tex(name):
+    return _PLY.replace(b"format ascii 1.0\n", f"format ascii 1.0\ncomment TextureFile {name}\n".encode())
+
+
+def upload_images(files, label):
+    r = client.post("/modele-3d/1/images", files=[("images", (n, c)) for n, c in files],
+                    headers={"Origin": "http://testserver", "X-Requested-With": "fetch"})
+    check(r.status_code == 200, f"POST /modele-3d/1/images {label} -> {r.status_code}")
+    return r.json() if r.status_code == 200 else {}
+
+
+_ri = upload_images([("Upper.png", _PNG)], "(image avant son .ply)")
+check(_ri.get("pending") == ["Upper.png"], "modele 3D : image mise en attente")
+_u = upload_ply("Upper.ply", _ply_tex("Upper.png"), "2026-03-12", label="Upper.ply (reprend l'image en attente)")
+check(bool(_u.get("texture_url")) and _u.get("texture_ref") == "Upper.png", "modele 3D : couleurs auto (image avant .ply)")
+# Deux exports differents qui nomment la meme image (contenus distincts).
+_l1 = upload_ply("Lower.ply", _variant(_ply_tex("Lower.png"), "a"), "2026-03-12", label="Lower.ply (sans image)")
+_l2 = upload_ply("Lower (1).ply", _variant(_ply_tex("Lower.png"), "b"), "2026-03-12", label="Lower (1).ply meme image")
+check(not _l1.get("texture_url") and not _l2.get("texture_url"), "modele 3D : pas de couleurs tant que l'image manque")
+_ri = upload_images([("Lower.png", _PNG), ("faux.png", b"pas une image")], "(image apres ses .ply)")
+check([len(a["models"]) for a in _ri.get("attached", [])] == [2] and len(_ri.get("errors", [])) == 1,
+      "modele 3D : image rattachee aux 2 doublons, faux PNG refuse")
+_l3 = upload_ply("Lower (2).ply", _variant(_ply_tex("Lower.png"), "c"), "2026-03-12", label="Lower (2).ply (reprend l'image du doublon)")
+check(bool(_l3.get("texture_url")), "modele 3D : couleurs auto (copie d'un modele deja colore)")
+check(client.get(_l3.get("texture_url") or "/x").content == _PNG, "modele 3D : texture servie")
+for _m in (_u, _l1, _l2, _l3):
+    json_call("DELETE", f"/modele-3d/1/{_m.get('id')}", expect=(204,), label=f"/modele-3d suppression {_m.get('id')}")
+
 print("== Rappels (item 31) ==")
 post("/rappels/new", {"patient_id": "1", "description": "Détartrage", "due_date": "2026-09-01"})
 post("/rappels/1/status", {"status": "contacte"})

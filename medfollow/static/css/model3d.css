@@ -1,0 +1,89 @@
+/* ==========================================================================
+   Onglet « Modèle 3D » (fiche patient) — s'appuie sur les variables et
+   composants de odonto.css (panneaux, boutons, frise chronologique, modales).
+   ========================================================================== */
+
+.m3d-root { font-family: 'Manrope', system-ui, sans-serif; color: var(--odo-text); }
+.m3d-root [hidden], .m3d-upload [hidden] { display: none !important; }
+
+.m3d-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.m3d-heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.m3d-heading h3 { margin: 0; font-size: 16px; font-weight: 700; }
+
+.m3d-empty { text-align: center; padding: 40px 20px; }
+.m3d-empty p { margin: 0 0 6px; }
+.m3d-empty .odo-btn { margin-top: 12px; }
+.m3d-empty-icon { color: var(--odo-subtle); margin-bottom: 10px; }
+
+.m3d-stage-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.m3d-stage-title { font-size: 14px; color: var(--odo-muted); margin-bottom: 8px; }
+.m3d-stage-title strong { color: var(--odo-text); }
+.m3d-display { display: flex; gap: 14px; align-items: center; }
+.m3d-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--odo-muted); cursor: pointer; user-select: none; }
+
+.m3d-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.m3d-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 4px; border: 1px solid var(--odo-border); border-radius: 999px; background: #fff; font-size: 12px; max-width: 100%; }
+.m3d-chip.off { background: var(--odo-surface-muted); }
+.m3d-chip.off .m3d-chip-name { color: var(--odo-subtle); text-decoration: line-through; }
+.m3d-chip-name { font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.m3d-chip-size { color: var(--odo-subtle); font-size: 11px; padding-right: 2px; white-space: nowrap; }
+.m3d-chip-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: none; border-radius: 50%; background: none; color: var(--odo-muted); cursor: pointer; text-decoration: none; }
+.m3d-chip-btn:hover { background: var(--odo-surface-muted); color: var(--primary-dark, #0f61cf); }
+.m3d-chip-btn.danger:hover { background: var(--danger-light, #ffe0e6); color: var(--danger, #d93a58); }
+
+.m3d-canvas-wrap { position: relative; height: min(68vh, 620px); min-height: 360px; border-radius: 12px; overflow: hidden; background: var(--odo-surface-muted); border: 1px solid var(--odo-border); }
+.m3d-canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; cursor: grab; touch-action: none; }
+.m3d-canvas-wrap canvas:active { cursor: grabbing; }
+.m3d-views { position: absolute; top: 10px; left: 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px; background: rgba(255,255,255,.9); border: 1px solid var(--odo-border); border-radius: 10px; box-shadow: 0 4px 14px rgba(11,45,90,.08); }
+.m3d-view-btn { border: none; background: none; padding: 5px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--odo-muted); cursor: pointer; font-family: inherit; }
+.m3d-view-btn:hover { background: var(--primary-light, #d9efff); color: var(--primary-dark, #0f61cf); }
+.m3d-views-sep { width: 1px; align-self: stretch; background: var(--odo-border); margin: 2px 2px; }
+.m3d-hint { position: absolute; top: 14px; right: 12px; max-width: 46%; text-align: right; font-size: 11px; color: var(--odo-subtle); background: rgba(255,255,255,.8); padding: 3px 8px; border-radius: 999px; pointer-events: none; }
+.m3d-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(246,249,253,.85); font-size: 13px; font-weight: 600; color: var(--odo-muted); }
+.m3d-spinner { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--odo-surface-sunken); border-top-color: var(--primary, #1c8cf8); animation: m3d-spin .8s linear infinite; }
+@keyframes m3d-spin { to { transform: rotate(360deg); } }
+.m3d-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 13px; color: var(--odo-muted); pointer-events: none; }
+
+/* Modale d'import */
+.m3d-input { width: 100%; box-sizing: border-box; border: 1px solid var(--gray-300, #cbd5e1); border-radius: 11px; background: #fff; color: var(--odo-text); font: inherit; font-size: 14px; padding: 10px 12px; outline: none; transition: border-color .18s, box-shadow .18s; }
+.m3d-input:focus { border-color: #4ebfff; box-shadow: 0 0 0 4px rgba(30,175,255,.18); }
+.m3d-drop { position: relative; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 22px 14px; border: 1.5px dashed var(--odo-border); border-radius: 12px; background: var(--odo-surface-muted); text-align: center; font-size: 13px !important; font-weight: 500 !important; color: var(--odo-muted); cursor: pointer; margin: 0 !important; word-break: break-word; transition: border-color .15s, background .15s; }
+.m3d-drop:hover, .m3d-drop.over { border-color: var(--primary, #1c8cf8); background: var(--primary-light, #d9efff); }
+.m3d-drop.filled { border-style: solid; border-color: var(--primary, #1c8cf8); color: var(--odo-text); }
+.m3d-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.m3d-drop-icon { color: var(--primary, #1c8cf8); }
+.m3d-progress { height: 6px; border-radius: 999px; background: var(--odo-surface-sunken); overflow: hidden; }
+.m3d-progress-bar { height: 100%; width: 0; background: var(--primary, #1c8cf8); transition: width .15s; }
+.m3d-progress-text { margin: 6px 0 0; min-height: 16px; }
+
+@media (max-width: 640px) {
+  .m3d-canvas-wrap { height: 60vh; min-height: 300px; }
+  .m3d-hint { display: none; }
+  .m3d-views { right: 10px; gap: 2px; padding: 3px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .m3d-view-btn { padding: 4px 7px; font-size: 11px; flex-shrink: 0; }
+  .m3d-chip-name { max-width: 150px; }
+}
+
+/* Couleurs du scan (texture .png) */
+.m3d-chip-warn { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border: none; border-radius: 999px; background: #fff4e0; color: #a86300; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.m3d-chip-warn:hover { background: #ffe8bf; }
+.m3d-pairs { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--odo-muted); }
+.m3d-pairs li { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; border-radius: 8px; background: var(--odo-surface-muted); word-break: break-word; }
+.m3d-pairs li svg { flex-shrink: 0; margin-top: 1px; }
+.m3d-pairs li.ok { background: var(--success-light, #d6f8ec); color: #0a7a58; }
+.m3d-pairs li.warn { background: #fff4e0; color: #a86300; }
+.m3d-folder-btn { margin-top: 6px; }
+
+.m3d-chip-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--odo-muted); background: var(--odo-surface-muted); border: 1px solid var(--odo-border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+
+/* Ouverture de la bouche (bouton + curseur) */
+.m3d-mouth { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 10px; padding: 5px 12px 5px 5px; background: rgba(255,255,255,.92); border: 1px solid var(--odo-border); border-radius: 999px; box-shadow: 0 4px 14px rgba(11,45,90,.1); }
+.m3d-mouth-btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border: none; border-radius: 999px; background: var(--primary, #1c8cf8); color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: background .15s; }
+.m3d-mouth-btn:hover { background: var(--primary-dark, #0f61cf); }
+.m3d-mouth-btn.active { background: #142033; }
+.m3d-mouth input[type=range] { width: 140px; accent-color: var(--primary, #1c8cf8); cursor: pointer; }
+.m3d-mouth-value { min-width: 32px; font-size: 12px; font-weight: 700; color: var(--odo-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .m3d-mouth { right: 10px; }
+  .m3d-mouth input[type=range] { flex: 1; width: auto; min-width: 60px; }
+}
