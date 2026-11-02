@@ -427,6 +427,55 @@ get(_short, expect=(200,), label="/SA/{code}")
 get(_short.lower(), expect=(200,), label="/sa/{code en minuscules}")
 get("/SA/ZZ-0000", expect=(404,), label="/SA/{code invalide}")
 
+print("== Agenda : motif unique (type deduit) ==")
+_r = client.get("/appointments/")
+check('data-motif-combo' in _r.text and "timeGridWeek" in _r.text, "agenda : liste de motifs + vue semaine par defaut")
+for _motif, _type, _h in (("Extraction 36", "intervention", 11), ("Contrôle / suivi", "suivi", 12),
+                          ("Urgence (douleur)", "urgence", 13), ("Bilan annuel", "consultation", 14)):
+    json_call("POST", "/appointments/api/new", {"patient_id": 1, "title": _motif, "status": "planifie",
+                                                 "start_datetime": f"{_today}T{_h}:00", "end_datetime": f"{_today}T{_h}:30"},
+              label=f"/appointments/api/new motif « {_motif} »")
+_evs = {e["extendedProps"]["motif"]: e for e in (client.get("/appointments/api/events").json() or [])}
+for _motif, _type in (("Extraction 36", "intervention"), ("Contrôle / suivi", "suivi"),
+                      ("Urgence (douleur)", "urgence"), ("Bilan annuel", "consultation")):
+    check(_evs.get(_motif, {}).get("extendedProps", {}).get("type") == _type, f"type deduit de « {_motif} » = {_type}")
+json_call("POST", "/appointments/api/new", {"patient_id": 1, "title": "  ", "start_datetime": f"{_today}T15:00",
+                                            "end_datetime": f"{_today}T15:30"}, expect=(400,), label="motif vide (400)")
+
+print("== Salle d'attente : absent / replanifier (secretaire) ==")
+post("/admin/users/new", {"email": "secretaire@smoke.test", "password": "Password123!", "password_confirm": "Password123!",
+                          "first_name": "Sara", "last_name": "Secret", "role": "secretaire", "specialty": "",
+                          "linked_doctor_id": "1"}, label="/admin/users/new (secretaire)")
+post("/login", {"email": "secretaire@smoke.test", "password": "Password123!"}, label="/login (secretaire)")
+_board = client.get("/salle-attente/api/board").json()
+_exp = {e["reason"]: e for e in _board.get("expected", [])}
+check("Extraction 36" in _exp and "Bilan annuel" in _exp, "secretaire : RDV du jour visibles dans les attendus")
+_a, _b = _exp.get("Extraction 36", {}), _exp.get("Bilan annuel", {})
+check(bool(_a.get("start")) and bool(_a.get("end")), "attendus : debut/fin fournis pour replanifier")
+_tomorrow = (_date.today() + __import__("datetime").timedelta(days=1)).isoformat()
+_slots = client.get(f"/appointments/api/free-slots?doctor_id=0&date={_tomorrow}&duration=30&exclude_id={_a.get('appointment_id')}").json()
+check(len(_slots.get("slots", [])) > 0, "secretaire : creneaux libres du lendemain")
+json_call("POST", f"/appointments/{_a.get('appointment_id')}/reschedule",
+          {"start_datetime": f"{_tomorrow}T10:00", "end_datetime": f"{_tomorrow}T10:30"},
+          label="secretaire : replanifier au lendemain")
+json_call("POST", f"/appointments/{_a.get('appointment_id')}/reschedule",
+          {"start_datetime": f"{_tomorrow}T10:30", "end_datetime": f"{_tomorrow}T10:00"}, expect=(400,),
+          label="replanifier : fin avant debut (400)")
+_tok = csrf()
+_r = client.post(f"/appointments/{_b.get('appointment_id')}/status", data={"status": "absent"},
+                 headers={"X-CSRF-Token": _tok, "X-Requested-With": "fetch"})
+check(_r.status_code == 200, f"secretaire : marquer absent (no-show) -> {_r.status_code}")
+_r = client.post(f"/appointments/{_b.get('appointment_id')}/status", data={"status": "nimporte"},
+                 headers={"X-CSRF-Token": _tok, "X-Requested-With": "fetch"})
+check(_r.status_code == 400, f"statut invalide refuse -> {_r.status_code}")
+_reasons = [e["reason"] for e in client.get("/salle-attente/api/board").json().get("expected", [])]
+check("Extraction 36" not in _reasons and "Bilan annuel" not in _reasons,
+      "attendus : RDV replanifie et RDV absent retires de la liste")
+_r = client.get("/salle-attente/")
+check('data-action="noshow"' in _r.text and 'data-action="reschedule"' in _r.text,
+      "salle d'attente : boutons Absent / Replanifier")
+post("/login", {"email": "admin@smoke.test", "password": "Password123!"}, label="/login (retour medecin)")
+
 print("== Mon compte ==")
 get("/mon-compte")
 post("/mon-compte", {"first_name": "Smoke", "last_name": "Admin",

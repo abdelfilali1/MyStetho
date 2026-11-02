@@ -14,6 +14,46 @@ from services import waiting_room as wr
 router = APIRouter(prefix="/appointments")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+APPOINTMENT_TYPES = ("consultation", "suivi", "intervention", "urgence")
+APPOINTMENT_STATUSES = ("planifie", "confirme", "en_cours", "termine", "annule", "absent")
+
+# Motifs proposés dans la liste déroulante du formulaire (le praticien peut aussi
+# en saisir un autre). Le « type » (couleur dans l'agenda) en est déduit.
+MOTIFS_DENTAIRES = [
+    "Consultation", "Première consultation", "Contrôle / suivi", "Urgence (douleur)",
+    "Détartrage", "Soins / obturation", "Traitement de canal", "Extraction",
+    "Chirurgie / implant", "Prothèse / couronne", "Orthodontie", "Blanchiment",
+]
+MOTIFS_MEDICAUX = [
+    "Consultation", "Première consultation", "Contrôle / suivi", "Urgence",
+    "Résultats d'analyses", "Renouvellement d'ordonnance", "Certificat médical",
+    "Vaccination", "Acte / intervention",
+]
+
+
+async def _json_body(request: Request) -> dict | None:
+    """Corps JSON de la requête, ou None s'il est illisible (400 plutôt qu'une erreur 500)."""
+    try:
+        data = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def type_from_motif(motif: str, requested: str | None = None) -> str:
+    """Type de RDV (contrainte de la base : 4 valeurs) déduit du motif libre.
+    Un type explicite valide reste prioritaire (anciens clients de l'API)."""
+    if requested in APPOINTMENT_TYPES:
+        return requested
+    m = (motif or "").lower()
+    if "urgen" in m:
+        return "urgence"
+    if any(k in m for k in ("suivi", "contrôle", "controle")):
+        return "suivi"
+    if any(k in m for k in ("intervention", "chirurg", "extraction", "implant", "opérat", "operat", "canal")):
+        return "intervention"
+    return "consultation"
+
 
 @router.get("/", response_class=HTMLResponse)
 async def agenda(
@@ -22,6 +62,11 @@ async def agenda(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     uid = effective_doctor_id(user)
+
+    # Liste de motifs adaptée à la spécialité du praticien (y compris pour sa secrétaire).
+    cursor = await db.execute("SELECT specialty FROM users WHERE id = ?", (uid,))
+    spec_row = await cursor.fetchone()
+    is_dentist = "dent" in ((spec_row["specialty"] if spec_row else "") or "").lower()
 
     # Get all patients for the new appointment form
     cursor = await db.execute(
@@ -37,7 +82,8 @@ async def agenda(
 
     return templates.TemplateResponse(
         "appointments/index.html",
-        {"request": request, "user": user, "active": "appointments", "patients": patients, "doctors": doctors},
+        {"request": request, "user": user, "active": "appointments", "patients": patients, "doctors": doctors,
+         "motifs": MOTIFS_DENTAIRES if is_dentist else MOTIFS_MEDICAUX},
     )
 
 
@@ -147,12 +193,18 @@ async def create_appointment_api(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Create appointment via JSON. Returns conflict info if slot is taken."""
-    data = await request.json()
+    data = await _json_body(request)
+    if data is None:
+        return JSONResponse(status_code=400, content={"error": "Requête invalide"})
     patient_id = data.get("patient_id")
     doctor_id = effective_doctor_id(user)  # always the logged-in doctor; never trust the client body
-    title = data.get("title", "")
-    appointment_type = data.get("appointment_type", "consultation")
+    title = (data.get("title") or "").strip()
+    if not title:
+        return JSONResponse(status_code=400, content={"error": "Le motif est obligatoire"})
+    appointment_type = type_from_motif(title, data.get("appointment_type"))
     status = data.get("status", "planifie")
+    if status not in APPOINTMENT_STATUSES:
+        status = "planifie"
     start_datetime = data.get("start_datetime", "")
     end_datetime = data.get("end_datetime", "")
     room = data.get("room", "") or None
@@ -237,10 +289,13 @@ async def create_appointment(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Fallback form POST (no conflict check — kept for compatibility)."""
-    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, user["sub"]))
+    doctor_id = effective_doctor_id(user)
+    cursor = await db.execute("SELECT 1 FROM patients WHERE id = ? AND doctor_id = ?", (patient_id, doctor_id))
     if not await cursor.fetchone():
         return RedirectResponse(url="/appointments", status_code=302)
-    doctor_id = user["sub"]
+    appointment_type = type_from_motif(title, appointment_type)
+    if status not in APPOINTMENT_STATUSES:
+        status = "planifie"
 
     cur = await db.execute(
         """INSERT INTO appointments (patient_id, doctor_id, title, appointment_type, status, start_datetime, end_datetime, room, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -262,14 +317,24 @@ async def reschedule_appointment(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Reschedule an appointment to a new start/end datetime. Checks for conflicts."""
-    data = await request.json()
+    data = await _json_body(request)
+    if data is None:
+        return JSONResponse(status_code=400, content={"error": "Requête invalide"})
     start_datetime = data.get("start_datetime", "")
     end_datetime = data.get("end_datetime", "")
 
-    # Fetch doctor_id from the appointment
+    try:
+        datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M")
+        datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Date ou heure invalide"})
+    if end_datetime <= start_datetime:
+        return JSONResponse(status_code=400, content={"error": "La fin doit être après le début"})
+
+    # La secrétaire agit sur l'agenda de son médecin (effective_doctor_id).
     cursor = await db.execute(
-        "SELECT doctor_id FROM appointments WHERE id = ? AND doctor_id = ?",
-        (appointment_id, user["sub"]),
+        "SELECT doctor_id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
+        (appointment_id, effective_doctor_id(user)),
     )
     row = await cursor.fetchone()
     if not row:
@@ -317,7 +382,8 @@ async def reschedule_appointment(
         (start_datetime, end_datetime, appointment_id),
     )
     await db.commit()
-    await log_audit(db, user, "rdv_deplace", entity_type="appointment", entity_id=appointment_id, ip=client_ip(request))
+    await log_audit(db, user, "rdv_deplace", entity_type="appointment", entity_id=appointment_id,
+                    patient_id=row["patient_id"], ip=client_ip(request), details=f"{start_datetime} -> {end_datetime}")
     return JSONResponse(content={"ok": True})
 
 
@@ -329,9 +395,11 @@ async def update_status(
     user: dict = Depends(require_login_api),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    if status not in APPOINTMENT_STATUSES:
+        return JSONResponse(status_code=400, content={"error": "Statut invalide"})
     cursor = await db.execute(
         "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
-        (appointment_id, user["sub"]),
+        (appointment_id, effective_doctor_id(user)),
     )
     row = await cursor.fetchone()
     if not row:
@@ -357,20 +425,21 @@ async def update_appointment(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Modifier le motif / type / salle / notes d'un RDV existant (item 30)."""
-    data = await request.json()
+    data = await _json_body(request)
+    if data is None:
+        return JSONResponse(status_code=400, content={"error": "Requête invalide"})
     title = (data.get("title") or "").strip()
-    appointment_type = (data.get("appointment_type") or "").strip()
     room = (data.get("room") or "").strip()
     notes = (data.get("notes") or "").strip()
 
     if not title:
         return JSONResponse(status_code=400, content={"error": "Le motif est obligatoire"})
-    if appointment_type not in ("consultation", "suivi", "intervention", "urgence"):
-        return JSONResponse(status_code=400, content={"error": "Type de rendez-vous invalide"})
+    # Le type suit le motif (champ unique dans le formulaire).
+    appointment_type = type_from_motif(title, (data.get("appointment_type") or "").strip())
 
     cursor = await db.execute(
         "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
-        (appointment_id, user["sub"]),
+        (appointment_id, effective_doctor_id(user)),
     )
     row = await cursor.fetchone()
     if not row:
@@ -394,7 +463,7 @@ async def delete_appointment(
 ):
     cursor = await db.execute(
         "SELECT id, patient_id FROM appointments WHERE id = ? AND doctor_id = ?",
-        (appointment_id, user["sub"]),
+        (appointment_id, effective_doctor_id(user)),
     )
     row = await cursor.fetchone()
     if not row:

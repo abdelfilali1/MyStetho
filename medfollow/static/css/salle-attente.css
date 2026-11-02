@@ -573,3 +573,13 @@
     margin: 18px -20px 0;
     padding: 12px 20px;
 }
+
+/* RDV attendus : absent (no-show) / replanifier */
+.wr-btn-noshow { color: var(--danger, #d93a58); border-color: rgba(217, 58, 88, .35); }
+.wr-btn-noshow:hover { background: #fff1f4; border-color: var(--danger, #d93a58); color: var(--danger, #d93a58); }
+.wr-rs-slots { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center; }
+.wr-rs-slot { border: 1px solid rgba(15, 33, 56, .15); background: #fff; color: #142033; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.wr-rs-slot:hover { border-color: var(--primary, #1c8cf8); color: var(--primary-dark, #0f61cf); }
+.wr-rs-slot.is-on { background: var(--primary, #1c8cf8); border-color: var(--primary, #1c8cf8); color: #fff; }
+.wr-rs-hint { font-size: 12px; color: #6b7f9b; }
+.wr-rs-conflict { background: #fff4f4; border: 1px solid #fca5a5; color: #7f1d1d; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }

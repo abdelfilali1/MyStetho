@@ -136,6 +136,18 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.motif-combo { position: relative; }
+.motif-combo input { width: 100%; padding-right: 36px; }
+.motif-combo-toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: none; background: none; color: var(--gray-500); cursor: pointer; border-radius: 6px; }
+.motif-combo-toggle:hover { background: var(--gray-100); color: var(--gray-800); }
+.motif-combo-list { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; box-shadow: 0 12px 28px rgba(11, 45, 90, .16); }
+.motif-combo-list li { padding: 8px 10px; border-radius: 7px; font-size: 13px; color: var(--gray-800); cursor: pointer; }
+.motif-combo-list li:hover, .motif-combo-list li.is-active { background: var(--primary-light, #d9efff); color: var(--primary-dark, #0f61cf); }
+.motif-combo-list li[aria-selected="true"] { font-weight: 700; }
+.motif-combo-sm input { font-size: 13px; padding: 7px 36px 7px 10px; border: 1px solid var(--gray-300); border-radius: 8px; }
+</style>
+
 <!-- New appointment modal -->
 <div id="new-apt-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCreateModal()">
     <div class="modal-box agenda-create-modal">
@@ -174,17 +186,14 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Motif</label>
-                <input type="text" name="title" required placeholder="Consultation de suivi">
-            </div>
-            <div class="form-group">
-                <label>Type</label>
-                <select name="appointment_type">
-                    <option value="consultation">Consultation</option>
-                    <option value="suivi">Suivi</option>
-                    <option value="intervention">Intervention</option>
-                    <option value="urgence">Urgence</option>
-                </select>
+                <label for="apt-title">Motif</label>
+                <div class="motif-combo" data-motif-combo>
+                    <input type="text" name="title" id="apt-title" required autocomplete="off"
+                           placeholder="Choisir dans la liste ou saisir un motif" role="combobox"
+                           aria-autocomplete="list" aria-expanded="false" aria-controls="apt-title-list">
+                    <button type="button" class="motif-combo-toggle" tabindex="-1" aria-label="Afficher les motifs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <ul class="motif-combo-list" id="apt-title-list" role="listbox" hidden></ul>
+                </div>
             </div>
             <div class="form-group">
                 <label>Statut</label>
@@ -277,19 +286,15 @@
         <div id="edit-section" style="padding:0 24px 16px;display:none;">
             <div style="font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Modifier le rendez-vous</div>
             <div class="form-group" style="margin-bottom:10px;">
-                <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Motif</label>
-                <input type="text" id="edit-title" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
+                <label for="edit-title" style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Motif</label>
+                <div class="motif-combo motif-combo-sm" data-motif-combo>
+                    <input type="text" id="edit-title" autocomplete="off" placeholder="Choisir ou saisir un motif"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="edit-title-list">
+                    <button type="button" class="motif-combo-toggle" tabindex="-1" aria-label="Afficher les motifs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <ul class="motif-combo-list" id="edit-title-list" role="listbox" hidden></ul>
+                </div>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <div style="flex:1;">
-                    <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Type</label>
-                    <select id="edit-type" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
-                        <option value="consultation">Consultation</option>
-                        <option value="suivi">Suivi</option>
-                        <option value="intervention">Intervention</option>
-                        <option value="urgence">Urgence</option>
-                    </select>
-                </div>
                 <div style="flex:1;">
                     <label style="font-size:11px;color:var(--gray-500);display:block;margin-bottom:4px;">Salle</label>
                     <input type="text" id="edit-room" style="width:100%;font-size:13px;padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;">
@@ -427,8 +432,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const isMobileView = window.matchMedia('(max-width: 900px)').matches;
 
     _calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: isMobileView ? 'timeGridDay' : 'dayGridMonth',
+        // Vue par défaut : la semaine (liste de la semaine sur téléphone, la grille y serait illisible).
+        initialView: isMobileView ? 'listWeek' : 'timeGridWeek',
         locale: 'fr',
+        firstDay: 1,   // semaine du lundi au dimanche
         headerToolbar: isMobileView
             ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay,listWeek' }
             : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,listMonth' },
@@ -489,6 +496,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         dayCellDidMount: function(info) {
+            // Bouton « + » et pastille du nombre de RDV : grille mensuelle seulement. En vue
+            // semaine/jour, l'en-tête de colonne porte déjà le compteur et un clic dans la grille
+            // crée le RDV ; ces éléments s'y empileraient dans un coin.
+            if (info.view.type !== 'dayGridMonth') return;
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'day-add-btn';
@@ -674,8 +685,7 @@ if (aptForm) {
         const payload = {
             patient_id: parseInt(fd.get('patient_id')),
             doctor_id: parseInt(fd.get('doctor_id')),
-            title: fd.get('title'),
-            appointment_type: fd.get('appointment_type'),
+            title: (fd.get('title') || '').trim(),
             status: fd.get('status'),
             start_datetime: fd.get('start_datetime'),
             end_datetime: fd.get('end_datetime'),
@@ -744,7 +754,6 @@ function toggleEditApt() {
     sec.style.display = open ? 'none' : 'block';
     if (!open) {
         document.getElementById('edit-title').value = _evTitle || '';
-        document.getElementById('edit-type').value = _evType || 'consultation';
         document.getElementById('edit-room').value = _evRoom || '';
         document.getElementById('edit-notes').value = _evNotes || '';
     }
@@ -756,7 +765,6 @@ async function confirmEdit() {
     if (!title) { if (window.showToast) showToast('Le motif est obligatoire', 'error'); return; }
     const payload = {
         title: title,
-        appointment_type: document.getElementById('edit-type').value,
         room: document.getElementById('edit-room').value.trim(),
         notes: document.getElementById('edit-notes').value.trim(),
     };
@@ -830,6 +838,84 @@ function showRescheduleSuggestions(suggestions) {
         sugEl.appendChild(btn);
     });
 }
+
+// ===== MOTIF : liste déroulante + saisie libre =====
+// Le type du RDV (couleur dans l'agenda) est déduit du motif côté serveur.
+const MOTIFS = {{ motifs | tojson }};
+
+function initMotifCombo(root) {
+    const input = root.querySelector('input');
+    const list = root.querySelector('.motif-combo-list');
+    const toggle = root.querySelector('.motif-combo-toggle');
+    let items = [];
+    let active = -1;
+    let showingAll = true;   // liste complète (focus) ou filtrée par la saisie
+
+    function esc(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+    function open(showAll) {
+        showingAll = showAll;
+        const q = showAll ? '' : input.value.trim().toLowerCase();
+        items = MOTIFS.filter(m => !q || m.toLowerCase().includes(q));
+        if (!items.length) { close(); return; }
+        if (active >= items.length) active = -1;
+        list.innerHTML = items.map((m, i) =>
+            `<li role="option" id="${list.id}-${i}" data-i="${i}" class="${i === active ? 'is-active' : ''}"` +
+            ` aria-selected="${m === input.value}">${esc(m)}</li>`).join('');
+        list.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+        if (active >= 0) {
+            input.setAttribute('aria-activedescendant', `${list.id}-${active}`);
+            list.children[active].scrollIntoView({ block: 'nearest' });
+        } else {
+            input.removeAttribute('aria-activedescendant');
+        }
+    }
+    function close() {
+        list.hidden = true;
+        active = -1;
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+    }
+    function choose(i) {
+        input.value = items[i];
+        close();
+    }
+
+    input.addEventListener('focus', () => open(true));
+    input.addEventListener('click', () => { if (list.hidden) open(true); });
+    input.addEventListener('input', () => { active = -1; open(false); });
+    input.addEventListener('blur', () => setTimeout(close, 120));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (list.hidden) { open(true); return; }
+            const n = items.length;
+            active = e.key === 'ArrowDown' ? (active + 1) % n : (active <= 0 ? n - 1 : active - 1);
+            open(showingAll);
+        } else if (e.key === 'Enter' && !list.hidden && active >= 0) {
+            e.preventDefault();   // choisir l'option, pas envoyer le formulaire
+            choose(active);
+        } else if (e.key === 'Escape' && !list.hidden) {
+            e.stopPropagation();  // fermer la liste, pas la fenêtre
+            close();
+        }
+    });
+    toggle.addEventListener('mousedown', (e) => {
+        e.preventDefault();       // garder le focus dans le champ
+        if (list.hidden) { input.focus(); open(true); } else { close(); }
+    });
+    list.addEventListener('mousedown', (e) => {
+        const li = e.target.closest('li');
+        if (!li) return;
+        e.preventDefault();
+        choose(Number(li.dataset.i));
+    });
+}
+document.querySelectorAll('[data-motif-combo]').forEach(initMotifCombo);
 
 // Hide conflict banner when dates change
 ['apt_start', 'apt_end'].forEach(id => {

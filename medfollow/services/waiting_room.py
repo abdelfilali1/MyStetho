@@ -702,7 +702,7 @@ async def board(db: aiosqlite.Connection, doctor_id: int, day: Optional[str] = N
 
     # Colonne 1 : les RDV du jour pas encore pointés.
     cur = await db.execute(
-        """SELECT a.id, a.start_datetime, a.title, a.status, a.room, a.appointment_type,
+        """SELECT a.id, a.start_datetime, a.end_datetime, a.title, a.status, a.room, a.appointment_type,
                   p.id AS patient_id, p.first_name, p.last_name
            FROM appointments a
            JOIN patients p ON a.patient_id = p.id
@@ -723,6 +723,9 @@ async def board(db: aiosqlite.Connection, doctor_id: int, day: Optional[str] = N
             "status": row["status"],
             "room": row["room"] or "",
             "type": row["appointment_type"] or "",
+            # Pour « Replanifier » depuis la salle d'attente (même durée par défaut).
+            "start": str(row["start_datetime"] or "")[:16].replace(" ", "T"),
+            "end": str(row["end_datetime"] or "")[:16].replace(" ", "T"),
         })
 
     return {

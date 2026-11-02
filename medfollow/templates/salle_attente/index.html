@@ -2,7 +2,7 @@
 {% block title %}Salle d'attente - Doctivo{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="/static/css/salle-attente.css?v=20260825-10">
+<link rel="stylesheet" href="/static/css/salle-attente.css?v=20261102-1">
 {% endblock %}
 
 {% block content %}
@@ -97,6 +97,53 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Replanifier un RDV attendu -->
+<div class="modal-overlay wr-modal" id="wr-reschedule-modal" style="display:none;">
+    <div class="modal-box" style="max-width:500px;">
+        <div class="modal-header">
+            <h3>Replanifier le rendez-vous</h3>
+            <button type="button" class="modal-close" onclick="wrCloseModal('wr-reschedule-modal')">&times;</button>
+        </div>
+        <div class="wr-modal-body">
+            <p style="margin:0 0 14px;color:#3f536d;">Patient : <strong id="wr-rs-name"></strong></p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1 1 150px;">
+                    <label for="wr-rs-date">Nouvelle date</label>
+                    <input type="date" id="wr-rs-date">
+                </div>
+                <div class="form-group" style="flex:1 1 100px;">
+                    <label for="wr-rs-time">Heure</label>
+                    <input type="time" id="wr-rs-time" step="300">
+                </div>
+                <div class="form-group" style="flex:1 1 100px;">
+                    <label for="wr-rs-duration">Durée</label>
+                    <select id="wr-rs-duration">
+                        <option value="15">15 min</option>
+                        <option value="20">20 min</option>
+                        <option value="30">30 min</option>
+                        <option value="45">45 min</option>
+                        <option value="60">1 h</option>
+                        <option value="90">1 h 30</option>
+                        <option value="120">2 h</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Créneaux libres ce jour-là</label>
+                <div class="wr-rs-slots" id="wr-rs-slots"></div>
+            </div>
+            <div id="wr-rs-conflict" class="wr-rs-conflict" style="display:none;">
+                <strong>Ce créneau est déjà pris.</strong> Créneaux disponibles :
+                <div class="wr-rs-slots" id="wr-rs-conflict-slots" style="margin-top:8px;"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="wrCloseModal('wr-reschedule-modal')">Annuler</button>
+                <button type="button" class="btn btn-primary" id="wr-rs-submit" onclick="wrSubmitReschedule()">Replanifier</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Patient sans RDV -->
 <div class="modal-overlay wr-modal" id="wr-walkin-modal" style="display:none;">
     <div class="modal-box" style="max-width:520px;">
@@ -368,9 +415,15 @@
                         (it.reason ? '<span>' + esc(it.reason) + '</span>' : '') +
                         '<span class="badge badge-' + esc(it.status) + '">' + esc(it.status) + '</span>' +
                     '</div>' +
-                '</div>' +
-                '<div class="wr-actions">' +
-                    '<button type="button" class="btn btn-sm btn-primary" data-action="checkin" data-apt="' + it.appointment_id + '">Arrivé</button>' +
+                    '<div class="wr-actions" style="margin-top:8px;flex-wrap:wrap;">' +
+                        '<button type="button" class="btn btn-sm btn-primary" data-action="checkin" data-apt="' + it.appointment_id + '">Arrivé</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline" data-action="reschedule" data-apt="' + it.appointment_id + '"' +
+                            ' data-name="' + attr(it.name) + '" data-start="' + attr(it.start) + '" data-end="' + attr(it.end) + '"' +
+                            ' title="Déplacer ce rendez-vous à un autre jour ou une autre heure">Replanifier</button>' +
+                        '<button type="button" class="btn btn-sm btn-outline wr-btn-noshow" data-action="noshow" data-apt="' + it.appointment_id + '"' +
+                            ' data-name="' + attr(it.name) + '" data-time="' + attr(it.apt_time) + '"' +
+                            ' title="Annuler le rendez-vous : le patient n\'est pas venu (no-show)">Absent</button>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -488,6 +541,11 @@
 
         if (action === 'checkin') {
             act('/salle-attente/checkin', { appointment_id: btn.getAttribute('data-apt') }, 'Patient en salle d\'attente');
+        } else if (action === 'noshow') {
+            markNoShow(btn.getAttribute('data-apt'), btn.getAttribute('data-name'), btn.getAttribute('data-time'));
+        } else if (action === 'reschedule') {
+            openReschedule(btn.getAttribute('data-apt'), btn.getAttribute('data-name'),
+                           btn.getAttribute('data-start'), btn.getAttribute('data-end'));
         } else if (action === 'move') {
             act('/salle-attente/' + id + '/move', { direction: btn.getAttribute('data-dir') });
         } else if (action === 'priority') {
@@ -511,6 +569,126 @@
                                 btn.getAttribute('data-reason'));
         }
     });
+
+    // ------------------------------------- RDV attendu : absent / replanifier
+    // Les routes de l'agenda sont réutilisées (mêmes contrôles de conflit) ; elles
+    // agissent sur l'agenda du médecin, y compris pour sa secrétaire.
+
+    function markNoShow(aptId, name, time) {
+        if (!confirm('Marquer ' + (name || 'ce patient') + (time ? ' (' + time + ')' : '') +
+                     ' comme absent ?\n\nLe rendez-vous est annulé (no-show) et retiré des attendus.')) return;
+        fetch('/appointments/' + aptId + '/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ status: 'absent' }).toString()
+        }).then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (data) {
+                if (!r.ok || data.error) throw new Error(data.error || 'Erreur');
+                if (window.showToast) window.showToast('Rendez-vous annulé : patient absent');
+                refresh();
+            });
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        });
+    }
+
+    var rs = { id: null, duration: 30 };
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function localIso(d) {
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    function openReschedule(aptId, name, start, end) {
+        rs.id = aptId;
+        var s = start ? new Date(start) : new Date();
+        var e = end ? new Date(end) : null;
+        rs.duration = (e && e > s) ? Math.round((e - s) / 60000) : 30;
+        // Par défaut : même heure, le prochain jour ouvré.
+        var next = new Date(s.getTime());
+        do { next.setDate(next.getDate() + 1); } while (next.getDay() === 0);
+        document.getElementById('wr-rs-name').textContent = name || '';
+        document.getElementById('wr-rs-date').value = localIso(next).slice(0, 10);
+        document.getElementById('wr-rs-time').value = localIso(next).slice(11, 16);
+        document.getElementById('wr-rs-duration').value = String(rs.duration);
+        document.getElementById('wr-rs-conflict').style.display = 'none';
+        openModal('wr-reschedule-modal');
+        loadFreeSlots();
+    }
+
+    function loadFreeSlots() {
+        var date = document.getElementById('wr-rs-date').value;
+        var box = document.getElementById('wr-rs-slots');
+        if (!date) { box.innerHTML = ''; return; }
+        box.innerHTML = '<span class="wr-rs-hint">Recherche des créneaux libres…</span>';
+        var duration = parseInt(document.getElementById('wr-rs-duration').value, 10) || 30;
+        fetch('/appointments/api/free-slots?doctor_id=0&date=' + encodeURIComponent(date) +
+              '&duration=' + duration + '&exclude_id=' + encodeURIComponent(rs.id))
+            .then(function (r) { return r.ok ? r.json() : { slots: [] }; })
+            .then(function (data) { renderSlots(data.slots || [], box); })
+            .catch(function () { box.innerHTML = ''; });
+    }
+
+    function renderSlots(slots, box) {
+        if (!slots.length) { box.innerHTML = '<span class="wr-rs-hint">Aucun créneau libre ce jour-là.</span>'; return; }
+        box.innerHTML = slots.map(function (sl) {
+            return '<button type="button" class="wr-rs-slot" data-start="' + attr(sl.start) + '">' + esc(sl.label) + '</button>';
+        }).join('');
+    }
+
+    function pickSlot(start) {
+        document.getElementById('wr-rs-date').value = start.slice(0, 10);
+        document.getElementById('wr-rs-time').value = start.slice(11, 16);
+        document.querySelectorAll('.wr-rs-slot').forEach(function (b) {
+            b.classList.toggle('is-on', b.getAttribute('data-start') === start);
+        });
+    }
+
+    document.getElementById('wr-rs-slots').addEventListener('click', function (e) {
+        var b = e.target.closest('.wr-rs-slot');
+        if (b) pickSlot(b.getAttribute('data-start'));
+    });
+    document.getElementById('wr-rs-conflict-slots').addEventListener('click', function (e) {
+        var b = e.target.closest('.wr-rs-slot');
+        if (b) { pickSlot(b.getAttribute('data-start')); document.getElementById('wr-rs-conflict').style.display = 'none'; }
+    });
+    document.getElementById('wr-rs-date').addEventListener('change', loadFreeSlots);
+    document.getElementById('wr-rs-duration').addEventListener('change', loadFreeSlots);
+
+    window.wrSubmitReschedule = function () {
+        var date = document.getElementById('wr-rs-date').value;
+        var time = document.getElementById('wr-rs-time').value;
+        var duration = parseInt(document.getElementById('wr-rs-duration').value, 10) || 30;
+        if (!date || !time) {
+            if (window.showToast) window.showToast('Choisissez une date et une heure', 'error');
+            return;
+        }
+        var start = new Date(date + 'T' + time);
+        var payload = { start_datetime: localIso(start), end_datetime: localIso(new Date(start.getTime() + duration * 60000)) };
+        var btn = document.getElementById('wr-rs-submit');
+        btn.disabled = true;
+        fetch('/appointments/' + rs.id + '/reschedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (data) {
+                if (r.status === 409) {
+                    var box = document.getElementById('wr-rs-conflict');
+                    box.style.display = 'block';
+                    renderSlots(data.suggestions || [], document.getElementById('wr-rs-conflict-slots'));
+                    return;
+                }
+                if (!r.ok || data.error) throw new Error(data.error || 'Erreur');
+                window.wrCloseModal('wr-reschedule-modal');
+                var d = new Date(payload.start_datetime);
+                if (window.showToast) window.showToast('Rendez-vous replanifié au ' +
+                    d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' à ' + time);
+                refresh();
+            });
+        }).catch(function (err) {
+            if (window.showToast) window.showToast(err.message || 'Erreur', 'error');
+        }).then(function () { btn.disabled = false; });
+    };
 
     // ---------------------------------------------------------- modales
 
