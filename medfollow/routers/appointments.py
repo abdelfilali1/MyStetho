@@ -80,11 +80,52 @@ async def agenda(
     )
     doctors = [dict(r) for r in await cursor.fetchall()]
 
+    cursor = await db.execute(
+        "SELECT label FROM appointment_motifs WHERE doctor_id = ? ORDER BY label COLLATE NOCASE", (uid,)
+    )
+    custom_motifs = [r["label"] for r in await cursor.fetchall()]
+
     return templates.TemplateResponse(
         "appointments/index.html",
         {"request": request, "user": user, "active": "appointments", "patients": patients, "doctors": doctors,
-         "motifs": MOTIFS_DENTAIRES if is_dentist else MOTIFS_MEDICAUX},
+         "motifs": MOTIFS_DENTAIRES if is_dentist else MOTIFS_MEDICAUX, "custom_motifs": custom_motifs},
     )
+
+
+@router.post("/api/motifs")
+async def add_motif(
+    request: Request,
+    user: dict = Depends(require_login_api),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Enregistre un motif personnalisé, visible uniquement pour ce praticien."""
+    data = await _json_body(request)
+    label = " ".join(((data or {}).get("label") or "").split())[:120]
+    if not label:
+        return JSONResponse(status_code=400, content={"error": "Le motif est vide"})
+    await db.execute(
+        "INSERT OR IGNORE INTO appointment_motifs (doctor_id, label) VALUES (?, ?)",
+        (effective_doctor_id(user), label),
+    )
+    await db.commit()
+    return JSONResponse(content={"label": label})
+
+
+@router.post("/api/motifs/delete")
+async def delete_motif(
+    request: Request,
+    user: dict = Depends(require_login_api),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Retire un motif personnalisé du praticien (les RDV existants gardent leur motif)."""
+    data = await _json_body(request)
+    label = ((data or {}).get("label") or "").strip()
+    await db.execute(
+        "DELETE FROM appointment_motifs WHERE doctor_id = ? AND label = ?",
+        (effective_doctor_id(user), label),
+    )
+    await db.commit()
+    return JSONResponse(content={"ok": True})
 
 
 @router.get("/api/events")

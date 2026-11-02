@@ -156,6 +156,11 @@
 .motif-combo-list li { padding: 8px 10px; border-radius: 7px; font-size: 13px; color: var(--gray-800); cursor: pointer; }
 .motif-combo-list li:hover, .motif-combo-list li.is-active { background: var(--primary-light, #d9efff); color: var(--primary-dark, #0f61cf); }
 .motif-combo-list li[aria-selected="true"] { font-weight: 700; }
+.motif-combo-list li .motif-del { float: right; border: none; background: none; color: var(--gray-500); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.motif-combo-list li .motif-del:hover { color: var(--danger); }
+.motif-combo-list li.is-empty { color: var(--gray-500); cursor: default; background: none; }
+.combo-with-add { display: flex; gap: 6px; align-items: center; }
+.combo-with-add .motif-combo { flex: 1; }
 .motif-combo-sm input { font-size: 13px; padding: 7px 36px 7px 10px; border: 1px solid var(--gray-300); border-radius: 8px; }
 </style>
 
@@ -178,13 +183,15 @@
         <form id="new-apt-form" class="new-apt-form">
             <div class="form-group">
                 <label>Patient</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <select name="patient_id" id="sel-patient-a" required style="flex:1;">
-                        <option value="">Sélectionner...</option>
-                        {% for p in patients %}
-                        <option value="{{ p.id }}">{{ p.last_name | upper }} {{ p.first_name }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="combo-with-add">
+                    <div class="motif-combo" id="patient-combo">
+                        <input type="text" id="apt-patient-search" autocomplete="off"
+                               placeholder="Taper le nom du patient…" role="combobox"
+                               aria-autocomplete="list" aria-expanded="false" aria-controls="apt-patient-list">
+                        <input type="hidden" name="patient_id" id="sel-patient-a">
+                        <button type="button" class="motif-combo-toggle" tabindex="-1" aria-label="Afficher les patients"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                        <ul class="motif-combo-list" id="apt-patient-list" role="listbox" hidden></ul>
+                    </div>
                     <a href="/patients/new?next=/appointments" class="btn btn-outline btn-sm" title="Créer un nouveau patient">+</a>
                 </div>
             </div>
@@ -198,12 +205,15 @@
             </div>
             <div class="form-group">
                 <label for="apt-title">Motif</label>
-                <div class="motif-combo" data-motif-combo>
-                    <input type="text" name="title" id="apt-title" required autocomplete="off"
-                           placeholder="Choisir dans la liste ou saisir un motif" role="combobox"
-                           aria-autocomplete="list" aria-expanded="false" aria-controls="apt-title-list">
-                    <button type="button" class="motif-combo-toggle" tabindex="-1" aria-label="Afficher les motifs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                    <ul class="motif-combo-list" id="apt-title-list" role="listbox" hidden></ul>
+                <div class="combo-with-add">
+                    <div class="motif-combo" data-motif-combo>
+                        <input type="text" name="title" id="apt-title" required autocomplete="off"
+                               placeholder="Choisir dans la liste ou saisir un motif" role="combobox"
+                               aria-autocomplete="list" aria-expanded="false" aria-controls="apt-title-list">
+                        <button type="button" class="motif-combo-toggle" tabindex="-1" aria-label="Afficher les motifs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                        <ul class="motif-combo-list" id="apt-title-list" role="listbox" hidden></ul>
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="openMotifModal()" title="Enregistrer un nouveau motif">+</button>
                 </div>
             </div>
             <div class="form-group">
@@ -239,6 +249,27 @@
             <a href="/patients/new">Ajoutez d'abord un patient</a> pour créer un rendez-vous.
         </p>
         {% endif %}
+    </div>
+</div>
+
+<!-- Nouveau motif (enregistré pour le praticien connecté uniquement) -->
+<div id="motif-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeMotifModal()">
+    <div class="modal-box" style="width:420px;">
+        <div class="modal-header">
+            <h3>Nouveau motif</h3>
+            <button class="modal-close" type="button" onclick="closeMotifModal()">×</button>
+        </div>
+        <form id="motif-form">
+            <div class="form-group">
+                <label for="motif-new-label">Motif</label>
+                <input type="text" id="motif-new-label" maxlength="120" required placeholder="Ex. Pose de bracket">
+                <small class="form-hint">Il sera proposé dans votre liste de motifs pour vos prochains rendez-vous.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeMotifModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -434,8 +465,7 @@ function closeCreateModal() {
 document.addEventListener('DOMContentLoaded', function() {
     const _urlPid = new URLSearchParams(window.location.search).get('patient_id');
     if (_urlPid) {
-        const sel = document.getElementById('sel-patient-a');
-        if (sel) sel.value = _urlPid;
+        setAptPatient(_urlPid);
         openCreateModal();
     }
 
@@ -688,6 +718,11 @@ const aptForm = document.getElementById('new-apt-form');
 if (aptForm) {
     aptForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        if (!document.getElementById('sel-patient-a').value) {
+            if (window.showToast) showToast('Choisissez un patient dans la liste', 'error');
+            document.getElementById('apt-patient-search').focus();
+            return;
+        }
         const btn = document.getElementById('apt-submit-btn');
         btn.disabled = true;
         btn.textContent = 'Vérification...';
@@ -852,7 +887,10 @@ function showRescheduleSuggestions(suggestions) {
 
 // ===== MOTIF : liste déroulante + saisie libre =====
 // Le type du RDV (couleur dans l'agenda) est déduit du motif côté serveur.
-const MOTIFS = {{ motifs | tojson }};
+// Les motifs enregistrés par le praticien (bouton « + ») viennent en tête
+// et peuvent être retirés de sa liste (×).
+const CUSTOM_MOTIFS = {{ custom_motifs | tojson }};
+const MOTIFS = [...CUSTOM_MOTIFS, ...{{ motifs | tojson }}.filter(m => !CUSTOM_MOTIFS.includes(m))];
 
 function initMotifCombo(root) {
     const input = root.querySelector('input');
@@ -875,7 +913,9 @@ function initMotifCombo(root) {
         if (active >= items.length) active = -1;
         list.innerHTML = items.map((m, i) =>
             `<li role="option" id="${list.id}-${i}" data-i="${i}" class="${i === active ? 'is-active' : ''}"` +
-            ` aria-selected="${m === input.value}">${esc(m)}</li>`).join('');
+            ` aria-selected="${m === input.value}">${esc(m)}` +
+            (CUSTOM_MOTIFS.includes(m) ? `<button type="button" class="motif-del" data-del="${i}" title="Retirer de ma liste">×</button>` : '') +
+            `</li>`).join('');
         list.hidden = false;
         input.setAttribute('aria-expanded', 'true');
         if (active >= 0) {
@@ -919,14 +959,154 @@ function initMotifCombo(root) {
         e.preventDefault();       // garder le focus dans le champ
         if (list.hidden) { input.focus(); open(true); } else { close(); }
     });
-    list.addEventListener('mousedown', (e) => {
+    list.addEventListener('mousedown', async (e) => {
         const li = e.target.closest('li');
         if (!li) return;
         e.preventDefault();
+        const del = e.target.closest('.motif-del');
+        if (del) {
+            const label = items[Number(del.dataset.del)];
+            if (!confirm(`Retirer « ${label} » de vos motifs ?`)) return;
+            const res = await fetch('/appointments/api/motifs/delete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label }),
+            });
+            if (!res.ok) { if (window.showToast) showToast('Suppression impossible', 'error'); return; }
+            CUSTOM_MOTIFS.splice(CUSTOM_MOTIFS.indexOf(label), 1);
+            MOTIFS.splice(MOTIFS.indexOf(label), 1);
+            input.focus();
+            open(showingAll);
+            return;
+        }
         choose(Number(li.dataset.i));
     });
 }
 document.querySelectorAll('[data-motif-combo]').forEach(initMotifCombo);
+
+function openMotifModal() {
+    const field = document.getElementById('motif-new-label');
+    field.value = document.getElementById('apt-title').value.trim();
+    document.getElementById('motif-modal').style.display = 'flex';
+    field.focus();
+}
+function closeMotifModal() {
+    document.getElementById('motif-modal').style.display = 'none';
+}
+document.getElementById('motif-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const label = document.getElementById('motif-new-label').value.trim();
+    if (!label) return;
+    try {
+        const res = await fetch('/appointments/api/motifs', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label }),
+        });
+        if (!res.ok) throw new Error();
+        const saved = (await res.json()).label;
+        if (!CUSTOM_MOTIFS.includes(saved)) CUSTOM_MOTIFS.unshift(saved);
+        if (MOTIFS.includes(saved)) MOTIFS.splice(MOTIFS.indexOf(saved), 1);
+        MOTIFS.unshift(saved);
+        document.getElementById('apt-title').value = saved;
+        closeMotifModal();
+        if (window.showToast) showToast('Motif enregistré');
+    } catch (err) {
+        if (window.showToast) showToast("Impossible d'enregistrer le motif", 'error');
+    }
+});
+
+// ===== PATIENT : recherche par nom + liste déroulante défilante =====
+function _norm(t) {
+    return (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+const APT_PATIENTS = {{ patients | tojson }}.map(p => {
+    const label = (p.last_name || '').toUpperCase() + ' ' + (p.first_name || '');
+    return { id: String(p.id), label, key: _norm(label) };
+});
+
+function setAptPatient(id) {
+    const p = APT_PATIENTS.find(x => x.id === String(id));
+    const hidden = document.getElementById('sel-patient-a');
+    const input = document.getElementById('apt-patient-search');
+    if (!hidden || !input) return;
+    hidden.value = p ? p.id : '';
+    input.value = p ? p.label : '';
+}
+
+(function initPatientCombo() {
+    const root = document.getElementById('patient-combo');
+    if (!root) return;
+    const input = root.querySelector('#apt-patient-search');
+    const hidden = root.querySelector('#sel-patient-a');
+    const list = root.querySelector('.motif-combo-list');
+    const toggle = root.querySelector('.motif-combo-toggle');
+    let items = [];
+    let active = -1;
+    let showingAll = true;
+
+    function esc(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+    function open(showAll) {
+        showingAll = showAll;
+        // Tous les mots tapés doivent apparaître (nom et prénom, dans n'importe quel ordre).
+        const words = showAll ? [] : _norm(input.value).split(/\s+/).filter(Boolean);
+        items = APT_PATIENTS.filter(p => words.every(w => p.key.includes(w)));
+        if (active >= items.length) active = -1;
+        list.innerHTML = items.length
+            ? items.map((p, i) =>
+                `<li role="option" id="${list.id}-${i}" data-i="${i}" class="${i === active ? 'is-active' : ''}"` +
+                ` aria-selected="${p.id === hidden.value}">${esc(p.label)}</li>`).join('')
+            : '<li class="is-empty">Aucun patient trouvé</li>';
+        list.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+        if (active >= 0) list.children[active].scrollIntoView({ block: 'nearest' });
+    }
+    function close() {
+        list.hidden = true;
+        active = -1;
+        input.setAttribute('aria-expanded', 'false');
+    }
+    function choose(i) {
+        setAptPatient(items[i].id);
+        close();
+    }
+
+    input.addEventListener('focus', () => { input.select(); open(true); });
+    input.addEventListener('input', () => { hidden.value = ''; active = -1; open(false); });
+    input.addEventListener('blur', () => setTimeout(() => {
+        close();
+        // Un seul patient correspond à la saisie : on le retient.
+        if (!hidden.value && items.length === 1 && input.value.trim()) setAptPatient(items[0].id);
+    }, 120));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (list.hidden) { open(!!hidden.value); return; }
+            const n = items.length;
+            if (!n) return;
+            active = e.key === 'ArrowDown' ? (active + 1) % n : (active <= 0 ? n - 1 : active - 1);
+            open(showingAll);
+        } else if (e.key === 'Enter' && !list.hidden) {
+            e.preventDefault();   // choisir le patient, pas envoyer le formulaire
+            if (active >= 0) choose(active);
+            else if (items.length === 1) choose(0);
+        } else if (e.key === 'Escape' && !list.hidden) {
+            e.stopPropagation();
+            close();
+        }
+    });
+    toggle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (list.hidden) { input.focus(); open(true); } else { close(); }
+    });
+    list.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const li = e.target.closest('li[data-i]');
+        if (li) choose(Number(li.dataset.i));
+    });
+})();
 
 // Hide conflict banner when dates change
 ['apt_start', 'apt_end'].forEach(id => {

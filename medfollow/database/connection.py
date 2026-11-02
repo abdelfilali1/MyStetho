@@ -909,6 +909,19 @@ async def init_db():
     except Exception:
         pass
 
+    # Motifs de RDV ajoutés par un praticien (bouton « + » de l'agenda) :
+    # proposés ensuite dans sa liste uniquement.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS appointment_motifs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL REFERENCES users(id),
+            label TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(doctor_id, label)
+        )
+    """)
+    await db.commit()
+
     # Pièce d'identité d'un tuteur légal (parent ou autre) : le n° peut alors
     # être partagé avec un autre patient (ex. plusieurs enfants d'un même parent).
     try:
