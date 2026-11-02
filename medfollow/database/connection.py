@@ -909,6 +909,45 @@ async def init_db():
     except Exception:
         pass
 
+    # Pièce d'identité d'un tuteur légal (parent ou autre) : le n° peut alors
+    # être partagé avec un autre patient (ex. plusieurs enfants d'un même parent).
+    try:
+        await db.execute("ALTER TABLE patients ADD COLUMN identity_is_guardian INTEGER DEFAULT 0")
+        await db.commit()
+    except Exception:
+        pass
+
+    # Les bases anciennes déclarent « social_security_number TEXT UNIQUE » sur
+    # toute la base (tous médecins confondus), ce qui interdit la pièce d'un
+    # tuteur partagée. Le contrôle des doublons se fait désormais dans
+    # routers/patients.py. Même recette de reconstruction que pour devis
+    # ci-dessus ; on recopie le SQL d'origine sans le UNIQUE pour garder
+    # exactement les colonnes et leur ordre (SELECT * reste valide).
+    cursor = await db.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'patients'")
+    _patients_sql = await cursor.fetchone()
+    if _patients_sql and "social_security_number TEXT UNIQUE" in (_patients_sql[0] or ""):
+        _new_sql = re.sub(r"^\s*CREATE TABLE\s+\"?patients\"?", "CREATE TABLE patients_migr",
+                          _patients_sql[0], count=1)
+        _new_sql = _new_sql.replace("social_security_number TEXT UNIQUE", "social_security_number TEXT")
+        await db.execute("DROP TABLE IF EXISTS patients_migr")
+        await db.execute("PRAGMA foreign_keys = OFF")
+        await db.execute("PRAGMA legacy_alter_table = ON")
+        await db.execute("BEGIN IMMEDIATE")
+        cursor = await db.execute("SELECT seq FROM sqlite_sequence WHERE name = 'patients'")
+        _seq = await cursor.fetchone()
+        await db.execute(_new_sql)
+        await db.execute("INSERT INTO patients_migr SELECT * FROM patients")
+        await db.execute("DROP TABLE patients")
+        await db.execute("ALTER TABLE patients_migr RENAME TO patients")
+        # Conserve le compteur AUTOINCREMENT (un id supprimé n'est jamais réattribué).
+        if _seq:
+            await db.execute(
+                "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'patients'", (_seq[0],)
+            )
+        await db.commit()
+        await db.execute("PRAGMA legacy_alter_table = OFF")
+        await db.execute("PRAGMA foreign_keys = ON")
+
     # Interrupteur du service WhatsApp par praticien (OPT-IN : désactivé par
     # défaut) : gate tous les envois (confirmation, rappel RDV, rappel de soin)
     # de ce médecin. Le choix est enregistré et n'est JAMAIS réinitialisé par un

@@ -595,7 +595,8 @@ def generate_patient_brochure_pdf(
             addr += f" {patient['postal_code']}"
         id_rows.append(["Adresse", addr])
     if patient.get("social_security_number"):
-        id_rows.append(["N° CIN", patient["social_security_number"]])
+        id_rows.append(["N° CIN", patient["social_security_number"]
+                        + (" (tuteur légal)" if patient.get("identity_is_guardian") else "")])
     if patient.get("insurance_name"):
         ins = patient["insurance_name"]
         if patient.get("insurance_number"):

@@ -112,6 +112,12 @@
                 <div class="form-group">
                     <label for="social_security_number">N° de la pièce</label>
                     <input type="text" id="social_security_number" name="social_security_number" value="{{ patient.social_security_number if patient and patient.social_security_number else '' }}" placeholder="N° du document">
+                    <label class="check-inline" for="identity_is_guardian">
+                        <input type="checkbox" id="identity_is_guardian" name="identity_is_guardian" value="1"
+                               {{ 'checked' if patient and patient.identity_is_guardian }}>
+                        <span>Pièce du tuteur légal (parent ou autre)</span>
+                    </label>
+                    <small class="form-hint">Le même n° peut alors être utilisé pour plusieurs patients.</small>
                 </div>
             </div>
             <div class="form-row">

@@ -143,6 +143,33 @@ def _parse_float(v):
         return None
 
 
+async def _identity_conflict(db, doctor_id, number, guardian, exclude_id=None):
+    """Nom du patient du même cabinet qui porte déjà ce n° de pièce, sinon None.
+
+    Une pièce de tuteur légal (parent ou autre) peut être partagée : aucun
+    contrôle quand la case est cochée, et les fiches déjà marquées « tuteur »
+    ne bloquent pas l'enregistrement de la pièce personnelle du tuteur.
+    """
+    number = (number or "").strip()
+    if not number or guardian:
+        return None
+    cursor = await db.execute(
+        """SELECT first_name || ' ' || last_name FROM patients
+           WHERE doctor_id = ? AND is_active = 1 AND id != ?
+             AND upper(trim(social_security_number)) = upper(?)
+             AND COALESCE(identity_is_guardian, 0) = 0
+           LIMIT 1""",
+        (doctor_id, exclude_id or 0, number),
+    )
+    row = await cursor.fetchone()
+    return row[0] if row else None
+
+
+def _identity_conflict_msg(name):
+    return (f"Ce n° de pièce est déjà utilisé par {name}. S'il s'agit de la pièce "
+            "d'un tuteur légal, cochez « Pièce du tuteur légal ».")
+
+
 @router.post("/new", response_class=HTMLResponse)
 async def create_patient(
     request: Request,
@@ -152,6 +179,7 @@ async def create_patient(
     gender: str = Form(""),
     social_security_number: str = Form(""),
     identity_document_type: str = Form("CIN"),
+    identity_is_guardian: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
     address: str = Form(""),
@@ -188,24 +216,31 @@ async def create_patient(
     breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
     gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
     wa_opt_out_i = 1 if whatsapp_opt_out in ("1", "on", "true", "yes") else 0
+    guardian_i = 1 if identity_is_guardian in ("1", "on", "true", "yes") else 0
+    social_security_number = social_security_number.strip()
 
     try:
+        conflict = await _identity_conflict(
+            db, effective_doctor_id(user), social_security_number, guardian_i,
+        )
+        if conflict:
+            raise ValueError(_identity_conflict_msg(conflict))
         cur = await db.execute(
             """INSERT INTO patients (
                 doctor_id, first_name, last_name, date_of_birth, gender, social_security_number,
-                identity_document_type,
+                identity_document_type, identity_is_guardian,
                 email, phone, address, city, postal_code, blood_type,
                 referring_doctor, referring_doctor_phone,
                 insurance_name, insurance_number, insurance_serial,
                 emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
                 profession, marital_status, height_cm, weight_kg, smoking, alcohol,
                 pregnant, breastfeeding, current_medications, gdpr_consent, notes, whatsapp_opt_out
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 effective_doctor_id(user),
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
-                identity_document_type or None,
+                identity_document_type or None, guardian_i,
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
                 referring_doctor or None, referring_doctor_phone or None,
@@ -230,11 +265,12 @@ async def create_patient(
         set_flash(response, "Patient créé")
         return response
     except Exception as e:
-        error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
+        error = "Ce numéro de pièce existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {
             "first_name": first_name, "last_name": last_name, "date_of_birth": date_of_birth,
             "gender": gender, "social_security_number": social_security_number,
             "identity_document_type": identity_document_type,
+            "identity_is_guardian": guardian_i,
             "email": email, "phone": phone, "address": address, "city": city,
             "postal_code": postal_code, "blood_type": blood_type,
             "referring_doctor": referring_doctor, "referring_doctor_phone": referring_doctor_phone,
@@ -465,6 +501,7 @@ async def update_patient(
     gender: str = Form(""),
     social_security_number: str = Form(""),
     identity_document_type: str = Form("CIN"),
+    identity_is_guardian: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
     address: str = Form(""),
@@ -500,12 +537,19 @@ async def update_patient(
     breastfeeding_i = 1 if breastfeeding in ("1", "on", "true", "yes") else 0
     gdpr_i = 1 if gdpr_consent in ("1", "on", "true", "yes") else 0
     wa_opt_out_i = 1 if whatsapp_opt_out in ("1", "on", "true", "yes") else 0
+    guardian_i = 1 if identity_is_guardian in ("1", "on", "true", "yes") else 0
+    social_security_number = social_security_number.strip()
 
     try:
+        conflict = await _identity_conflict(
+            db, effective_doctor_id(user), social_security_number, guardian_i, exclude_id=patient_id,
+        )
+        if conflict:
+            raise ValueError(_identity_conflict_msg(conflict))
         await db.execute(
             """UPDATE patients SET
                 first_name=?, last_name=?, date_of_birth=?, gender=?, social_security_number=?,
-                identity_document_type=?,
+                identity_document_type=?, identity_is_guardian=?,
                 email=?, phone=?, address=?, city=?, postal_code=?, blood_type=?,
                 referring_doctor=?, referring_doctor_phone=?,
                 insurance_name=?, insurance_number=?, insurance_serial=?,
@@ -518,7 +562,7 @@ async def update_patient(
             (
                 first_name, last_name, date_of_birth,
                 gender or None, social_security_number or None,
-                identity_document_type or None,
+                identity_document_type or None, guardian_i,
                 email or None, phone or None, address or None,
                 city or None, postal_code or None, blood_type or None,
                 referring_doctor or None, referring_doctor_phone or None,
@@ -540,11 +584,12 @@ async def update_patient(
         set_flash(response, "Patient modifié")
         return response
     except Exception as e:
-        error = "Ce numéro CIN existe déjà." if "UNIQUE" in str(e) else str(e)
+        error = "Ce numéro de pièce existe déjà." if "UNIQUE" in str(e) else str(e)
         patient_data = {"id": patient_id, "first_name": first_name, "last_name": last_name,
                         "date_of_birth": date_of_birth, "gender": gender,
                         "social_security_number": social_security_number,
                         "identity_document_type": identity_document_type,
+                        "identity_is_guardian": guardian_i,
                         "email": email, "phone": phone, "address": address, "city": city,
                         "postal_code": postal_code, "blood_type": blood_type,
                         "referring_doctor": referring_doctor,

@@ -721,6 +721,17 @@ body.mobile-nav-open {
     color: var(--text-muted);
 }
 
+/* Case a cocher en ligne sous un champ (libelle normal, cliquable). */
+.check-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-weight: 400;
+    cursor: pointer;
+}
+.check-inline input { width: auto; margin: 0; }
+
 .form-actions {
     display: flex;
     justify-content: flex-end;

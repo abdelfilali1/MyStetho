@@ -385,7 +385,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                 </div>
                 <div class="info-item">
                     <span class="info-label">N° {{ patient.identity_document_type or 'CIN' }}</span>
-                    <span class="info-value">{{ patient.social_security_number or '—' }}</span>
+                    <span class="info-value">{{ patient.social_security_number or '—' }}{% if patient.social_security_number and patient.identity_is_guardian %} <span class="form-hint">(tuteur légal)</span>{% endif %}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Médecin traitant</span>
