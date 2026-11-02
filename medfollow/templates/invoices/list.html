@@ -60,17 +60,17 @@
 </div>
 
 <div class="card" style="margin-bottom: 12px;">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <a href="/invoices/factures" class="btn btn-sm {{ 'btn-primary' if not selected_status else 'btn-outline' }}">Toutes</a>
-            <a href="/invoices/factures?status=brouillon" class="btn btn-sm {{ 'btn-primary' if selected_status == 'brouillon' else 'btn-outline' }}">Brouillons</a>
-            <a href="/invoices/factures?status=emise" class="btn btn-sm {{ 'btn-primary' if selected_status == 'emise' else 'btn-outline' }}">Émises</a>
-            <a href="/invoices/factures?status=payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'payee' else 'btn-outline' }}">Payées</a>
-            <a href="/invoices/factures?status=partiellement_payee" class="btn btn-sm {{ 'btn-primary' if selected_status == 'partiellement_payee' else 'btn-outline' }}">Part. payées</a>
+    <div class="card-header" style="flex-wrap:wrap;">
+        <div class="tabs" style="margin:0;">
+            <a href="/invoices/factures" class="tab {{ 'active' if not selected_status }}">Toutes</a>
+            <a href="/invoices/factures?status=brouillon" class="tab {{ 'active' if selected_status == 'brouillon' }}">Brouillons</a>
+            <a href="/invoices/factures?status=emise" class="tab {{ 'active' if selected_status == 'emise' }}">Émises</a>
+            <a href="/invoices/factures?status=payee" class="tab {{ 'active' if selected_status == 'payee' }}">Payées</a>
+            <a href="/invoices/factures?status=partiellement_payee" class="tab {{ 'active' if selected_status == 'partiellement_payee' }}">Part. payées</a>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div class="cluster">
             {% if (date_from is defined and date_from) or (date_to is defined and date_to) %}
-            <span style="font-size:12px;color:var(--gray-500);">
+            <span class="text-muted text-small">
                 {{ date_from if date_from else '...' }} → {{ date_to if date_to else '...' }}
             </span>
             <a href="/invoices{{ '?status=' ~ selected_status if selected_status else '' }}" class="btn btn-outline btn-sm">✕</a>

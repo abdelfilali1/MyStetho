@@ -7,7 +7,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260316-13">
+    {% set _ui_theme = ui_theme() if ui_theme is defined else 'premium' %}
+    {% if _ui_theme == 'original' %}
+    <link rel="stylesheet" href="/static/css/style-original.css?v=20261102-1">
+    {% else %}
+    <link rel="stylesheet" href="/static/css/style.css?v=20261102-5">
+    {% if _ui_theme == 'vibrant' %}<link rel="stylesheet" href="/static/css/theme-vibrant.css?v=20261102-2">{% endif %}
+    {% endif %}
     {% block head %}{% endblock %}
 </head>
 <style>

@@ -1,0 +1,208 @@
+/* =====================================================================
+   THEME « VIVANT »
+   Couche chargee APRES style.css (theme Premium) : memes composants,
+   palette plus lumineuse tiree du logo (bleu -> vert). Les couleurs
+   pleines gardent un contraste AA avec le texte blanc.
+   ===================================================================== */
+:root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-dark: #1e40af;
+    --primary-light: #e0ebff;
+    --primary-ring: rgba(37, 99, 235, 0.25);
+    --accent: #10b981;
+    --accent-strong: #047857;
+    --accent-light: #d1fae5;
+
+    --bg: #f3f6fd;
+    --navy: #172554;
+    --navy-2: #1e40af;
+    --sidebar-bg: #1e3a8a;
+
+    --shadow-soft: 0 1px 2px rgba(30, 58, 138, 0.06), 0 6px 18px -6px rgba(30, 58, 138, 0.16);
+    --shadow-raised: 0 2px 4px rgba(30, 58, 138, 0.06), 0 18px 36px -12px rgba(30, 58, 138, 0.32);
+
+    --brand-gradient: linear-gradient(135deg, #1d4ed8 0%, #0e7490 55%, #047857 100%);
+}
+
+/* ---------- Barre laterale : bleu royal ---------- */
+.sidebar {
+    background: linear-gradient(180deg, #1e4fd0 0%, #1e3a8a 55%, #172554 100%);
+    border-right: none;
+}
+
+/* Le logo (bleu/vert) disparaitrait sur le bleu : tuile claire derriere. */
+.sidebar .brand-logo {
+    background: #fff;
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 10px 24px -10px rgba(8, 20, 60, 0.6);
+}
+
+.nav-links li a {
+    color: #dbe7ff;
+}
+
+.nav-links li a:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.nav-links li.active a {
+    color: var(--primary-dark);
+    background: #fff;
+    box-shadow: 0 6px 16px -6px rgba(8, 20, 60, 0.5);
+}
+
+.nav-links li.active a svg {
+    color: var(--primary);
+}
+
+.nav-separator,
+.sidebar-footer {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.nav-separator {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.brand-tag,
+.user-role {
+    color: #bcd0f5;
+}
+
+.logout-btn {
+    color: #dbe7ff;
+}
+
+.user-avatar {
+    background: linear-gradient(135deg, #10b981, #047857);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.mobile-nav-toggle {
+    background: var(--primary);
+}
+
+/* ---------- Titres ---------- */
+.page-header h2 {
+    color: var(--navy);
+}
+
+.card-header {
+    background: linear-gradient(180deg, #f7f9ff, #fff);
+}
+
+/* ---------- Boutons ---------- */
+.btn-primary {
+    background: var(--primary);
+    box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+    box-shadow: 0 10px 22px -8px rgba(37, 99, 235, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.btn-accent {
+    background: var(--accent-strong);
+    box-shadow: 0 6px 16px -6px rgba(4, 120, 87, 0.6);
+}
+
+.btn-accent:hover {
+    background: #065f46;
+}
+
+/* ---------- Onglets : actif en bleu plein ---------- */
+.tabs .tab.active,
+.view-segmented .view-btn.active {
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.6);
+}
+
+/* ---------- Accueil ---------- */
+.welcome {
+    background: var(--brand-gradient);
+    box-shadow: 0 20px 40px -18px rgba(14, 116, 144, 0.7);
+}
+
+.welcome-date {
+    color: #a7f3d0;
+}
+
+.welcome p {
+    color: #e0ecff;
+}
+
+.btn-on-dark {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.btn-on-dark:hover {
+    background: rgba(255, 255, 255, 0.26);
+}
+
+.welcome .btn-accent {
+    color: var(--primary-dark);
+    background: #fff;
+}
+
+.welcome .btn-accent:hover {
+    background: #eef4ff;
+}
+
+/* ---------- Statistiques : cartes pleines, une couleur par indicateur ---------- */
+.stat-card {
+    border: none;
+    color: #fff;
+}
+
+.stat-card:nth-child(4n+1) { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.stat-card:nth-child(4n+2) { background: linear-gradient(135deg, #0f766e, #115e59); }
+.stat-card:nth-child(4n+3) { background: linear-gradient(135deg, #c2410c, #9a3412); }
+.stat-card:nth-child(4n+4) { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+
+.stat-card .stat-icon {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+.stat-card .stat-value {
+    color: #fff;
+}
+
+.stat-card .stat-label {
+    color: rgba(255, 255, 255, 0.92);
+}
+
+/* ---------- Listes : avatars colores ---------- */
+.list li:nth-child(5n+1) .list-avatar { background: #dbeafe; color: #1d4ed8; }
+.list li:nth-child(5n+2) .list-avatar { background: #d1fae5; color: #047857; }
+.list li:nth-child(5n+3) .list-avatar { background: #ffedd5; color: #c2410c; }
+.list li:nth-child(5n+4) .list-avatar { background: #ede9fe; color: #6d28d9; }
+.list li:nth-child(5n+5) .list-avatar { background: #fce7f3; color: #be185d; }
+
+/* ---------- Tableaux ---------- */
+.table th,
+.data-table th {
+    background: #eef3ff;
+    color: var(--primary-dark);
+}
+
+.table tbody tr:hover td,
+.data-table tbody tr:hover td {
+    background: #f3f7ff;
+}
+
+/* ---------- Etats vides ---------- */
+.empty-state-icon {
+    background: linear-gradient(135deg, #dbeafe, #d1fae5);
+    color: var(--primary);
+}
+
+/* ---------- Bandeaux sombres (consultation en cours) ---------- */
+.consult-banner {
+    background: var(--brand-gradient);
+}

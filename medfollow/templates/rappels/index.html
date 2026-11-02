@@ -61,11 +61,11 @@
 
 <!-- Onglets filtres -->
 <div class="card">
-    <div class="card-header" style="padding-bottom:0;">
-        <div class="tabs" style="display:flex;gap:4px;flex-wrap:wrap;">
+    <div class="card-header">
+        <div class="tabs" style="margin:0;">
             {% set tabs = [('a_contacter','À contacter'), ('ce_mois','Ce mois'), ('contacte','Contactés'), ('clotures','Clôturés'), ('tous','Tous')] %}
             {% for key, label in tabs %}
-            <a href="/rappels?filtre={{ key }}" class="tab {{ 'active' if filtre == key }}" style="padding:8px 14px;text-decoration:none;border-radius:8px 8px 0 0;{{ 'background:var(--primary-light);color:var(--primary-dark);font-weight:600;' if filtre == key else 'color:var(--gray-500);' }}">{{ label }}</a>
+            <a href="/rappels?filtre={{ key }}" class="tab {{ 'active' if filtre == key }}">{{ label }}</a>
             {% endfor %}
         </div>
     </div>
@@ -118,7 +118,7 @@
                             {% else %}
                                 <form method="POST" action="/rappels/{{ r.id }}/reopen" style="margin:0;"><button class="btn btn-outline btn-sm">Rouvrir</button></form>
                             {% endif %}
-                            <form method="POST" action="/rappels/{{ r.id }}/delete" style="margin:0;" onsubmit="return confirm('Supprimer ce rappel ?');"><button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Suppr.</button></form>
+                            <form method="POST" action="/rappels/{{ r.id }}/delete" style="margin:0;" onsubmit="return confirm('Supprimer ce rappel ?');"><button class="btn btn-sm btn-outline-danger">Suppr.</button></form>
                         </div>
                     </td>
                 </tr>

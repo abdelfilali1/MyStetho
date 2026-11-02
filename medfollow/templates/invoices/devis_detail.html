@@ -63,10 +63,10 @@
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
             {% if devis.status == 'propose' %}
             <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="accepte"><button class="btn btn-success btn-sm">Marquer accepté</button></form>
-            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-outline btn-sm" style="color:var(--danger);">Marquer refusé</button></form>
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-sm btn-outline-danger">Marquer refusé</button></form>
             {% elif devis.status == 'accepte' %}
             <form method="POST" action="/invoices/devis/{{ devis.id }}/convert" style="margin:0;" onsubmit="return confirm('Convertir ce devis en facture ?');"><button class="btn btn-primary btn-sm">Convertir en facture</button></form>
-            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-outline btn-sm" style="color:var(--danger);">Marquer refusé</button></form>
+            <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="refuse"><button class="btn btn-sm btn-outline-danger">Marquer refusé</button></form>
             {% elif devis.status == 'refuse' %}
             <form method="POST" action="/invoices/devis/{{ devis.id }}/status" style="margin:0;"><input type="hidden" name="status" value="propose"><button class="btn btn-outline btn-sm">Repasser en proposé</button></form>
             {% elif devis.status == 'converti' and devis.converted_invoice_id %}

@@ -48,7 +48,7 @@
                     <div class="med-item" data-index="{{ loop.index0 }}">
                         {% if not loop.first %}
                         <div style="display: flex; justify-content: flex-end;">
-                            <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.med-item').remove()" style="color: var(--danger);">Supprimer</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.med-item').remove()">Supprimer</button>
                         </div>
                         {% endif %}
                         <div class="form-row">
@@ -228,7 +228,7 @@ function addMedication() {
     const html = `
     <div class="med-item" data-index="${idx}">
         <div style="display: flex; justify-content: flex-end;">
-            <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.med-item').remove()" style="color: var(--danger);">Supprimer</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.med-item').remove()">Supprimer</button>
         </div>
         <div class="form-row">
             <div class="form-group" style="flex: 2; position:relative;">

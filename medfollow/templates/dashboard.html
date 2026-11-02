@@ -2,9 +2,25 @@
 {% block title %}Tableau de bord — Doctivo{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>Tableau de bord</h2>
-</div>
+<section class="welcome">
+    <div>
+        <p class="welcome-date" id="welcome-date"></p>
+        <h2><span id="welcome-greeting">Bonjour</span>{% if user.first_name or user.last_name %}, {% if user.role != 'secretaire' %}Dr {{ user.last_name or user.first_name }}{% else %}{{ user.first_name }}{% endif %}{% endif %}</h2>
+        <p>{% if stats.today_appointments %}<b>{{ stats.today_appointments }} rendez-vous</b> au programme aujourd'hui.{% else %}Aucun rendez-vous aujourd'hui : une journée pour avancer sur les dossiers.{% endif %}</p>
+    </div>
+    <div class="welcome-actions">
+        <a href="/patients/new" class="btn btn-on-dark">Nouveau patient</a>
+        <a href="/appointments" class="btn btn-accent">Ouvrir l'agenda</a>
+    </div>
+</section>
+<script>
+(function () {
+    var now = new Date(), h = now.getHours();
+    document.getElementById('welcome-greeting').textContent = h >= 18 ? 'Bonsoir' : 'Bonjour';
+    var d = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('welcome-date').textContent = d.charAt(0).toUpperCase() + d.slice(1);
+})();
+</script>
 
 <div class="stats-grid">
     <div class="stat-card">
@@ -80,7 +96,7 @@
                             <form method="POST" action="/consultations/start" style="display:inline;">
                                 <input type="hidden" name="patient_id" value="{{ apt.patient_id }}">
                                 <input type="hidden" name="appointment_id" value="{{ apt.id }}">
-                                <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px;">Consulter</button>
+                                <button type="submit" class="btn btn-outline btn-sm">Consulter</button>
                             </form>
                             {% endif %}
                         </td>
@@ -89,7 +105,12 @@
                 </tbody>
             </table>
             {% else %}
-            <p class="empty-state">Aucun rendez-vous prévu aujourd'hui</p>
+            <div class="empty-state">
+                <div class="empty-state-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+                <strong>Journée libre</strong>
+                Aucun rendez-vous prévu aujourd'hui.
+                <div><a href="/appointments" class="btn btn-outline btn-sm">Planifier un rendez-vous</a></div>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -102,12 +123,15 @@
             {% if recent_patients %}
             <ul class="list">
                 {% for p in recent_patients %}
-                <li class="list-item">
-                    <div class="list-avatar">{{ p.first_name[0] }}{{ p.last_name[0] }}</div>
-                    <div class="list-info">
-                        <span class="list-title">{{ p.last_name | upper }} {{ p.first_name }}</span>
-                        <span class="list-subtitle">Ajouté le {{ p.created_at[:10] }}</span>
-                    </div>
+                <li>
+                    <a href="/patients/{{ p.id }}" class="list-item">
+                        <div class="list-avatar">{{ p.first_name[0] | upper }}{{ p.last_name[0] | upper }}</div>
+                        <div class="list-info">
+                            <span class="list-title">{{ p.last_name | upper }} {{ p.first_name }}</span>
+                            <span class="list-subtitle">Ajouté le {{ p.created_at[:10] }}</span>
+                        </div>
+                        <svg class="list-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
                 </li>
                 {% endfor %}
             </ul>

@@ -14,11 +14,11 @@
 </div>
 
 <div class="card">
-    <div class="card-header" style="padding-bottom:0;">
-        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+    <div class="card-header">
+        <div class="tabs" style="margin:0;">
             {% set tabs = [('', 'Tous'), ('propose','Proposés'), ('accepte','Acceptés'), ('refuse','Refusés'), ('converti','Convertis')] %}
             {% for key, label in tabs %}
-            <a href="/invoices/devis{{ '?status=' ~ key if key }}" class="tab" style="padding:8px 14px;text-decoration:none;border-radius:8px 8px 0 0;{{ 'background:var(--primary-light);color:var(--primary-dark);font-weight:600;' if selected_status == key or (not selected_status and not key) else 'color:var(--gray-500);' }}">{{ label }}</a>
+            <a href="/invoices/devis{{ '?status=' ~ key if key }}" class="tab {{ 'active' if selected_status == key or (not selected_status and not key) }}">{{ label }}</a>
             {% endfor %}
         </div>
     </div>

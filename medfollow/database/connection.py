@@ -1236,6 +1236,14 @@ async def init_db():
         );
     """)
     await db.commit()
+    # Reglages globaux de l'application (cle/valeur), ex. ui_theme choisi par l'admin.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    await db.commit()
     for _legacy_tbl, _legacy_col in (
         ("dental_teeth", "odo_synced INTEGER DEFAULT 0"),
         ("dental_tooth_surfaces", "odo_synced INTEGER DEFAULT 0"),

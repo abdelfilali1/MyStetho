@@ -308,6 +308,7 @@ async def health():
 import json as _json
 from fastapi.templating import Jinja2Templates
 from config import TEMPLATES_DIR
+from services.ui_theme import get_theme
 
 
 def _from_json(value):
@@ -320,11 +321,13 @@ def _from_json(value):
 
 _global_templates = Jinja2Templates(directory=TEMPLATES_DIR)
 _global_templates.env.globals["now_year"] = date.today().year
+_global_templates.env.globals["ui_theme"] = get_theme
 
 # Patch all router template envs to include now_year and calc_age/fromjson filters
 for mod in [auth, dashboard, patients, appointments, consultations, prescriptions, documents, messages, invoices, dental, mutuelle, cephalo, radio, learning, rappels, salle_attente, profile]:
     if hasattr(mod, 'templates'):
         mod.templates.env.globals["now_year"] = date.today().year
+        mod.templates.env.globals["ui_theme"] = get_theme
         mod.templates.env.filters["calc_age"] = _calc_age
         mod.templates.env.filters["fromjson"] = _from_json
 _global_templates.env.filters["calc_age"] = _calc_age

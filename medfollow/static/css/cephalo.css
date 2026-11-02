@@ -224,11 +224,12 @@
 .ceph-float input[type="number"],
 .ceph-float select {
     width: 100%;
-    background: rgba(255, 255, 255, .08);
+    background-color: rgba(255, 255, 255, .08);
     border: 1px solid rgba(255, 255, 255, .16);
     border-radius: 7px;
     color: #fff;
-    padding: 6px 8px;
+    padding: 6px 28px 6px 8px;
+    background-position: right 6px center;
     font-size: 12.5px;
     font-family: inherit;
     margin-bottom: 8px;
@@ -268,7 +269,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 10.5px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: .06em;
     font-weight: 700;
@@ -393,7 +394,7 @@
 .ceph-empty { font-size: 12px; color: var(--gray-400); font-style: italic; }
 
 .ceph-section-title {
-    font-size: 10.5px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: .06em;
     font-weight: 700;
@@ -432,7 +433,7 @@
 }
 
 .ceph-footnote {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--gray-400);
     line-height: 1.4;
     margin-top: 12px;
@@ -473,7 +474,7 @@
 
 .ceph-badge {
     display: inline-block;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 700;
     padding: 2px 7px;
     border-radius: 999px;
@@ -639,12 +640,13 @@
 
 .ceph-select {
     width: 100%;
-    padding: 6px 8px;
+    padding: 6px 28px 6px 8px;
     border: 1px solid var(--gray-200);
     border-radius: 8px;
     font-family: inherit;
     font-size: 12.5px;
-    background: #fff;
+    background-color: #fff;
+    background-position: right 6px center;
     color: var(--gray-800);
 }
 

@@ -7,32 +7,38 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260825-2">
+    {% set _ui_theme = ui_theme() if ui_theme is defined else 'premium' %}
+    {% if _ui_theme == 'original' %}
+    <link rel="stylesheet" href="/static/css/style-original.css?v=20261102-1">
+    {% else %}
+    <link rel="stylesheet" href="/static/css/style.css?v=20261102-5">
+    {% if _ui_theme == 'vibrant' %}<link rel="stylesheet" href="/static/css/theme-vibrant.css?v=20261102-2">{% endif %}
+    {% endif %}
     <style>
     /* Recherche globale + badge messagerie (intégration) */
     /* Champ de recherche : loupe a gauche, raccourci en pastille a droite.
        Le raccourci vivait dans le texte du placeholder (« … (Ctrl+K) »), ce qui
        allongeait la phrase et disparaissait des qu'on tapait. */
-    .sidebar-search { padding: 12px 14px 6px; position: relative; }
+    .sidebar-search { padding: 4px 0 8px; position: relative; }
     .ss-field { position: relative; display: flex; align-items: center; }
-    .ss-field .ss-icon { position: absolute; left: 10px; width: 14px; height: 14px; color: rgba(174,219,245,.55); pointer-events: none; transition: color .15s ease; }
+    .ss-field .ss-icon { position: absolute; left: 10px; width: 14px; height: 14px; color: #8fa9c2; pointer-events: none; transition: color .15s ease; }
     /* Le bandeau ne fait que 282 px : les retraits gauche/droite sont calcules
        au plus juste pour que « Rechercher un patient… » tienne entre la loupe
        et la pastille sans etre tronque. */
-    .sidebar-search input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.06); border: 1px solid rgba(160,220,255,.18); border-radius: 11px; color: #eaf6ff; padding: 9px 46px 9px 30px; font-size: 12.5px; font-family: inherit; box-shadow: inset 0 1px 2px rgba(3,18,37,.35); transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
-    .sidebar-search input::placeholder { color: rgba(174,219,245,.5); }
-    .sidebar-search input:hover { background: rgba(255,255,255,.09); border-color: rgba(160,220,255,.3); }
-    .sidebar-search input:focus { outline: none; border-color: #25b7ff; background: rgba(255,255,255,.12); box-shadow: inset 0 1px 2px rgba(3,18,37,.2), 0 0 0 3px rgba(37,183,255,.16); }
-    .ss-field:focus-within .ss-icon { color: #25b7ff; }
+    .sidebar-search input { width: 100%; box-sizing: border-box; background-color: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-control); color: #eaf6ff; padding: 9px 46px 9px 32px; font-size: 13px; font-family: inherit; }
+    .sidebar-search input::placeholder { color: #8fa9c2; }
+    .sidebar-search input:hover:not(:focus) { background-color: rgba(255,255,255,.09); border-color: rgba(255,255,255,.18); }
+    .sidebar-search input:focus { border-color: #4ea3f2; background-color: rgba(255,255,255,.1); box-shadow: 0 0 0 3px rgba(78,163,242,.25); }
+    .ss-field:focus-within .ss-icon { color: #8cc4f7; }
     /* La pastille s'efface des qu'on saisit : elle a rempli son role. */
-    .ss-kbd { position: absolute; right: 7px; font-family: inherit; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: rgba(174,219,245,.6); background: rgba(255,255,255,.07); border: 1px solid rgba(160,220,255,.2); border-radius: 5px; padding: 2px 5px; pointer-events: none; transition: opacity .15s ease; }
+    .ss-kbd { position: absolute; right: 7px; font-family: inherit; font-size: 11px; font-weight: 600; color: #8fa9c2; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 5px; padding: 2px 5px; pointer-events: none; transition: opacity .15s ease; }
     .ss-field:focus-within .ss-kbd { opacity: 0; }
-    #global-search-results { position: absolute; top: 100%; left: 14px; right: 14px; background: #fff; border: 1px solid rgba(160,220,255,.25); border-radius: 12px; box-shadow: 0 14px 36px rgba(3,18,37,.45); z-index: 300; max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 4px 0; }
-    #global-search-results .gsr-section { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; padding: 8px 12px 2px; }
-    #global-search-results .gsr-item { display: block; padding: 8px 12px; font-size: 13px; color: #0f172a; text-decoration: none; cursor: pointer; }
-    #global-search-results .gsr-item:hover, #global-search-results .gsr-item.kbd-active { background: #eef6ff; }
-    #global-search-results .gsr-empty { padding: 10px 12px; font-size: 13px; color: #94a3b8; }
-    .msg-unread-badge { background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
+    #global-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-control); box-shadow: var(--shadow-medium); z-index: 300; max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 4px 0; }
+    #global-search-results .gsr-section { font-size: 12px; font-weight: 600; color: var(--text-muted); padding: 8px 12px 2px; }
+    #global-search-results .gsr-item { display: block; padding: 8px 12px; font-size: 14px; color: var(--gray-900); text-decoration: none; cursor: pointer; }
+    #global-search-results .gsr-item:hover, #global-search-results .gsr-item.kbd-active { background: var(--primary-light); }
+    #global-search-results .gsr-empty { padding: 10px 12px; font-size: 14px; color: var(--text-muted); }
+    .msg-unread-badge { background: var(--danger); color: #fff; border-radius: 999px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -162,6 +168,12 @@
                     <span>Utilisateurs</span>
                 </a>
             </li>
+            <li class="{% if active == 'admin_layout' %}active{% endif %}">
+                <a href="/admin/layout">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="9" y1="10" x2="21" y2="10"/></svg>
+                    <span>Layout</span>
+                </a>
+            </li>
             {% endif %}
         </ul>
         <div class="sidebar-footer">
@@ -194,12 +206,12 @@
         {% if _ac and request.url.path != '/patients/' ~ _ac.patient_id %}
         <a href="/patients/{{ _ac.patient_id }}?consultation_id={{ _ac.id }}" class="no-print" style="
             text-decoration:none;display:flex;align-items:center;justify-content:space-between;gap:12px;
-            background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;
-            border-radius:12px;padding:11px 18px;margin-bottom:16px;
-            box-shadow:0 4px 18px rgba(15,23,42,.28);">
+            background:var(--sidebar-bg);color:#fff;
+            border-radius:var(--radius);padding:11px 18px;margin-bottom:16px;
+            ">
             <span style="display:flex;align-items:center;gap:10px;min-width:0;">
                 <span style="width:9px;height:9px;border-radius:50%;background:#22c55e;
-                       box-shadow:0 0 0 3px rgba(34,197,94,.3);flex-shrink:0;animation:pulse-dot-global 2s infinite;"></span>
+                       box-shadow:0 0 0 3px rgba(47,208,143,.25);flex-shrink:0;"></span>
                 <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                     Consultation en cours — {{ _ac.last_name|upper }} {{ _ac.first_name }}
                 </span>

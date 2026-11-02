@@ -96,7 +96,7 @@ function addItem() {
     list.insertAdjacentHTML('beforeend', `
     <div class="invoice-item" data-index="${itemIndex}">
         <div style="display: flex; justify-content: flex-end;">
-            <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.invoice-item').remove(); calcTotal();" style="color: var(--danger);">Supprimer</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.invoice-item').remove(); calcTotal();">Supprimer</button>
         </div>
         <div class="form-row">
             <div class="form-group" style="flex: 2;">

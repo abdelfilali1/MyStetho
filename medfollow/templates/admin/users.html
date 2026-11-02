@@ -94,7 +94,7 @@ function copyReset() {
                                 <button type="submit" class="btn btn-outline btn-sm" title="Générer un lien de réinitialisation">Reset MDP</button>
                             </form>
                             <form method="POST" action="/admin/users/{{ u.id }}/toggle-active" onsubmit="return confirm('{{ 'Désactiver' if u.is_active else 'Réactiver' }} le compte de {{ u.first_name }} {{ u.last_name }} ?')">
-                                <button type="submit" class="btn btn-sm {{ 'btn-outline' if u.is_active else 'btn-success' }}" style="{{ 'color:var(--danger);' if u.is_active else '' }}">
+                                <button type="submit" class="btn btn-sm {{ 'btn-outline-danger' if u.is_active else 'btn-success' }}">
                                     {{ 'Désactiver' if u.is_active else 'Réactiver' }}
                                 </button>
                             </form>

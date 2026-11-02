@@ -127,7 +127,7 @@
                             {% if inv.status == 'en attente' %}
                             <form method="POST" action="/admin/invite/{{ inv.id }}/delete"
                                 onsubmit="return confirm('Supprimer cette invitation ?')">
-                                <button type="submit" class="btn btn-sm btn-outline" style="color:var(--danger);">Supprimer</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
                             </form>
                             {% endif %}
                         </td>

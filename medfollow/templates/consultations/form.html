@@ -7,10 +7,6 @@
     width: 100%;
 }
 
-#dental-teeth-toggle {
-    min-height: 44px;
-}
-
 #dental-teeth-label {
     display: block;
     max-width: calc(100% - 22px);
@@ -18,10 +14,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
-}
-
-#dental-teeth-menu label:hover {
-    background: var(--gray-100);
 }
 
 @media (max-width: 860px) {
@@ -41,11 +33,6 @@
 }
 
 @media (max-width: 580px) {
-    #dental-teeth-toggle {
-        font-size: 15px !important;
-        padding: 11px 12px !important;
-    }
-
     #dental-teeth-menu {
         max-height: 200px !important;
     }
@@ -72,14 +59,14 @@
                 <div class="form-row">
                     <div class="form-group" style="flex:1;">
                         <label>Patient *</label>
-                        <div style="display:flex;gap:6px;align-items:center;">
+                        <div style="display:flex;gap:8px;align-items:center;">
                             <select name="patient_id" id="sel-patient-c" required style="flex:1;">
                                 <option value="">Sélectionner...</option>
                                 {% for p in patients %}
                                 <option value="{{ p.id }}" {{ 'selected' if (consultation and consultation.patient_id == p.id) or (selected_patient_id and selected_patient_id == p.id) }}>{{ p.last_name | upper }} {{ p.first_name }}</option>
                                 {% endfor %}
                             </select>
-                            <a href="/patients/new?next=/consultations/new" class="btn btn-outline btn-sm" title="Créer un nouveau patient">+</a>
+                            <a href="/patients/new?next=/consultations/new" class="btn btn-outline btn-icon" title="Créer un nouveau patient" aria-label="Créer un nouveau patient"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></a>
                         </div>
                     </div>
                     <div class="form-group">
@@ -100,7 +87,7 @@
 
                 {% if is_dentist %}
                 {# ── Dental consultation fields ── #}
-                <div class="form-group" style="margin-top: 12px;">
+                <div class="form-group">
                     <label>Motif de consultation</label>
                     <select name="reason">
                         <option value="">— Sélectionner —</option>
@@ -114,20 +101,19 @@
                         <label>Dent(s) concernée(s)</label>
                         <input type="hidden" name="symptoms" id="dental-teeth-hidden" value="{{ consultation.symptoms if consultation and consultation.symptoms else '' }}">
                         <div id="dental-teeth-dropdown" style="position: relative;">
-                            <button type="button" id="dental-teeth-toggle" style="width:100%; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1px solid var(--gray-300); border-radius:14px; background:#fff; color:var(--gray-700); font-size:16px; cursor:pointer;">
-                                <span id="dental-teeth-label">Sélectionner les dents...</span>
-                                <span aria-hidden="true">▾</span>
+                            <button type="button" id="dental-teeth-toggle" class="select-trigger" aria-haspopup="true" aria-expanded="false">
+                                <span id="dental-teeth-label">Sélectionner les dents…</span>
                             </button>
-                            <div id="dental-teeth-menu" hidden style="position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:50; max-height:260px; overflow:auto; padding:8px; border:1px solid var(--gray-300); border-radius:14px; background:#fff; box-shadow:0 12px 30px rgba(15, 23, 42, 0.12);">
-                                <label style="display:flex; align-items:center; gap:8px; margin:0 0 8px 0; padding:8px 10px; border-radius:10px; font-size:14px; color:var(--gray-700); cursor:pointer;">
+                            <div id="dental-teeth-menu" class="dropdown-menu" hidden>
+                                <label class="dropdown-option">
                                     <input type="checkbox" id="dental-teeth-all">
                                     Toutes les dents
                                 </label>
-                                <div style="height:1px; background:var(--gray-200); margin: 0 0 8px 0;"></div>
+                                <div class="dropdown-divider"></div>
                                 <div id="dental-teeth-options" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px;"></div>
                             </div>
                         </div>
-                        <span id="dental-teeth-count" style="display:block; margin-top:8px; font-size:13px; color: var(--gray-500);">Aucune dent sélectionnée</span>
+                        <span id="dental-teeth-count" class="form-hint">Aucune dent sélectionnée</span>
                     </div>
                 </div>
                 <div class="form-group">
@@ -153,7 +139,7 @@
                 </div>
                 {% else %}
                 {# ── General consultation fields ── #}
-                <div class="form-group" style="margin-top: 12px;">
+                <div class="form-group">
                     <label>Motif de consultation</label>
                     <input type="text" name="reason" value="{{ consultation.reason if consultation and consultation.reason else '' }}">
                 </div>
@@ -441,7 +427,7 @@ function getSelectedTeethValues() {
 function updateTeethDropdownLabel(selected) {
     if (!teethLabel) return;
     if (selected.length === 0) {
-        teethLabel.textContent = 'Sélectionner les dents...';
+        teethLabel.textContent = 'Sélectionner les dents…';
         return;
     }
     if (selected.length === dentalTeethFdi.length) {
@@ -500,15 +486,7 @@ function buildTeethOptions() {
     teethOptions.innerHTML = '';
     for (const code of dentalTeethFdi) {
         const label = document.createElement('label');
-        label.style.display = 'flex';
-        label.style.alignItems = 'center';
-        label.style.gap = '8px';
-        label.style.margin = '0';
-        label.style.padding = '7px 10px';
-        label.style.borderRadius = '10px';
-        label.style.fontSize = '14px';
-        label.style.color = 'var(--gray-700)';
-        label.style.cursor = 'pointer';
+        label.className = 'dropdown-option';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';

@@ -14,6 +14,7 @@ from services.auth_service import hash_password, verify_password, create_token, 
 from services.rate_limit import retry_after, record_failure, reset as rate_limit_reset
 from services.audit import log_audit, client_ip
 from services.flash import set_flash
+from services.ui_theme import THEMES, get_theme, set_theme
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -164,6 +165,31 @@ async def _get_doctors(db) -> list:
         "SELECT id, first_name, last_name FROM users WHERE role IN ('medecin', 'admin') AND is_active = 1 ORDER BY last_name, first_name"
     )
     return [{"id": r[0], "first_name": r[1], "last_name": r[2]} for r in await cursor.fetchall()]
+
+
+@router.get("/admin/layout", response_class=HTMLResponse)
+async def layout_settings(request: Request, user: dict = Depends(require_admin)):
+    return templates.TemplateResponse("admin/layout.html", {
+        "request": request, "user": user, "active": "admin_layout",
+        "themes": THEMES, "current_theme": get_theme(),
+    })
+
+
+@router.post("/admin/layout")
+async def layout_settings_save(
+    request: Request,
+    theme: str = Form(...),
+    user: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    response = RedirectResponse(url="/admin/layout", status_code=302)
+    if theme not in THEMES:
+        set_flash(response, "Layout inconnu.", "error")
+        return response
+    await set_theme(db, theme)
+    await log_audit(db, user, "ui_theme", details=f"theme={theme}")
+    set_flash(response, f"Layout « {THEMES[theme]} » appliqué à toute l'application.")
+    return response
 
 
 @router.get("/admin/users/new", response_class=HTMLResponse)

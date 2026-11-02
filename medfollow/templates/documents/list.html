@@ -81,7 +81,7 @@
                         <a href="/documents/{{ d.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
                         <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
                         <form method="POST" action="/documents/{{ d.id }}/delete" style="display: inline;" onsubmit="return confirm('Supprimer le document « {{ d.title }} » ?')">
-                            <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">×</button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">×</button>
                         </form>
                     </td>
                 </tr>

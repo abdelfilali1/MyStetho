@@ -18,24 +18,25 @@
     max-width: 100%; overflow: hidden;
 }
 .view-segmented {
-    display: flex; gap: 0;
-    background: var(--gray-100); border-radius: 11px;
-    padding: 4px; border: 1px solid var(--gray-200);
+    display: flex; gap: 2px;
+    background: var(--gray-100); border-radius: 10px;
+    padding: 3px;
     flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
     max-width: 100%; box-sizing: border-box;
     scrollbar-width: none;
 }
 .view-segmented::-webkit-scrollbar { display: none; }
 .view-btn {
-    padding: 6px 14px; border: none; border-radius: 8px;
-    font-size: 12px; font-weight: 600; cursor: pointer;
-    color: var(--gray-500); background: transparent;
-    transition: all 0.18s; white-space: nowrap;
+    height: var(--control-h-sm); padding: 0 12px; border: none; border-radius: 7px;
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    color: var(--gray-600); background: transparent;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); white-space: nowrap;
     display: flex; align-items: center; gap: 6px; flex-shrink: 0;
 }
+.view-btn:hover { color: var(--gray-900); }
 .view-btn.active {
-    background: white; color: var(--gray-900);
-    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+    background: var(--surface); color: var(--gray-900);
+    box-shadow: 0 1px 2px rgba(19,32,51,0.1);
 }
 .view-btn-sep {
     width: 1px; background: var(--gray-300); margin: 4px 2px; align-self: stretch; flex-shrink: 0;
@@ -44,12 +45,12 @@
 .hist-combo-wrap { position: relative; flex: 2; }
 .hist-dropdown {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: #fff; border: 1.5px solid var(--gray-200);
-    border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-control); box-shadow: var(--shadow-medium);
     z-index: 300; max-height: 220px; overflow-y: auto;
 }
 .hist-opt {
-    padding: 9px 14px; font-size: 13px; cursor: pointer;
+    padding: 9px 14px; font-size: 14px; cursor: pointer;
     color: var(--gray-800); border-bottom: 1px solid var(--gray-100);
 }
 .hist-opt:last-child { border-bottom: none; }
@@ -62,7 +63,7 @@
 /* ===== CSS dentiste — copié depuis dental/chart.html ===== */
 .legend-pill { display: flex; align-items: center; gap: 6px; background: transparent; border: none; border-radius: 0; padding: 0; font-size: 11px; color: var(--gray-700); font-weight: 500; white-space: normal; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.08); }
-#toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 22px; border-radius: 50px; font-size: 13px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+#toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--gray-900); color: white; padding: 10px 20px; border-radius: var(--radius-control); font-size: 14px; font-weight: 600; z-index: 3000; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
 .endo-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px; margin-bottom: 8px; }
 .endo-arch-label { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 0; }
 .endo-tooth-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 2px; border: 1.5px solid var(--gray-300); border-radius: 10px; background: #fff; cursor: pointer; transition: all 0.15s; min-height: 56px; }
@@ -73,7 +74,7 @@
 .endo-tooth-btn.has-data { border-color: var(--primary); background: rgba(28,140,248,0.04); }
 .endo-separator { grid-column: 1 / -1; height: 1px; background: var(--gray-200); margin: 6px 0 2px; }
 .endo-legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
-.endo-modal { background: #fff; border-radius: 20px; max-width: 900px; margin: 0 auto; box-shadow: 0 24px 64px rgba(0,0,0,0.25); overflow: hidden; }
+.endo-modal { background: var(--surface); border-radius: 14px; max-width: 900px; margin: 0 auto; box-shadow: 0 24px 64px rgba(0,0,0,0.25); overflow: hidden; }
 .endo-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--gray-200); }
 .endo-modal-tooth-num { font-size: 22px; font-weight: 800; color: var(--primary); margin-right: 10px; }
 .endo-modal-tooth-name { font-size: 14px; color: var(--gray-600); }
@@ -106,7 +107,7 @@
 .appt-badge.termine   { background:#dcfce7; color:#15803d; }
 .appt-badge.annule    { background:#fee2e2; color:#b91c1c; }
 .appt-badge.absent    { background:#fce7f3; color:#9d174d; }
-.treatment-card.is-done { background: #f8fafc; border-left: 3px solid #22c55e; opacity: 0.85; }
+.treatment-card.is-done { background: var(--gray-50); opacity: 0.85; }
 .treatment-card.is-done .treatment-type { text-decoration: line-through; color: #64748b; }
 @media (max-width: 700px) { .endo-grid { grid-template-columns: repeat(8, 1fr); } .endo-main-grid { flex-direction: column; } .endo-diagram-card { align-self: center; } .endo-modal { border-radius: 14px; margin: 0 4px; } .endo-modal-body { padding: 16px; } }
 @media (max-width: 480px) { .endo-grid { grid-template-columns: repeat(4, 1fr); } .endo-tooth-btn { min-height: 48px; } }
@@ -121,51 +122,43 @@
         <h2>{{ patient.last_name | upper }} {{ patient.first_name }}</h2>
         <p class="subtitle">Dossier patient #{{ patient.id }}</p>
     </div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;" class="no-print">
+    <div class="cluster no-print">
+        {% if not active_consultation %}
+        <button type="button" class="btn btn-primary" onclick="openStartModal()">Démarrer la consultation</button>
+        {% endif %}
         <button type="button" class="btn btn-outline" onclick="printPdf('/patients/{{ patient.id }}/brochure.pdf', 'Fiche patient')">Imprimer</button>
-        <a href="/patients/{{ patient.id }}/brochure.pdf?dl=1" class="btn btn-outline">📄 Brochure PDF</a>
+        <a href="/patients/{{ patient.id }}/brochure.pdf?dl=1" class="btn btn-outline">Brochure PDF</a>
         <a href="/patients/{{ patient.id }}/edit" class="btn btn-outline">Modifier</a>
         <form method="POST" action="/patients/{{ patient.id }}/delete" onsubmit="return confirm('Supprimer le patient {{ patient.last_name | upper }} {{ patient.first_name }} ? Cette action est irréversible.')">
-            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+            <button type="submit" class="btn btn-outline-danger">Supprimer</button>
         </form>
     </div>
 </div>
 
 <!-- Bandeau consultation active -->
 {% if active_consultation %}
-<div id="consultation-banner" class="no-print" style="
-    background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
-    color:white;border-radius:14px;padding:14px 20px;margin-bottom:16px;
-    display:flex;align-items:center;justify-content:space-between;gap:12px;
-    box-shadow:0 4px 20px rgba(15,23,42,.3);
-">
-    <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:10px;height:10px;border-radius:50%;background:#22c55e;
-                    box-shadow:0 0 0 3px rgba(34,197,94,.3);animation:pulse-dot 2s infinite;flex-shrink:0;"></div>
+<div id="consultation-banner" class="consult-banner no-print">
+    <div class="consult-banner-info">
+        <span class="consult-banner-dot" aria-hidden="true"></span>
         <div>
-            <span style="font-weight:700;font-size:14px;">Consultation en cours</span>
-            <span style="font-size:12px;color:rgba(148,163,184,.9);margin-left:12px;">
-                Démarrée à {{ active_consultation.consultation_date[11:16] }} &mdash; #{{ active_consultation.id }}
-            </span>
+            <strong>Consultation en cours</strong>
+            <span class="consult-banner-meta">Démarrée à {{ active_consultation.consultation_date[11:16] }} · #{{ active_consultation.id }}</span>
         </div>
     </div>
-    <button onclick="openTerminerModal()" style="
-        background:#ef4444;border:none;border-radius:9px;color:white;
-        font-size:13px;font-weight:600;padding:8px 18px;cursor:pointer;flex-shrink:0;
-    ">Terminer la consultation</button>
+    <button type="button" class="btn btn-danger btn-sm" onclick="openTerminerModal()">Terminer la consultation</button>
 </div>
 <style>
-@keyframes pulse-dot {
-  0%,100% { box-shadow:0 0 0 3px rgba(34,197,94,.3); }
-  50%      { box-shadow:0 0 0 7px rgba(34,197,94,.08); }
-}
+.consult-banner { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--sidebar-bg); color:#fff; border-radius:var(--radius); padding:12px 16px 12px 20px; margin-bottom:16px; }
+.consult-banner-info { display:flex; align-items:center; gap:12px; }
+.consult-banner-dot { width:10px; height:10px; border-radius:50%; background:#2fd08f; box-shadow:0 0 0 3px rgba(47,208,143,.25); flex-shrink:0; }
+.consult-banner-meta { font-size:13px; color:#a9bdd2; margin-left:12px; }
 </style>
 
 {# Récapitulatif du questionnaire de début de consultation #}
 {% if active_consultation.intake %}
 {% set _ik = active_consultation.intake %}
-<div class="card no-print" style="margin-bottom:16px;border-left:3px solid var(--primary);">
-    <div class="card-header"><h3 style="font-size:14px;">Questionnaire de début de consultation</h3></div>
+<div class="card no-print" style="margin-bottom:16px;">
+    <div class="card-header"><h3>Questionnaire de début de consultation</h3></div>
     <div class="card-body">
         {% macro _ikval(v) %}{{ v | join(', ') if v is iterable and v is not string else v }}{% endmacro %}
         <div class="info-grid">
@@ -185,27 +178,20 @@
 {% endif %}
 
 {% else %}
-<div class="no-print" style="margin-bottom:16px;">
-    <button type="button" onclick="openStartModal()" style="
-        background:var(--primary);border:none;border-radius:9px;color:white;
-        font-size:13px;font-weight:600;padding:9px 20px;cursor:pointer;
-    ">Démarrer la consultation</button>
-</div>
 
 <!-- ===== Modal : questionnaire de début de consultation (QCM + texte libre) ===== -->
-<div id="start-overlay" class="no-print" onclick="closeStartModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;backdrop-filter:blur(4px);"></div>
-<div id="start-modal" class="no-print" style="display:none;flex-direction:column;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;width:600px;max-width:96vw;max-height:90vh;overflow:hidden;z-index:2001;box-shadow:0 30px 80px rgba(0,0,0,.25);">
+<div id="start-overlay" class="no-print" onclick="closeStartModal()" style="display:none;position:fixed;inset:0;background:rgba(9,18,31,.5);z-index:2000;"></div>
+<div id="start-modal" class="no-print" style="display:none;flex-direction:column;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border-radius:14px;width:600px;max-width:96vw;max-height:90vh;overflow:hidden;z-index:2001;box-shadow:var(--shadow-medium);">
   <form method="POST" action="/consultations/start" id="start-form" style="display:flex;flex-direction:column;min-height:0;">
     <input type="hidden" name="patient_id" value="{{ patient.id }}">
-    <div style="padding:18px 22px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:12px;flex-shrink:0;">
-      <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--primary),#1e3a5f);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">🦷</div>
+    <div class="modal-header" style="padding:20px 24px 16px;margin:0;border-bottom:1px solid var(--border);flex-shrink:0;">
       <div>
-        <h3 style="margin:0;font-size:16px;">Début de consultation</h3>
-        <p style="margin:2px 0 0;font-size:12px;color:var(--gray-500);">Quelques questions avant de commencer</p>
+        <h3>Début de consultation</h3>
+        <p class="text-muted text-small">Quelques questions avant de commencer</p>
       </div>
-      <button type="button" onclick="closeStartModal()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);line-height:1;">✕</button>
+      <button type="button" class="modal-close" onclick="closeStartModal()" aria-label="Fermer">&times;</button>
     </div>
-    <div style="padding:18px 22px;overflow-y:auto;">
+    <div style="padding:20px 24px;overflow-y:auto;">
       <div class="start-q">
         <label class="start-q-label">Motif de consultation <span class="start-hint">(plusieurs choix possibles)</span></label>
         <div class="start-chips">
@@ -296,21 +282,22 @@
         <textarea name="intake_notes" rows="3" class="form-control" style="resize:vertical;width:100%;" placeholder="Décrivez la demande / le motif en détail..."></textarea>
       </div>
     </div>
-    <div style="padding:14px 22px;border-top:1px solid var(--gray-200);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">
+    <div class="modal-footer" style="margin:0;padding:16px 24px;flex-shrink:0;">
       <button type="button" onclick="closeStartModal()" class="btn btn-outline">Annuler</button>
-      <button type="submit" class="btn btn-primary">Commencer la consultation →</button>
+      <button type="submit" class="btn btn-primary">Commencer la consultation</button>
     </div>
   </form>
 </div>
 <style>
 .start-q{margin-bottom:18px;}
 .start-q-label{display:block;font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:9px;}
-.start-hint{font-weight:500;font-size:11px;color:var(--gray-400);}
+.start-hint{font-weight:500;font-size:12px;color:var(--text-muted);}
 .start-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .start-chip{position:relative;cursor:pointer;}
 .start-chip input{position:absolute;opacity:0;pointer-events:none;}
-.start-chip span{display:inline-block;padding:7px 14px;border:1px solid var(--gray-300);border-radius:20px;font-size:13px;color:var(--gray-600);transition:all .15s;background:#fff;}
-.start-chip span:hover{border-color:var(--primary);}
+.start-chip span{display:inline-flex;align-items:center;height:var(--control-h-sm);padding:0 14px;border:1px solid var(--gray-300);border-radius:999px;font-size:13px;color:var(--gray-700);transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease);background:var(--surface);}
+.start-chip span:hover{border-color:var(--gray-400);background:var(--gray-50);}
+.start-chip input:focus-visible + span{box-shadow:var(--focus-ring);}
 .start-chip input:checked + span{background:var(--primary);border-color:var(--primary);color:#fff;}
 .start-chip-sep{width:1px;align-self:stretch;min-height:24px;background:var(--gray-200);margin:0 4px;}
 .start-extra-input{margin-top:8px;width:100%;font-size:13px;}
@@ -446,7 +433,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                                 onclick='toggleHistEdit({{ h.id }})'>Modifier</button>
                         <form method="POST" action="/patients/{{ patient.id }}/history/{{ h.id }}/delete" style="margin:0;"
                               onsubmit="return confirm('Supprimer cet antécédent ?');">
-                            <button type="submit" class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;">Suppr.</button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Suppr.</button>
                         </form>
                     </div>
                 </li>
@@ -912,7 +899,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
                 <button id="endo-mode-toggle" class="btn btn-outline btn-sm" onclick="toggleEndoMode()">Modifier</button>
-                <button onclick="closeEndoModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-400);line-height:1;">✕</button>
+                <button type="button" class="modal-close" onclick="closeEndoModal()" aria-label="Fermer">&times;</button>
             </div>
         </div>
         <div class="endo-modal-body">
@@ -973,113 +960,85 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
 <style>
 #terminer-modal {
     display:none;flex-direction:column;position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%);background:#fff;border-radius:20px;
+    transform:translate(-50%,-50%);background:var(--surface);border-radius:14px;
     width:660px;max-width:96vw;max-height:92vh;overflow:hidden;
-    z-index:2001;box-shadow:0 32px 80px rgba(0,0,0,.22);
+    z-index:2001;box-shadow:var(--shadow-medium);
 }
-.term-hdr {
-    padding:18px 22px 16px;border-bottom:1px solid var(--gray-200);
-    display:flex;align-items:center;gap:14px;flex-shrink:0;
-    background:linear-gradient(135deg,#eef6ff 0%,#fff 70%);
+.term-hdr, .fu-hdr {
+    padding:20px 24px 16px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:12px;flex-shrink:0;
 }
-.term-hdr-icon {
-    width:40px;height:40px;flex-shrink:0;border-radius:12px;
-    background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:18px;box-shadow:0 4px 12px rgba(28,140,248,.35);
-}
-.term-hdr-text h3 { margin:0;font-size:16px;font-weight:700;color:var(--gray-900); }
-.term-hdr-text p  { margin:3px 0 0;font-size:12px;color:var(--gray-500); }
-.term-hdr-close {
+.term-hdr-text h3, .fu-hdr-text h3 { margin:0;font-size:17px;font-weight:700;color:var(--gray-900); }
+.term-hdr-text p, .fu-hdr-text p { margin:2px 0 0;font-size:13px;color:var(--text-muted); }
+.term-hdr-close, .fu-hdr-close {
     margin-left:auto;background:none;border:none;cursor:pointer;
-    width:30px;height:30px;border-radius:8px;display:flex;align-items:center;
-    justify-content:center;color:var(--gray-400);font-size:17px;transition:background .15s,color .15s;
+    width:var(--control-h-sm);height:var(--control-h-sm);border-radius:var(--radius-control);display:flex;align-items:center;
+    justify-content:center;color:var(--text-muted);font-size:22px;line-height:1;
+    transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease);
 }
-.term-hdr-close:hover { background:var(--gray-100);color:var(--gray-700); }
+.term-hdr-close:hover, .fu-hdr-close:hover { background:var(--gray-100);color:var(--gray-900); }
 .term-body { overflow-y:auto;flex:1; }
 .term-preview {
-    margin:14px 22px 0;padding:12px 14px;background:var(--gray-50);
-    border-radius:12px;border:1px solid var(--gray-200);
+    margin:16px 24px 0;padding:12px 14px;background:var(--gray-50);
+    border-radius:var(--radius-control);border:1px solid var(--border);
 }
-.term-preview-title {
-    font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;
-    letter-spacing:.7px;margin-bottom:8px;
-}
+.term-preview-title { font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px; }
 .term-badges { display:flex;flex-wrap:wrap;gap:6px; }
 .term-badge {
-    display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
-    border-radius:20px;font-size:12px;font-weight:500;
+    display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+    border-radius:999px;font-size:12px;font-weight:600;
 }
-.term-badge.blue   { background:#dbeafe;color:#1e40af; }
-.term-badge.green  { background:#dcfce7;color:#166534; }
-.term-badge.amber  { background:#fef3c7;color:#92400e; }
-.term-badge.purple { background:#ede9fe;color:#5b21b6; }
-.term-badge.pink   { background:#fce7f3;color:#9d174d; }
-.term-badge.gray   { background:var(--gray-100);color:var(--gray-500);font-style:italic; }
-.term-form { padding:16px 22px 4px; }
+.term-badge.blue   { background:var(--primary-light);color:var(--primary-dark); }
+.term-badge.green  { background:var(--success-light);color:var(--success); }
+.term-badge.amber  { background:var(--warning-light);color:var(--warning); }
+.term-badge.purple { background:#ecebfd;color:#4a43c0; }
+.term-badge.pink   { background:var(--danger-light);color:var(--danger); }
+.term-badge.gray   { background:var(--gray-100);color:var(--text-muted);font-weight:500; }
+.term-form { padding:16px 24px 4px; }
 .term-section-title {
-    font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;
-    letter-spacing:.7px;margin:0 0 12px;padding-bottom:6px;
-    border-bottom:1px solid var(--gray-100);
+    font-size:14px;font-weight:700;color:var(--gray-900);
+    margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
 }
-.term-field { margin-bottom:14px;position:relative; }
-.term-label { font-size:12px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:5px; }
-.term-chips { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px; }
+.term-field { margin-bottom:16px;position:relative; }
+.term-label { font-size:13px;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px; }
+.term-chips { display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px; }
 .term-chip {
-    padding:3px 10px;border-radius:20px;border:1px solid var(--gray-200);
-    background:#fff;font-size:11px;color:var(--gray-600);cursor:pointer;
-    transition:all .15s;white-space:nowrap;
+    height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--gray-300);
+    background:var(--surface);font:inherit;font-size:12px;color:var(--gray-700);cursor:pointer;
+    transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease);white-space:nowrap;
 }
-.term-chip:hover { background:var(--primary);border-color:var(--primary);color:#fff; }
+.term-chip:hover { background:var(--gray-50);border-color:var(--gray-400);color:var(--gray-900); }
 .term-cb-wrap { position:relative; }
-.term-cb-input {
-    width:100%;padding:8px 32px 8px 11px;border:1px solid var(--gray-300);
-    border-radius:9px;font-size:13px;color:var(--gray-800);background:#fff;
-    transition:border-color .15s,box-shadow .15s;outline:none;box-sizing:border-box;
+.term-cb-input { width:100%;padding-right:34px; }
+.term-cb-arrow { display:none; }
+.term-cb-wrap::after {
+    content:"";position:absolute;right:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);pointer-events:none;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235f7590' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat center / 16px;
 }
-.term-cb-input:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(28,140,248,.12); }
-.term-cb-arrow { position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:11px;pointer-events:none; }
 .term-cb-dd {
-    display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;
-    background:#fff;border:1px solid var(--gray-200);border-radius:10px;
-    box-shadow:0 8px 24px rgba(0,0,0,.11);z-index:120;max-height:160px;overflow-y:auto;
+    display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-control);
+    box-shadow:var(--shadow-medium);z-index:120;max-height:180px;overflow-y:auto;padding:4px;
 }
 .term-cb-dd.open { display:block; }
-.term-cb-opt {
-    padding:8px 12px;font-size:13px;color:var(--gray-700);cursor:pointer;
-    border-bottom:1px solid var(--gray-100);
+.term-cb-opt { padding:8px 10px;font-size:14px;color:var(--gray-800);cursor:pointer;border-radius:var(--radius-sm); }
+.term-cb-opt:hover,.term-cb-opt.focused { background:var(--gray-100); }
+.term-footer, .fu-footer {
+    padding:16px 24px;border-top:1px solid var(--border);
+    display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-shrink:0;
 }
-.term-cb-opt:last-child { border-bottom:none; }
-.term-cb-opt:hover,.term-cb-opt.focused { background:var(--gray-50); }
-.term-footer {
-    padding:14px 22px;border-top:1px solid var(--gray-200);
-    display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-shrink:0;
-    background:var(--gray-50);
-}
-.term-btn-cancel {
-    padding:9px 18px;border-radius:9px;border:1px solid var(--gray-300);
-    background:#fff;color:var(--gray-700);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
-}
-.term-btn-cancel:hover { background:var(--gray-100); }
-.term-btn-submit {
-    padding:9px 20px;border-radius:9px;border:none;
-    background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;
-    font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;
-    box-shadow:0 2px 8px rgba(239,68,68,.3);transition:all .15s;
-}
-.term-btn-submit:hover { box-shadow:0 4px 14px rgba(239,68,68,.45);transform:translateY(-1px); }
+</style>
 </style>
 <div id="terminer-overlay" onclick="closeTerminerModal()" style="
-    display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;backdrop-filter:blur(4px);
+    display:none;position:fixed;inset:0;background:rgba(9,18,31,.5);z-index:2000;
 "></div>
 <div id="terminer-modal">
     <div class="term-hdr">
-        <div class="term-hdr-icon">✓</div>
         <div class="term-hdr-text">
             <h3>Terminer la consultation</h3>
             <p>Clôturez et enregistrez le compte rendu.</p>
         </div>
-        <button onclick="closeTerminerModal()" class="term-hdr-close" title="Fermer">✕</button>
+        <button type="button" onclick="closeTerminerModal()" class="term-hdr-close" title="Fermer" aria-label="Fermer">&times;</button>
     </div>
     <div class="term-body">
         <div class="term-preview">
@@ -1090,7 +1049,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         </div>
         <form method="POST" action="/consultations/{{ active_consultation.id }}/terminate" class="term-form" id="term-form">
             <input type="hidden" name="patient_id" value="{{ patient.id }}">
-            <p class="term-section-title" style="margin-top:16px;">Compte rendu clinique</p>
+            <p class="term-section-title">Compte rendu clinique</p>
 
             <div class="term-field">
                 <label class="term-label">Motif de consultation</label>
@@ -1100,7 +1059,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                            placeholder="{% if is_dentist %}Douleur, détartrage, suivi...{% else %}Douleur, suivi, bilan...{% endif %}"
                            autocomplete="off"
                            onfocus="termCbOpen('motif')" oninput="termCbFilter('motif',this.value)" onblur="termCbClose('motif',300)">
-                    <span class="term-cb-arrow">▾</span>
+                    
                     <div id="term-motif-dd" class="term-cb-dd"></div>
                 </div>
             </div>
@@ -1118,7 +1077,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                 <div class="term-chips" id="term-exam-chips"></div>
                 <textarea name="clinical_exam" id="term-exam-ta" rows="2" class="form-control"
                           placeholder="{% if is_dentist %}Observations endo-buccales...{% else %}Observations cliniques...{% endif %}"
-                          style="resize:vertical;font-size:13px;"></textarea>
+></textarea>
             </div>
 
             <div class="term-field">
@@ -1126,7 +1085,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                 <div class="term-chips" id="term-diag-chips"></div>
                 <textarea name="diagnosis" id="term-diag-ta" rows="2" class="form-control"
                           placeholder="Diagnostic retenu..."
-                          style="resize:vertical;font-size:13px;"></textarea>
+></textarea>
             </div>
 
             <div class="term-field">
@@ -1134,22 +1093,20 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                 <div class="term-chips" id="term-plan-chips"></div>
                 <textarea name="treatment_plan" id="term-plan-ta" rows="2" class="form-control"
                           placeholder="Suites envisagées..."
-                          style="resize:vertical;font-size:13px;"></textarea>
+></textarea>
             </div>
 
-            <p class="term-section-title" style="margin-top:16px;">Notes internes</p>
+            <p class="term-section-title" style="margin-top:24px;">Notes internes</p>
             <div class="term-field" style="margin-bottom:8px;">
                 <textarea name="notes" rows="2" class="form-control"
                           placeholder="Notes confidentielles (non incluses dans le PDF patient)..."
-                          style="resize:vertical;font-size:13px;border-style:dashed;color:var(--gray-600);"></textarea>
+                          style="border-style:dashed;"></textarea>
             </div>
         </form>
     </div>
     <div class="term-footer">
-        <button type="button" onclick="closeTerminerModal()" class="term-btn-cancel">Annuler</button>
-        <button type="submit" form="term-form" class="term-btn-submit">
-            Clôturer la consultation <span>→</span>
-        </button>
+        <button type="button" onclick="closeTerminerModal()" class="btn btn-outline">Annuler</button>
+        <button type="submit" form="term-form" class="btn btn-danger term-btn-submit">Clôturer la consultation</button>
     </div>
 </div>
 {% endif %}
@@ -1157,67 +1114,41 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
 {% if active_consultation %}
 <!-- ===== Modal Suivi (follow-up RDV) ===== -->
 <style>
-#followup-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;backdrop-filter:blur(4px); }
+#followup-overlay { display:none;position:fixed;inset:0;background:rgba(9,18,31,.5);z-index:2100; }
 #followup-modal {
     display:none;flex-direction:column;position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%);background:#fff;border-radius:20px;
+    transform:translate(-50%,-50%);background:var(--surface);border-radius:14px;
     width:560px;max-width:96vw;max-height:90vh;overflow:hidden;
-    z-index:2101;box-shadow:0 32px 80px rgba(0,0,0,.22);
+    z-index:2101;box-shadow:var(--shadow-medium);
 }
-.fu-hdr {
-    padding:18px 22px 16px;border-bottom:1px solid var(--gray-200);
-    display:flex;align-items:center;gap:14px;flex-shrink:0;
-    background:linear-gradient(135deg,#f0fdf4 0%,#fff 70%);
-}
-.fu-hdr-icon {
-    width:40px;height:40px;flex-shrink:0;border-radius:12px;
-    background:linear-gradient(135deg,#22c55e,#16a34a);
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(34,197,94,.35);
-}
-.fu-hdr-text h3 { margin:0;font-size:16px;font-weight:700;color:var(--gray-900); }
-.fu-hdr-text p  { margin:3px 0 0;font-size:12px;color:var(--gray-500); }
-.fu-hdr-close { margin-left:auto;background:none;border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:17px;transition:background .15s; }
-.fu-hdr-close:hover { background:var(--gray-100);color:var(--gray-700); }
-.fu-body { overflow-y:auto;flex:1;padding:18px 22px 8px; }
+.fu-body { overflow-y:auto;flex:1;padding:20px 24px 8px; }
 .fu-suggest {
-    background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;
-    border-radius:12px;padding:12px 14px;margin-bottom:16px;
+    background:var(--gray-50);border:1px solid var(--border);
+    border-radius:var(--radius-control);padding:12px 14px;margin-bottom:16px;
 }
-.fu-suggest-label { font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px; }
+.fu-suggest-label { font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px; }
 .fu-suggest-chips { display:flex;flex-wrap:wrap;gap:6px; }
 .fu-chip {
-    padding:5px 12px;border-radius:20px;border:1px solid #bfdbfe;background:#fff;
-    font-size:12px;font-weight:500;color:#1d4ed8;cursor:pointer;transition:all .15s;
+    height:var(--control-h-sm);padding:0 12px;border-radius:999px;border:1px solid var(--gray-300);background:var(--surface);
+    font:inherit;font-size:13px;font-weight:500;color:var(--gray-700);cursor:pointer;
+    transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease),color var(--dur) var(--ease);
 }
-.fu-chip:hover,.fu-chip.active { background:#2563eb;border-color:#2563eb;color:#fff; }
+.fu-chip:hover { border-color:var(--gray-400);background:var(--gray-50); }
+.fu-chip.active { background:var(--primary);border-color:var(--primary);color:#fff; }
 .fu-row { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px; }
 .fu-field { margin-bottom:12px; }
-.fu-label { font-size:12px;font-weight:600;color:var(--gray-600);display:block;margin-bottom:5px; }
-.fu-input {
-    width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:9px;
-    font-size:13px;color:var(--gray-800);outline:none;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;
-}
-.fu-input:focus { border-color:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.12); }
-.fu-footer {
-    padding:14px 22px;border-top:1px solid var(--gray-200);display:flex;justify-content:flex-end;
-    align-items:center;gap:10px;flex-shrink:0;background:var(--gray-50);
-}
-.fu-btn-skip { padding:9px 18px;border-radius:9px;border:1px solid var(--gray-300);background:#fff;color:var(--gray-600);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s; }
-.fu-btn-skip:hover { background:var(--gray-100); }
-.fu-btn-create { padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(34,197,94,.3);transition:all .15s; }
-.fu-btn-create:hover { box-shadow:0 4px 14px rgba(34,197,94,.45);transform:translateY(-1px); }
-.fu-btn-create:disabled { opacity:.6;cursor:not-allowed;transform:none; }
+.fu-label { font-size:13px;font-weight:600;color:var(--gray-700);display:block;margin-bottom:6px; }
+.fu-input { width:100%; }
+@media (max-width:520px) { .fu-row { grid-template-columns:1fr; } }
 </style>
 <div id="followup-overlay"></div>
 <div id="followup-modal">
     <div class="fu-hdr">
-        <div class="fu-hdr-icon">📅</div>
         <div class="fu-hdr-text">
             <h3>Consultation terminée !</h3>
             <p>Souhaitez-vous planifier un rendez-vous de suivi ?</p>
         </div>
-        <button class="fu-hdr-close" onclick="fuSkip()" title="Fermer">✕</button>
+        <button type="button" class="fu-hdr-close" onclick="fuSkip()" title="Fermer" aria-label="Fermer">&times;</button>
     </div>
     <div class="fu-body">
         <div class="fu-suggest">
@@ -1265,15 +1196,13 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
         </div>
         <div class="fu-field" style="margin-bottom:4px;">
             <label class="fu-label">Notes <span style="font-weight:400;color:var(--gray-400);">(optionnel)</span></label>
-            <textarea id="fu-notes" class="fu-input" rows="2" placeholder="Instructions post-consultation..." style="resize:vertical;"></textarea>
+            <textarea id="fu-notes" class="fu-input" rows="2" placeholder="Instructions post-consultation..."></textarea>
         </div>
         <div id="fu-error" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;"></div>
     </div>
     <div class="fu-footer">
-        <button class="fu-btn-skip" onclick="fuSkip()">Passer sans RDV</button>
-        <button class="fu-btn-create" id="fu-create-btn" onclick="fuCreate()">
-            📅 Créer le rendez-vous
-        </button>
+        <button type="button" class="btn btn-outline" onclick="fuSkip()">Passer sans RDV</button>
+        <button type="button" class="btn btn-primary" id="fu-create-btn" onclick="fuCreate()">Créer le rendez-vous</button>
     </div>
 </div>
 {% endif %}
@@ -1628,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeTerminerModal();
             fuOpen();
         } catch(err) {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Clôturer la consultation <span>→</span>'; }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Clôturer la consultation'; }
             alert('Erreur lors de la clôture : ' + err.message);
         }
     });
@@ -1717,7 +1646,7 @@ async function fuCreate() {
                 : '';
             errEl.textContent = 'Créneau déjà occupé.' + sugg;
             errEl.style.display = 'block';
-            btn.disabled = false; btn.innerHTML = '📅 Créer le rendez-vous';
+            btn.disabled = false; btn.textContent = 'Créer le rendez-vous';
             return;
         }
         if (!res.ok) throw new Error('Erreur serveur');
@@ -1725,7 +1654,7 @@ async function fuCreate() {
     } catch(err) {
         errEl.textContent = 'Erreur : ' + err.message;
         errEl.style.display = 'block';
-        btn.disabled = false; btn.innerHTML = '📅 Créer le rendez-vous';
+        btn.disabled = false; btn.textContent = 'Créer le rendez-vous';
     }
 }
 {% endif %}
@@ -1905,7 +1834,7 @@ function renderEndoHistory() {
         const by = h.changed_by_name || '—';
         const hasCorrection = h.corrected_value != null;
         const displayNew = hasCorrection ? `${h.new_value} <span class="endo-history-correction">→ corrigé : ${h.corrected_value}</span>` : (h.new_value || '—');
-        tr.innerHTML = `<td style="font-size:11px;color:var(--gray-400);white-space:nowrap;">${dt}</td><td><strong style="color:var(--primary);">${h.canal_name}</strong></td><td style="font-size:12px;">${h.field}</td><td style="font-size:12px;color:var(--gray-500);">${h.old_value || '—'}</td><td style="font-size:12px;" class="hist-new-cell">${displayNew}</td><td style="font-size:11px;color:var(--gray-400);">${by}</td><td><button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="startEditHistoryRow(${i})">Corriger</button></td>`;
+        tr.innerHTML = `<td style="font-size:11px;color:var(--gray-400);white-space:nowrap;">${dt}</td><td><strong style="color:var(--primary);">${h.canal_name}</strong></td><td style="font-size:12px;">${h.field}</td><td style="font-size:12px;color:var(--gray-500);">${h.old_value || '—'}</td><td style="font-size:12px;" class="hist-new-cell">${displayNew}</td><td style="font-size:11px;color:var(--gray-400);">${by}</td><td><button type="button" class="btn btn-outline btn-sm" onclick="startEditHistoryRow(${i})">Corriger</button></td>`;
         tbody.appendChild(tr);
     });
 }
@@ -1918,7 +1847,7 @@ function startEditHistoryRow(idx) {
     const currentVal = h.corrected_value != null ? h.corrected_value : (h.new_value || '');
     cell.innerHTML = `<input type="text" value="${currentVal}" id="hist-edit-input-${idx}" style="width:90px;" placeholder="Valeur corrigée">`;
     const btn = tr.querySelector('td:last-child');
-    btn.innerHTML = `<div style="display:flex;gap:4px;"><button type="button" class="btn btn-primary btn-sm" style="font-size:11px;padding:3px 8px;" onclick="saveHistoryCorrection(${idx}, ${h.id || 'null'})">✓</button><button type="button" class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="renderEndoHistory()">✕</button></div>`;
+    btn.innerHTML = `<div style="display:flex;gap:4px;"><button type="button" class="btn btn-primary btn-sm" onclick="saveHistoryCorrection(${idx}, ${h.id || 'null'})">✓</button><button type="button" class="btn btn-outline btn-sm" onclick="renderEndoHistory()">✕</button></div>`;
     tr.classList.add('editing');
     document.getElementById(`hist-edit-input-${idx}`)?.focus();
 }
