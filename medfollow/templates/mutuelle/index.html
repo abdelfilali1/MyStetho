@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Mutuelle — NGAP Maroc — Doctivo{% endblock %}
+{% block title %}Mutuelle — Doctivo{% endblock %}
 
 {% block head %}
 <style>
@@ -83,6 +83,8 @@
 .btn-feuille { width:100%; padding:10px; background:var(--primary); color:#fff; border:none; border-radius:9px; font-size:.875rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .15s; }
 .btn-feuille:hover { background:var(--primary-dark); }
 .btn-feuille:disabled { opacity:.4; cursor:not-allowed; }
+.mutuelle-pick { width:100%; padding:8px 12px; border:1.5px solid var(--gray-200); border-radius:9px; font-size:.8125rem; font-weight:600; color:var(--gray-700); background:#fff; cursor:pointer; transition:border-color .15s; }
+.mutuelle-pick:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
 .btn-note { width:100%; padding:9px; background:transparent; color:var(--gray-600); border:1.5px solid var(--gray-200); border-radius:9px; font-size:.8125rem; font-weight:600; cursor:pointer; transition:all .15s; }
 .btn-note:hover { border-color:var(--primary); color:var(--primary); }
 .btn-note:disabled { opacity:.3; cursor:not-allowed; }
@@ -91,9 +93,9 @@
 .btn-reset-panel:disabled { opacity:.3; cursor:not-allowed; }
 
 /* ===== MODALS ===== */
-.m-overlay { position:fixed; inset:0; background:rgba(20,32,51,.55); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .15s; }
+.m-overlay { position:fixed; inset:0; background:rgba(20,32,51,.55); z-index:1000; display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px 16px; animation:fadeIn .15s; }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-.m-box { background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:92vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,.22); animation:slideUp .2s; }
+.m-box { background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,.22); animation:slideUp .2s; }
 .m-box.wide { max-width:680px; }
 @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
 .m-header { padding:20px 24px 16px; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:#fff; z-index:1; }
@@ -182,15 +184,15 @@
 {% block breadcrumb %}
 <div class="breadcrumb no-print">
     <a href="/">Accueil</a><span class="breadcrumb-sep">/</span>
-    <span>Mutuelle — NGAP</span>
+    <span>Mutuelle</span>
 </div>
 {% endblock %}
 
 {% block content %}
 <div class="mutuelle-header">
     <div>
-        <h2>Mutuelle &amp; NGAP Maroc</h2>
-        <p class="subtitle">Nomenclature Générale des Actes Professionnels — CNOPS / CNSS</p>
+        <h2>Mutuelle</h2>
+        <p class="subtitle">Nomenclature Générale des Actes Professionnels — CNOPS / CNSS / OCP</p>
     </div>
     <span class="acts-badge">{{ total_acts }} actes référencés</span>
 </div>
@@ -238,8 +240,13 @@
       <div class="panel-actions">
         <button class="btn-feuille" id="btn-feuille" disabled onclick="openFeuille()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Feuille de soins (CNOPS/CNSS)
+          <span>Feuille de soins (<span id="btn-feuille-mut">CNOPS</span>)</span>
         </button>
+        <select class="mutuelle-pick" id="mutuelle-pick" aria-label="Mutuelle de la feuille de soins" onchange="pickMutuelle(this.value)">
+          <option value="CNOPS">CNOPS</option>
+          <option value="CNSS">CNSS</option>
+          <option value="OCP">OCP</option>
+        </select>
         <button class="btn-note" id="btn-note" disabled onclick="openNote()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Note d'Honoraires
@@ -306,12 +313,13 @@
         <div class="fg-row">
           <div class="fg">
             <label>Mutuelle <span class="req">*</span></label>
-            <select id="f-mutuelle" onchange="feuilleChanged()">
+            <select id="f-mutuelle" onchange="pickMutuelle(this.value)">
               <option value="CNOPS">CNOPS</option>
               <option value="CNSS">CNSS</option>
+              <option value="OCP">OCP</option>
             </select>
           </div>
-          <div class="fg">
+          <div class="fg cnx-only">
             <label>Type <span class="req">*</span></label>
             <select id="f-type" onchange="feuilleChanged()">
               <option value="execution">Exécution</option>
@@ -357,7 +365,7 @@
           </div>
         </div>
         <div class="fg-row">
-          <div class="fg">
+          <div class="fg cnx-only">
             <label>Sexe <span class="req">*</span></label>
             <select id="f-sexe" onchange="feuilleChanged()">
               <option value="male">Masculin</option>
@@ -375,6 +383,18 @@
         </div>
       </div>
 
+      <div class="form-section ocp-only" style="display:none">
+        <h4>Agent OCP</h4>
+        <div class="fg">
+          <label>Statut de l'agent</label>
+          <select id="o-statut" onchange="feuilleChanged()">
+            <option value="activite">Agent en activité</option>
+            <option value="retraite">Agent en retraite</option>
+          </select>
+        </div>
+        <p class="m-helper" style="margin:0">Sert à cocher « Agent » ou « Agent retraité » dans « Qui est malade ? ». La partie « Remplir par l'agent » et les volets détachables restent vierges : l'agent les complète à la main.</p>
+      </div>
+
       <div class="form-section">
         <h4>Médecin traitant</h4>
         <div class="fg-row">
@@ -384,7 +404,7 @@
             <div class="err-msg" id="f-inpe-err" style="display:none">Requis</div>
             <label class="checkbox-row" style="margin-top:6px;font-size:.74rem;color:var(--gray-500)"><input type="checkbox" id="f-hide-inpe" onchange="feuilleChanged()"> Masquer l'INPE sur la feuille</label>
           </div>
-          <div class="fg">
+          <div class="fg cnx-only">
             <label>Type de déclaration <span class="req">*</span></label>
             <select id="f-type-soin" onchange="feuilleChanged()">
               <option value="soins">Soins</option>
@@ -394,7 +414,7 @@
             </select>
           </div>
         </div>
-        <div class="fg-row">
+        <div class="fg-row cnx-only">
           <div class="fg">
             <label>Numéro d'entente préalable</label>
             <input type="text" id="f-entente" placeholder="Si applicable" oninput="feuilleChanged()">
@@ -554,6 +574,7 @@ const MAX = 9;
 const TODAY = new Date().toISOString().split('T')[0];
 const ALL_ACTS = {{ acts_json | safe }};
 const ALL_PATIENTS = {{ patients_json | safe }};
+const DOCTOR_NAME = {{ doctor_name_json | default('""') | safe }};
 {% raw %}
 // ==============================
 // TOOTH SELECTION LOGIC (mirrors ngap-maroc.com fA/tt functions)
@@ -742,6 +763,7 @@ window.confirmAdd = function() {
         lettre: selectedAct.lettre,
         cotation: selectedAct.cotation,
         valeure_lettre: selectedAct.valeure_lettre,
+        categorie: selectedAct.categorie,
         toothNumber: addTeeth.sort((a,b)=>parseInt(a)-parseInt(b)).join(' '),
         date, montant,
     });
@@ -997,7 +1019,28 @@ document.addEventListener('click', function(e) {
 // ==============================
 // FEUILLE DE SOINS MODAL
 // ==============================
-const FEUILLE_REQUIRED = ['f-nom','f-ddn','f-cin','f-ville','f-date'];
+function feuilleRequired() {
+    return currentMutuelle() === 'OCP' ? ['f-nom','f-ddn','f-date'] : ['f-nom','f-ddn','f-cin','f-ville','f-date'];
+}
+function currentMutuelle() { return document.getElementById('mutuelle-pick').value; }
+// Sélecteur du panneau et sélecteur de la modale restent synchronisés
+window.pickMutuelle = function(m) {
+    document.getElementById('mutuelle-pick').value = m;
+    document.getElementById('f-mutuelle').value = m;
+    document.getElementById('btn-feuille-mut').textContent = m;
+    applyMutuelleUi();
+    feuilleChanged();
+};
+function applyMutuelleUi() {
+    const ocp = currentMutuelle() === 'OCP';
+    document.querySelectorAll('#modal-feuille .cnx-only').forEach(el => el.style.display = ocp ? 'none' : '');
+    document.querySelectorAll('#modal-feuille .ocp-only').forEach(el => el.style.display = ocp ? '' : 'none');
+    // Un champ masqué ne doit pas rester signalé en erreur
+    ['f-cin','f-ville'].forEach(id => {
+        document.getElementById(id).classList.remove('err');
+        const e = document.getElementById(id+'-err'); if (e) e.style.display = 'none';
+    });
+}
 function loadFeuilleDoctor() {
     try {
         const d = JSON.parse(localStorage.getItem('ngap_feuille_doctor') || 'null');
@@ -1021,7 +1064,7 @@ window.feuilleChanged = function() {
     updateFeuilleStatus();
 };
 function missingFeuilleFields() {
-    return FEUILLE_REQUIRED.filter(id => !document.getElementById(id).value.trim());
+    return feuilleRequired().filter(id => !document.getElementById(id).value.trim());
 }
 function updateFeuilleStatus() {
     const missing = missingFeuilleFields();
@@ -1035,6 +1078,8 @@ function updateFeuilleStatus() {
 window.openFeuille = function() {
     if (!treatments.length) return;
     document.getElementById('f-date').value = TODAY;
+    document.getElementById('f-mutuelle').value = currentMutuelle();
+    applyMutuelleUi();
     // Pré-remplir le patient si on arrive depuis une consultation (?patient_id=)
     if (_contextPatientIdx >= 0) { selectPatient(_contextPatientIdx); }
     else { clearPatient(); }
@@ -1238,27 +1283,12 @@ function renderVerso(svgTmpl, soins) {
     return s;
 }
 
-window.saveFeuille = async function() {
-    const missing = missingFeuilleFields();
-    if (missing.length) {
-        missing.forEach(id => {
-            const el = document.getElementById(id); el.classList.add('err');
-            const e = document.getElementById(id+'-err'); if (e) e.style.display='';
-        }); updateFeuilleStatus(); return;
-    }
-    if (!_selectedPatientId) {
-        alert('Veuillez sélectionner un patient dans la liste pour enregistrer la fiche.');
-        return;
-    }
-    const btn = document.getElementById('btn-save-feuille');
-    btn.disabled = true;
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Enregistrement…';
-
-    const isCNSS = document.getElementById('f-mutuelle').value === 'CNSS';
+// Champs $fiche des gabarits CNOPS/CNSS (reprend Wt() de l'original)
+function cnxFiche() {
     const lien = document.getElementById('f-lien').value;
     const sexeVal = document.getElementById('f-sexe').value;
     const typeSoin = document.getElementById('f-type-soin').value;
-    const fiche = {
+    return {
         type_fds:         document.getElementById('f-type').value === 'entente' ? 'entente' : 'execution',
         nom_beneficiaire: document.getElementById('f-nom').value,
         ddn:              document.getElementById('f-ddn').value,
@@ -1271,16 +1301,209 @@ window.saveFeuille = async function() {
         ville:            document.getElementById('f-ville').value,
         date:             document.getElementById('f-date').value,
     };
+}
 
-    let html_content = '';
-    try {
+// ==============================
+// FEUILLE OCP — fond issu du PDF officiel (A3 paysage, coordonnées en mm),
+// imprimé réduit sur A4 paysage (même ratio)
+// ==============================
+const OCP_PROTH_CATS = new Set(['Prothèse dentaire','Prothèse restauratrice maxillo-faciale']);
+const OCP_ODF_CAT = 'Orthopédie Dento-faciale';
+const OCP_ROWS = { soins: 8, prothese: 3, odf: 2 };
+// Centre de chaque dent sur le schéma « Soins dentaires » (mm). Le schéma
+// « Prothèse et ODF » est le même dessin décalé de OCP_PROTH_SHIFT.
+const OCP_TEETH = {
+    11:[88.75,77.0], 12:[86.25,77.75], 13:[84.25,79.25], 14:[83.0,82.0], 15:[80.4,85.0], 16:[79.9,88.5], 17:[79.0,92.5], 18:[78.15,96.5],
+    21:[92.25,76.9], 22:[95.0,77.75], 23:[96.75,79.25], 24:[98.0,82.0], 25:[99.9,85.0], 26:[100.9,88.5], 27:[102.1,92.5], 28:[102.75,96.5],
+    31:[92.0,122.75], 32:[94.4,122.0], 33:[96.25,120.5], 34:[98.0,118.4], 35:[99.25,115.9], 36:[100.85,112.75], 37:[101.75,108.75], 38:[103.0,104.4],
+    41:[88.75,122.75], 42:[86.25,122.0], 43:[84.25,121.0], 44:[82.5,118.5], 45:[81.0,115.9], 46:[79.5,112.75], 47:[78.5,108.75], 48:[77.25,104.4],
+    51:[89.75,83.25], 52:[88.35,83.6], 53:[87.0,84.5], 54:[86.0,85.9], 55:[85.25,87.75],
+    61:[91.5,83.25], 62:[93.25,83.5], 63:[94.75,84.25], 64:[95.6,85.75], 65:[96.4,87.65],
+    71:[91.25,117.25], 72:[92.9,117.0], 73:[94.25,116.0], 74:[95.1,114.6], 75:[96.0,113.1],
+    81:[89.75,117.25], 82:[88.0,117.0], 83:[86.5,116.15], 84:[85.75,114.75], 85:[84.85,113.0],
+};
+// [dx, dy arcade du haut, dy arcade du bas] : le second dessin est un peu moins haut
+const OCP_PROTH_SHIFT = [244.25, -19.5, -20.5];
+// Étiquettes « dent : codes » de part et d'autre de chaque schéma. dg = hauteur
+// de l'axe D—G, dont les lettres occupent la marge (aucune étiquette à ce niveau).
+const OCP_LABELS = {
+    soins:    { dg: 100.6, left: { x: 70,    width: 13.5, sep: ' : ' }, right: { x: 107,   width: 8.5, sep: ':' } },
+    prothese: { dg: 80.6,  left: { x: 318.5, width: 12.5, sep: ' : ' }, right: { x: 352.5, width: 15,  sep: ' : ' } },
+};
+const OCP_MARK = '#e00000';
+// Entoure en rouge les dents traitées et les relie à leur étiquette « 16 : D748 »
+function svgTeeth(soins, labels, [dx, dyUp, dyLow] = [0, 0, 0]) {
+    const codes = new Map();
+    for (const t of soins) {
+        (t.toothNumber || '').split(/[^0-9]+/).forEach(n => {
+            if (!OCP_TEETH[n]) return;
+            const c = codes.get(n) || [];
+            if (!c.includes(t.code)) c.push(t.code);
+            codes.set(n, c);
+        });
+    }
+    const sides = { left: [], right: [] };
+    for (const [n, c] of codes) {
+        const q = Math.floor(n / 10), up = [1, 2, 5, 6].includes(q);
+        const [x, y] = OCP_TEETH[n];
+        const cy = y + (up ? dyUp : dyLow);
+        // Dents antérieures (1 à 3) : étiquette sortie au-dessus / au-dessous de
+        // l'arcade, sinon le trait traverserait les dents voisines.
+        const lift = n % 10 <= 3 ? 4 : 0;
+        // Quadrants 1, 4, 5, 8 = côté droit du patient = à gauche du schéma
+        sides[[1, 4, 5, 8].includes(q) ? 'left' : 'right'].push({
+            n, codes: c, r: n < 50 ? 2.1 : 1.1, cx: x + dx, cy, ty: cy + (up ? -lift : lift),
+        });
+    }
+    const size = 2.2, gap = 2.7, dgLo = labels.dg - 2, dgHi = labels.dg + 2.6;
+    const out = [];
+    for (const side of ['left', 'right']) {
+        const L = labels[side];
+        let prev = -Infinity;
+        for (const m of sides[side].sort((a, b) => a.ty - b.ty)) {
+            let ly = Math.max(m.ty + 0.75, prev + gap);
+            if (ly > dgLo && ly < dgHi) ly = dgHi;
+            prev = ly;
+            const tx = side === 'left' ? L.x + 0.6 : L.x - 0.6, ty = ly - 0.75;
+            const a = Math.atan2(ty - m.cy, tx - m.cx);
+            out.push(`<line x1="${(m.cx + m.r * Math.cos(a)).toFixed(2)}" y1="${(m.cy + m.r * Math.sin(a)).toFixed(2)}" x2="${tx.toFixed(2)}" y2="${ty.toFixed(2)}" stroke="${OCP_MARK}" stroke-width="0.35"/>`);
+            out.push(`<circle cx="${m.cx.toFixed(2)}" cy="${m.cy.toFixed(2)}" r="${m.r}" fill="none" stroke="${OCP_MARK}" stroke-width="0.5"/>`);
+            out.push(svgT(L.x, ly.toFixed(2), m.n + L.sep + m.codes.join(' '),
+                { size, width: L.width, anchor: side === 'left' ? 'end' : 'start' }));
+        }
+    }
+    return out.join('');
+}
+const dataUriCache = {};
+async function loadDataUri(name) {
+    if (dataUriCache[name]) return dataUriCache[name];
+    const blob = await (await fetch(`/static/ngap/${name}`)).blob();
+    const uri = await new Promise((ok, ko) => {
+        const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(blob);
+    });
+    dataUriCache[name] = uri;
+    return uri;
+}
+function actCategorie(t) {
+    return t.categorie || (ALL_ACTS.find(a => a.code === t.code) || {}).categorie || '';
+}
+function ocpGroups(soins) {
+    const g = { soins: [], prothese: [], odf: [] };
+    for (const t of soins) {
+        const c = actCategorie(t);
+        (c === OCP_ODF_CAT ? g.odf : OCP_PROTH_CATS.has(c) ? g.prothese : g.soins).push(t);
+    }
+    return g;
+}
+function ocpOverflow(soins) {
+    const g = ocpGroups(soins);
+    const lab = { soins: 'soins dentaires', prothese: 'prothèse', odf: 'ODF' };
+    return Object.keys(OCP_ROWS).filter(k => g[k].length > OCP_ROWS[k])
+        .map(k => `${g[k].length} actes de ${lab[k]} (${OCP_ROWS[k]} lignes max)`);
+}
+function fmtDateFr(s) { const p = parseDateParts(s); return p.jour ? `${p.jour}/${p.mois}/${p.annee}` : ''; }
+function fmtDh(n) { return (Number(n) || 0).toFixed(2).replace('.', ','); }
+// Courier : 0,6 em par caractère. Au-delà de la largeur dispo, le texte est
+// tronqué (o.clip) ou comprimé.
+function svgT(x, y, txt, o = {}) {
+    txt = String(txt ?? '').trim();
+    if (!txt) return '';
+    const size = o.size || 3.2;
+    const maxChars = o.width ? Math.floor(o.width / (size * 0.6)) : Infinity;
+    if (o.clip && txt.length > maxChars) txt = txt.slice(0, maxChars - 1).trimEnd() + '…';
+    const fit = o.width && txt.length * size * 0.6 > o.width
+        ? ` textLength="${o.width}" lengthAdjust="spacingAndGlyphs"` : '';
+    return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${o.anchor || 'start'}"${fit}>${escHtml(txt)}</text>`;
+}
+function svgX(cx, cy) { return svgT(cx, cy + 1.25, 'X', { size: 3.6, anchor: 'middle' }); }
+function ocpPage(bg, body) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="297mm" height="210mm">
+<image href="${bg}" x="0" y="0" width="420" height="297" preserveAspectRatio="none"/>
+<g font-family="'Courier New',Courier,monospace" font-weight="bold" fill="#000">${body}</g></svg>`;
+}
+// Recto : seule la rubrique « à remplir par le médecin ». La rubrique agent et
+// les volets détachables restent vierges (remplis à la main par l'agent).
+function renderOcpRecto(bg, f) {
+    const out = [];
+    // Qui est malade ?
+    const malade = { assure: f.statut === 'retraite' ? [291.7, 195.8] : [263.1, 195.8],
+                     conjoint: [314.7, 195.9], enfant: [335.8, 195.6] }[f.lien] || [263.1, 195.8];
+    out.push(svgX(...malade));
+    out.push(svgT(262, 202.6, f.nom, { width: 90 }));
+    out.push(svgT(252, 209.3, fmtDateFr(f.ddn), { width: 40 }));
+    out.push(svgT(249.5, 234.3, f.medecin, { width: 31, size: 2.8 }));
+    out.push(svgT(302, 234.3, f.inpe, { width: 30, size: 2.8 }));
+    return ocpPage(bg, out.join(''));
+}
+function renderOcpVerso(bg, f, soins) {
+    const g = ocpGroups(soins);
+    const coef = t => `${t.lettre || ''} ${t.cotation ?? ''}`.trim();
+    const nature = t => `${t.code} ${t.libelle || ''}`;
+    const sum = arr => arr.reduce((s, t) => s + (t.montant || 0), 0);
+    const out = [];
+    // Soins dentaires
+    if (g.soins.length) {
+        g.soins.slice(0, OCP_ROWS.soins).forEach((t, i) => {
+            const y = (87.75 + i * 4.63 + 3.3).toFixed(2);
+            out.push(svgT(124.1, y, fmtDateFr(t.date), { size: 2.3, anchor: 'middle', width: 15.4 }));
+            out.push(svgT(138.7, y, t.toothNumber, { size: 2.3, anchor: 'middle', width: 12 }));
+            out.push(svgT(145.8, y, nature(t), { size: 2.3, width: 21.2, clip: true }));
+            out.push(svgT(174.9, y, coef(t), { size: 2.3, anchor: 'middle', width: 13.6 }));
+            out.push(svgT(200.2, y, fmtDh(t.montant), { size: 2.3, anchor: 'end', width: 17 }));
+        });
+        out.push(svgT(190.5, 129.4, fmtDh(sum(g.soins)), { anchor: 'end' }));
+        out.push(svgTeeth(g.soins, OCP_LABELS.soins));
+    }
+    // Prothèse et ODF partagent le second schéma
+    out.push(svgTeeth([...g.prothese, ...g.odf], OCP_LABELS.prothese, OCP_PROTH_SHIFT));
+    if (g.prothese.length) {
+        g.prothese.slice(0, OCP_ROWS.prothese).forEach((t, i) => {
+            const y = (85.4 + i * 6.85 + 4.4).toFixed(2);
+            out.push(svgT(232.8, y, fmtDateFr(t.date), { size: 2.6, anchor: 'middle', width: 17 }));
+            const dents = t.toothNumber ? ` (${t.toothNumber})` : '';
+            out.push(svgT(242.8, y, nature(t) + dents, { size: 2.6, width: 32, clip: true }));
+            out.push(svgT(281.7, y, coef(t), { size: 2.6, anchor: 'middle', width: 11 }));
+            out.push(svgT(303.8, y, fmtDh(t.montant), { size: 2.6, anchor: 'end', width: 15 }));
+        });
+        out.push(svgT(294.5, 109.4, fmtDh(sum(g.prothese)), { anchor: 'end' }));
+    }
+    if (g.odf.length) {
+        g.odf.slice(0, OCP_ROWS.odf).forEach((t, i) => {
+            const y = (123.1 + i * 7.05 + 4.5).toFixed(2);
+            out.push(svgT(237.2, y, nature(t), { size: 2.6, anchor: 'middle', width: 25.5, clip: true }));
+            out.push(svgT(264.2, y, fmtDateFr(t.date), { size: 2.6, anchor: 'middle', width: 25 }));
+        });
+        out.push(svgT(294.5, 140.2, fmtDh(sum(g.odf)), { anchor: 'end' }));
+    }
+    return ocpPage(bg, out.join(''));
+}
+function ocpFiche() {
+    const v = id => document.getElementById(id).value.trim();
+    return {
+        statut: v('o-statut'), lien: v('f-lien'), nom: v('f-nom'), ddn: v('f-ddn'),
+        medecin: DOCTOR_NAME,
+        inpe: document.getElementById('f-hide-inpe').checked ? '' : v('f-inpe'),
+    };
+}
+
+// Document HTML complet (recto + verso) pour la mutuelle choisie
+async function buildFeuilleHtml() {
+    let recto, verso;
+    if (currentMutuelle() === 'OCP') {
+        const f = ocpFiche();
+        const [bgR, bgV] = await Promise.all([loadDataUri('ocp_recto.png'), loadDataUri('ocp_verso.png')]);
+        recto = renderOcpRecto(bgR, f);
+        verso = renderOcpVerso(bgV, f, treatments);
+    } else {
+        const isCNSS = currentMutuelle() === 'CNSS';
         const [rectoTmpl, versoTmpl] = await Promise.all([
             loadSvg(isCNSS ? 'cnss_recto.svg' : 'cnops_recto.svg'),
             loadSvg(isCNSS ? 'cnss_verso.svg' : 'cnops_verso.svg'),
         ]);
-        const recto = renderRecto(rectoTmpl, fiche);
-        const verso = renderVerso(versoTmpl, treatments);
-        html_content = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+        recto = renderRecto(rectoTmpl, cnxFiche());
+        verso = renderVerso(versoTmpl, treatments);
+    }
+    return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
 <title>Feuille de soins</title>
 <style>
 @page{size:A4 landscape;margin:0}
@@ -1293,6 +1516,39 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 <div class="pp">${recto}</div>
 <div class="pp">${verso}</div>
 </body></html>`;
+}
+
+// Champs requis + capacité des tableaux OCP ; false si la feuille ne peut pas être générée
+function checkFeuille() {
+    const missing = missingFeuilleFields();
+    if (missing.length) {
+        missing.forEach(id => {
+            const el = document.getElementById(id); el.classList.add('err');
+            const e = document.getElementById(id+'-err'); if (e) e.style.display='';
+        }); updateFeuilleStatus(); return false;
+    }
+    if (currentMutuelle() === 'OCP') {
+        const over = ocpOverflow(treatments);
+        if (over.length) { alert('La feuille OCP ne peut pas contenir :\n- ' + over.join('\n- ') + '\nRépartissez les actes sur plusieurs feuilles.'); return false; }
+    }
+    return true;
+}
+
+const SAVE_BTN_HTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
+
+window.saveFeuille = async function() {
+    if (!checkFeuille()) return;
+    if (!_selectedPatientId) {
+        alert('Veuillez sélectionner un patient dans la liste pour enregistrer la fiche.');
+        return;
+    }
+    const btn = document.getElementById('btn-save-feuille');
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> Enregistrement…';
+
+    let html_content = '';
+    try {
+        html_content = await buildFeuilleHtml();
     } catch(genErr) {
         console.error('HTML generation failed:', genErr);
     }
@@ -1300,15 +1556,15 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     const _urlConsultationId = new URLSearchParams(window.location.search).get('consultation_id');
     const data = {
         patient_id:       _selectedPatientId,
-        mutuelle:         document.getElementById('f-mutuelle').value,
+        mutuelle:         currentMutuelle(),
         type_feuille:     document.getElementById('f-type').value,
         nom_beneficiaire: document.getElementById('f-nom').value,
         ddn:              document.getElementById('f-ddn').value,
         cin:              document.getElementById('f-cin').value,
-        sexe:             sexeVal,
-        lien_assure:      lien,
+        sexe:             document.getElementById('f-sexe').value,
+        lien_assure:      document.getElementById('f-lien').value,
         inpe:             document.getElementById('f-inpe').value,
-        type_soin:        typeSoin,
+        type_soin:        document.getElementById('f-type-soin').value,
         numero_entente:   document.getElementById('f-entente').value,
         ville:            document.getElementById('f-ville').value,
         date_soin:        document.getElementById('f-date').value,
@@ -1329,74 +1585,19 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
             window.open('/mutuelle/feuille/' + result.id + '/view', '_blank');
         } else {
             alert('Erreur lors de l\'enregistrement.');
-            btn.disabled = false;
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
         }
     } catch (e) {
         console.error(e);
         alert('Erreur réseau.');
-        btn.disabled = false;
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Enregistrer';
     }
+    btn.disabled = false;
+    btn.innerHTML = SAVE_BTN_HTML;
 };
 
 window.printFeuille = async function() {
-    const missing = missingFeuilleFields();
-    if (missing.length) {
-        missing.forEach(id => {
-            const el=document.getElementById(id); el.classList.add('err');
-            const e=document.getElementById(id+'-err'); if(e) e.style.display='';
-        }); updateFeuilleStatus(); return;
-    }
-    const isCNSS = document.getElementById('f-mutuelle').value === 'CNSS';
-    const ficheRaw = {
-        mutuelle:    document.getElementById('f-mutuelle').value,
-        type:        document.getElementById('f-type').value,
-        nomBeneficiaire: document.getElementById('f-nom').value,
-        dateNaissance: document.getElementById('f-ddn').value,
-        cin:         document.getElementById('f-cin').value,
-        sexe:        document.getElementById('f-sexe').value,
-        lienAssure:  document.getElementById('f-lien').value,
-        inpe:        document.getElementById('f-inpe').value,
-        typeDeclaration: document.getElementById('f-type-soin').value,
-        numeroEntente: document.getElementById('f-entente').value,
-        ville:       document.getElementById('f-ville').value,
-        dateSoin:    document.getElementById('f-date').value,
-    };
-    // Map to $fiche fields (mirrors Wt() from original)
-    const fiche = {
-        type_fds: ficheRaw.type === 'entente' ? 'entente' : 'execution',
-        nom_beneficiaire: ficheRaw.nomBeneficiaire,
-        ddn: ficheRaw.dateNaissance,
-        cin: ficheRaw.cin,
-        parente: (['conjoint','enfant'].includes(ficheRaw.lienAssure)) ? ficheRaw.lienAssure : 'assure',
-        sexe: (['feminin','femelle','female'].includes(ficheRaw.sexe)) ? 'femelle' : 'male',
-        inpe: document.getElementById('f-hide-inpe').checked ? '' : ficheRaw.inpe,
-        numero_entente: ficheRaw.numeroEntente,
-        type_soin: (['prothese','odf','autres'].includes(ficheRaw.typeDeclaration)) ? ficheRaw.typeDeclaration : 'soins',
-        ville: ficheRaw.ville,
-        date: ficheRaw.dateSoin,
-    };
+    if (!checkFeuille()) return;
     try {
-        const [rectoTmpl, versoTmpl] = await Promise.all([
-            loadSvg(isCNSS ? 'cnss_recto.svg' : 'cnops_recto.svg'),
-            loadSvg(isCNSS ? 'cnss_verso.svg' : 'cnops_verso.svg'),
-        ]);
-        const recto = renderRecto(rectoTmpl, fiche);
-        const verso = renderVerso(versoTmpl, treatments);
-        const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-<title>Feuille de soins</title>
-<style>
-@page{size:A4 landscape;margin:0}
-html,body{margin:0;padding:0;background:#fff}
-body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pp{width:297mm;height:210mm;margin:0;page-break-after:always;break-after:page;overflow:hidden}
-.pp:last-child{page-break-after:auto;break-after:auto}
-.pp>svg{display:block;width:297mm;height:210mm}
-</style></head><body>
-<div class="pp">${recto}</div>
-<div class="pp">${verso}</div>
-</body></html>`;
+        const html = await buildFeuilleHtml();
         const w = window.open('','_blank');
         if (!w) { alert('Autorisez les pop-ups pour imprimer.'); return; }
         w.document.write(html); w.document.close();
@@ -1570,6 +1771,10 @@ document.getElementById('cat-chips').addEventListener('click', function(e){
     renderActs();
 });
 
+// Les fenêtres sont rattachées à <body> : l'animation d'entrée de .content
+// (transform) ferait sinon de la page, et non de l'écran, leur repère fixed.
+document.querySelectorAll('.m-overlay').forEach(m => document.body.appendChild(m));
+
 // Add _id index to acts for reference
 ALL_ACTS.forEach((a,i)=>{ a._idx = i; });
 
@@ -1581,7 +1786,12 @@ renderAll();
     const pid = params.get('patient_id');
     if (pid) {
         const idx = ALL_PATIENTS.findIndex(p => String(p.id) === pid);
-        if (idx >= 0) { _contextPatientIdx = idx; window.selectPatient(idx); }
+        if (idx >= 0) {
+            _contextPatientIdx = idx; window.selectPatient(idx);
+            // Mutuelle pré-sélectionnée d'après la fiche du patient
+            const ins = ALL_PATIENTS[idx].insurance;
+            if (['CNOPS','CNSS','OCP'].includes(ins)) pickMutuelle(ins);
+        }
     }
 })();
 

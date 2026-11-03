@@ -45,7 +45,7 @@ async def mutuelle_page(request: Request, db: aiosqlite.Connection = Depends(get
     categories = sorted(set(a["categorie"] for a in acts))
 
     pcursor = await db.execute(
-        "SELECT id, first_name, last_name, date_of_birth, gender, social_security_number "
+        "SELECT id, first_name, last_name, date_of_birth, gender, social_security_number, insurance_name "
         "FROM patients WHERE is_active = 1 AND doctor_id = ? ORDER BY last_name, first_name",
         (user["sub"],)
     )
@@ -56,9 +56,15 @@ async def mutuelle_page(request: Request, db: aiosqlite.Connection = Depends(get
             "dob": p["date_of_birth"] or "",
             "gender": p["gender"] or "",
             "cin": p["social_security_number"] or "",
+            "insurance": p["insurance_name"] or "",
         }
         for p in await pcursor.fetchall()
     ]
+
+    # Nom du praticien : rubrique « Médecin traitant » de la feuille OCP
+    dcursor = await db.execute("SELECT first_name, last_name FROM users WHERE id = ?", (user["sub"],))
+    d = await dcursor.fetchone()
+    doctor_name = f"Dr. {d['first_name']} {d['last_name']}" if d else ""
 
     return templates.TemplateResponse(
         "mutuelle/index.html",
@@ -70,6 +76,7 @@ async def mutuelle_page(request: Request, db: aiosqlite.Connection = Depends(get
             "categories": categories,
             "total_acts": len(acts),
             "patients_json": json.dumps(patients, ensure_ascii=False),
+            "doctor_name_json": json.dumps(doctor_name, ensure_ascii=False),
         },
     )
 
