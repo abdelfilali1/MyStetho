@@ -1416,8 +1416,13 @@ function svgT(x, y, txt, o = {}) {
     return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${o.anchor || 'start'}"${fit}>${escHtml(txt)}</text>`;
 }
 function svgX(cx, cy) { return svgT(cx, cy + 1.25, 'X', { size: 3.6, anchor: 'middle' }); }
-function ocpPage(bg, body) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="297mm" height="210mm">
+// Le PDF OCP est un A3 avec de larges marges et des traits de coupe : on n'affiche
+// qu'une fenêtre de 332 × 234,8 mm (ratio A4) → formulaire imprimé à ~90 % au lieu
+// de 71 %. Chaque face y est centrée sur son contenu : recto x 49–354 mm,
+// verso x 56–370 mm (56 = début des étiquettes de dents à gauche).
+const OCP_VIEWBOX = { recto: '35.4 31.85 332 234.8', verso: '47 31.85 332 234.8' };
+function ocpPage(bg, body, viewBox) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="297mm" height="210mm">
 <image href="${bg}" x="0" y="0" width="420" height="297" preserveAspectRatio="none"/>
 <g font-family="'Courier New',Courier,monospace" font-weight="bold" fill="#000">${body}</g></svg>`;
 }
@@ -1433,7 +1438,7 @@ function renderOcpRecto(bg, f) {
     out.push(svgT(252, 209.3, fmtDateFr(f.ddn), { width: 40 }));
     out.push(svgT(249.5, 234.3, f.medecin, { width: 31, size: 2.8 }));
     out.push(svgT(302, 234.3, f.inpe, { width: 30, size: 2.8 }));
-    return ocpPage(bg, out.join(''));
+    return ocpPage(bg, out.join(''), OCP_VIEWBOX.recto);
 }
 function renderOcpVerso(bg, f, soins) {
     const g = ocpGroups(soins);
@@ -1475,7 +1480,7 @@ function renderOcpVerso(bg, f, soins) {
         });
         out.push(svgT(294.5, 140.2, fmtDh(sum(g.odf)), { anchor: 'end' }));
     }
-    return ocpPage(bg, out.join(''));
+    return ocpPage(bg, out.join(''), OCP_VIEWBOX.verso);
 }
 function ocpFiche() {
     const v = id => document.getElementById(id).value.trim();
