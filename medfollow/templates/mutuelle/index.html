@@ -245,6 +245,7 @@
         <select class="mutuelle-pick" id="mutuelle-pick" aria-label="Mutuelle de la feuille de soins" onchange="pickMutuelle(this.value)">
           <option value="CNOPS">CNOPS</option>
           <option value="CNSS">CNSS</option>
+          <option value="CNSS2">CNSS nouvelle</option>
           <option value="OCP">OCP</option>
         </select>
         <button class="btn-note" id="btn-note" disabled onclick="openNote()">
@@ -316,6 +317,7 @@
             <select id="f-mutuelle" onchange="pickMutuelle(this.value)">
               <option value="CNOPS">CNOPS</option>
               <option value="CNSS">CNSS</option>
+              <option value="CNSS2">CNSS nouvelle</option>
               <option value="OCP">OCP</option>
             </select>
           </div>
@@ -1027,7 +1029,8 @@ function currentMutuelle() { return document.getElementById('mutuelle-pick').val
 window.pickMutuelle = function(m) {
     document.getElementById('mutuelle-pick').value = m;
     document.getElementById('f-mutuelle').value = m;
-    document.getElementById('btn-feuille-mut').textContent = m;
+    const pick = document.getElementById('mutuelle-pick');
+    document.getElementById('btn-feuille-mut').textContent = pick.options[pick.selectedIndex].text;
     applyMutuelleUi();
     feuilleChanged();
 };
@@ -1332,11 +1335,12 @@ const OCP_LABELS = {
 };
 const OCP_MARK = '#e00000';
 // Entoure en rouge les dents traitées et les relie à leur étiquette « 16 : D748 »
-function svgTeeth(soins, labels, [dx, dyUp, dyLow] = [0, 0, 0]) {
+// (teeth = centres des dents du schéma ; OCP par défaut)
+function svgTeeth(soins, labels, [dx, dyUp, dyLow] = [0, 0, 0], teeth = OCP_TEETH) {
     const codes = new Map();
     for (const t of soins) {
         (t.toothNumber || '').split(/[^0-9]+/).forEach(n => {
-            if (!OCP_TEETH[n]) return;
+            if (!teeth[n]) return;
             const c = codes.get(n) || [];
             if (!c.includes(t.code)) c.push(t.code);
             codes.set(n, c);
@@ -1345,7 +1349,7 @@ function svgTeeth(soins, labels, [dx, dyUp, dyLow] = [0, 0, 0]) {
     const sides = { left: [], right: [] };
     for (const [n, c] of codes) {
         const q = Math.floor(n / 10), up = [1, 2, 5, 6].includes(q);
-        const [x, y] = OCP_TEETH[n];
+        const [x, y] = teeth[n];
         const cy = y + (up ? dyUp : dyLow);
         // Dents antérieures (1 à 3) : étiquette sortie au-dessus / au-dessous de
         // l'arcade, sinon le trait traverserait les dents voisines.
@@ -1355,7 +1359,7 @@ function svgTeeth(soins, labels, [dx, dyUp, dyLow] = [0, 0, 0]) {
             n, codes: c, r: n < 50 ? 2.1 : 1.1, cx: x + dx, cy, ty: cy + (up ? -lift : lift),
         });
     }
-    const size = 2.2, gap = 2.7, dgLo = labels.dg - 2, dgHi = labels.dg + 2.6;
+    const size = labels.size || 2.2, gap = size + 0.5, dgLo = labels.dg - 2, dgHi = labels.dg + 2.6;
     const out = [];
     for (const side of ['left', 'right']) {
         const L = labels[side];
@@ -1421,9 +1425,10 @@ function svgX(cx, cy) { return svgT(cx, cy + 1.25, 'X', { size: 3.6, anchor: 'mi
 // de 71 %. Chaque face y est centrée sur son contenu : recto x 49–354 mm,
 // verso x 56–370 mm (56 = début des étiquettes de dents à gauche).
 const OCP_VIEWBOX = { recto: '35.4 31.85 332 234.8', verso: '47 31.85 332 234.8' };
-function ocpPage(bg, body, viewBox) {
+// Page = scan de fond (pw × ph mm) + textes, recadrée par viewBox sur l'A4 paysage
+function ocpPage(bg, body, viewBox, [pw, ph] = [420, 297]) {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="297mm" height="210mm">
-<image href="${bg}" x="0" y="0" width="420" height="297" preserveAspectRatio="none"/>
+<image href="${bg}" x="0" y="0" width="${pw}" height="${ph}" preserveAspectRatio="none"/>
 <g font-family="'Courier New',Courier,monospace" font-weight="bold" fill="#000">${body}</g></svg>`;
 }
 // Recto : seule la rubrique « à remplir par le médecin ». La rubrique agent et
@@ -1491,6 +1496,82 @@ function ocpFiche() {
     };
 }
 
+// ==============================
+// FEUILLE « CNSS nouvelle » — scan du formulaire Réf. 610-1-04 (364 × 257 mm,
+// coordonnées en mm), recadré à ~93 % sur l'A4 paysage. Même remplissage que
+// l'ancienne CNSS : la « Partie réservée à l'assuré » reste vierge, sauf le lien
+// de parenté du bénéficiaire.
+// ==============================
+const CNSS2_PAGE = [364, 257];
+const CNSS2_VIEWBOX = '38.3 3.7 318.5 225.2';
+const CNSS2_TICKS = {
+    ddn: [[271.8, 275.3, 278.9], [280.5, 284.1, 287.7], [288.8, 292.4, 296.1, 299.8, 303.4]],
+    cin: [274.6, 278.3, 281.7, 285.1, 288.8, 292.1, 295.6, 299.2, 302.7, 306.4],
+    inp: [220.9, 224.4, 228.0, 231.3, 235.0, 238.3, 241.8, 245.4, 248.9, 252.7],
+    entente: [268.6, 272.1, 275.7, 279.3, 282.6, 286.0, 289.6, 293.2, 296.7, 300.3],
+    le: [[301.9, 304.7, 307.1], [310.2, 313.0, 315.8], [319.0, 322.1, 325.3, 328.5, 331.3]],
+    code: [224.0, 227.9, 232.2, 236.4, 240.1],
+};
+const CNSS2_TEETH = {
+    11:[272.2,124.0], 12:[269.2,125.4], 13:[267.0,127.2], 14:[265.5,131.3], 15:[263.1,134.9], 16:[261.8,139.7], 17:[260.5,145.1], 18:[259.9,151.1],
+    21:[276.5,124.0], 22:[279.7,125.6], 23:[282.0,127.4], 24:[283.4,131.3], 25:[285.8,135.4], 26:[287.0,140.6], 27:[288.3,145.4], 28:[289.0,151.3],
+    31:[276.0,187.1], 32:[279.0,186.2], 33:[281.3,184.4], 34:[283.4,181.5], 35:[285.4,177.6], 36:[286.7,172.6], 37:[287.8,167.3], 38:[289.3,161.7],
+    41:[272.7,187.1], 42:[269.5,186.2], 43:[267.2,184.8], 44:[265.4,181.7], 45:[263.1,177.6], 46:[261.5,172.9], 47:[260.4,167.3], 48:[259.1,161.7],
+    51:[273.2,132.4], 52:[271.4,133.1], 53:[270.1,134.5], 54:[269.0,136.5], 55:[267.9,138.8],
+    61:[275.4,132.4], 62:[277.2,133.1], 63:[278.7,134.5], 64:[279.7,136.8], 65:[281.0,138.8],
+    71:[275.4,179.4], 72:[277.0,178.9], 73:[278.6,177.8], 74:[279.9,175.8], 75:[281.1,173.3],
+    81:[273.2,179.4], 82:[271.6,178.9], 83:[269.9,177.8], 84:[268.6,175.8], 85:[267.2,173.5],
+};
+const CNSS2_LABELS = { dg: 156.3, size: 2.8, left: { x: 252, width: 40, sep: ' : ' }, right: { x: 297, width: 50, sep: ' : ' } };
+// Un caractère par case (ticks = bords des cases)
+function svgBoxes(ticks, y, chars, size = 3.2) {
+    return [...chars].slice(0, ticks.length - 1)
+        .map((ch, i) => svgT(((ticks[i] + ticks[i + 1]) / 2).toFixed(2), y, ch, { size, anchor: 'middle' })).join('');
+}
+function svgDateBoxes(groups, y, iso) {
+    const p = parseDateParts(iso);
+    if (!p.jour) return '';
+    return [p.jour, p.mois, p.annee].map((v, i) => svgBoxes(groups[i], y, v)).join('');
+}
+function renderCnss2Recto(bg, f) {
+    const out = [];
+    out.push(svgX(f.type_fds === 'entente' ? 268.2 : 299.7, 23.5));
+    // Lien de parenté du bénéficiaire avec l'assuré
+    out.push(svgX(...({ conjoint: [259.2, 60.1], enfant: [283.0, 60.1] }[f.parente] || [309.3, 60.1])));
+    // Déclaration du chirurgien-dentiste : bénéficiaire
+    out.push(svgT(230, 96.3, f.nom_beneficiaire, { width: 85 }));
+    out.push(svgDateBoxes(CNSS2_TICKS.ddn, 102.4, f.ddn));
+    out.push(svgBoxes(CNSS2_TICKS.cin, 109.9, (f.cin || '').replace(/\s+/g, '').toUpperCase()));
+    out.push(svgX(f.sexe === 'femelle' ? 317.8 : 297.0, 115.0));
+    // Chirurgien-dentiste, type de soins, entente préalable
+    out.push(svgBoxes(CNSS2_TICKS.inp, 129.1, (f.inpe || '').replace(/\s+/g, '')));
+    out.push(svgX(279.2, { soins: 138.9, prothese: 144.6, odf: 150.3, autres: 155.9 }[f.type_soin] || 138.9));
+    out.push(svgBoxes(CNSS2_TICKS.entente, 163.3, (f.numero_entente || '').replace(/\s+/g, '')));
+    // Fait à … Le …
+    out.push(svgT(305, 185.0, f.ville, { width: 33 }));
+    out.push(svgDateBoxes(CNSS2_TICKS.le, 190.5, f.date));
+    return ocpPage(bg, out.join(''), CNSS2_VIEWBOX, CNSS2_PAGE);
+}
+// Description des actes : 3 grandes lignes (23,6 / 50 / 74,9 → 100,2 mm), 3 actes par ligne
+function renderCnss2Verso(bg, soins) {
+    const out = [];
+    const blocks = [23.6, 50.0, 74.9];
+    soins.slice(0, 9).forEach((t, i) => {
+        const y = (blocks[Math.floor(i / 3)] + 6 + (i % 3) * 7).toFixed(2);
+        out.push(svgT(215.4, y, t.toothNumber, { size: 3, anchor: 'middle', width: 16 }));
+        const code = String(t.code || '');
+        out.push(code.length <= 4 && !/\s/.test(code)
+            ? svgBoxes(CNSS2_TICKS.code, y, code, 3)
+            : svgT(232.05, y, code, { size: 3, anchor: 'middle', width: 15 }));
+        out.push(svgT(250.0, y, fmtDateFr(t.date), { size: 3, anchor: 'middle', width: 18.5 }));
+        out.push(svgT(268.6, y, `${t.lettre || ''} ${t.cotation ?? ''}`.trim(), { size: 3, anchor: 'middle', width: 16.5 }));
+        out.push(svgT(286.1, y, t.lettre ? `${t.lettre} = ${t.valeure_lettre ?? ''}` : '', { size: 3, anchor: 'middle', width: 16 }));
+        out.push(svgT(310.6, y, fmtDh(t.montant), { size: 3, anchor: 'end', width: 15 }));
+    });
+    out.push(svgTeeth(soins, CNSS2_LABELS, [0, 0, 0], CNSS2_TEETH));
+    return ocpPage(bg, out.join(''), CNSS2_VIEWBOX, CNSS2_PAGE);
+}
+
 // Document HTML complet (recto + verso) pour la mutuelle choisie
 async function buildFeuilleHtml() {
     let recto, verso;
@@ -1499,6 +1580,10 @@ async function buildFeuilleHtml() {
         const [bgR, bgV] = await Promise.all([loadDataUri('ocp_recto.png'), loadDataUri('ocp_verso.png')]);
         recto = renderOcpRecto(bgR, f);
         verso = renderOcpVerso(bgV, f, treatments);
+    } else if (currentMutuelle() === 'CNSS2') {
+        const [bgR, bgV] = await Promise.all([loadDataUri('cnss2_recto.png'), loadDataUri('cnss2_verso.png')]);
+        recto = renderCnss2Recto(bgR, cnxFiche());
+        verso = renderCnss2Verso(bgV, treatments);
     } else {
         const isCNSS = currentMutuelle() === 'CNSS';
         const [rectoTmpl, versoTmpl] = await Promise.all([
