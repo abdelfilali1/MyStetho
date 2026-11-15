@@ -436,7 +436,11 @@ async def delete_document(
     )
     row = await cursor.fetchone()
 
-    response = RedirectResponse(url="/documents", status_code=302)
+    # Suppression depuis la fiche patient (onglet Documents) : y revenir
+    form = await request.form()
+    back_to_patient = form.get("from") == "patient" and row
+    redirect_url = f"/patients/{row[1]}?tab=documents" if back_to_patient else "/documents"
+    response = RedirectResponse(url=redirect_url, status_code=302)
     if row:
         file_path, doc_patient_id = row[0], row[1]
         if os.path.exists(file_path):

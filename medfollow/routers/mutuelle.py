@@ -66,6 +66,8 @@ async def mutuelle_page(request: Request, db: aiosqlite.Connection = Depends(get
     d = await dcursor.fetchone()
     doctor_name = f"Dr. {d['first_name']} {d['last_name']}" if d else ""
 
+    doctor_prefs = {k: await _get_pref(db, user["sub"], k) for k in _PREF_KINDS}
+
     return templates.TemplateResponse(
         "mutuelle/index.html",
         {
@@ -77,8 +79,65 @@ async def mutuelle_page(request: Request, db: aiosqlite.Connection = Depends(get
             "total_acts": len(acts),
             "patients_json": json.dumps(patients, ensure_ascii=False),
             "doctor_name_json": json.dumps(doctor_name, ensure_ascii=False),
+            "doctor_prefs_json": json.dumps(doctor_prefs, ensure_ascii=False),
         },
     )
+
+
+# --- « Mémoriser ces informations » : coordonnées du praticien par compte ---
+# Stockées côté serveur (app_settings, clé namespacée par utilisateur) pour être
+# retrouvées sur tous les appareils et ne pas être partagées entre comptes.
+_PREF_KINDS = ("feuille", "note")
+_PREF_MAX_LEN = 8000
+
+
+def _pref_key(user_id, kind: str) -> str:
+    return f"mutuelle_doctor_{kind}:{int(user_id)}"
+
+
+async def _get_pref(db, user_id, kind: str):
+    cur = await db.execute("SELECT value FROM app_settings WHERE key = ?", (_pref_key(user_id, kind),))
+    row = await cur.fetchone()
+    if not row or not row["value"]:
+        return None
+    try:
+        return json.loads(row["value"])
+    except ValueError:
+        return None
+
+
+@router.post("/doctor-prefs")
+async def save_doctor_prefs(request: Request, db: aiosqlite.Connection = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    kind = body.get("kind")
+    data = body.get("data")
+    if kind not in _PREF_KINDS:
+        return JSONResponse({"error": "invalid kind"}, status_code=400)
+    key = _pref_key(user["sub"], kind)
+    if data is None:
+        await db.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+    else:
+        if not isinstance(data, dict):
+            return JSONResponse({"error": "invalid data"}, status_code=400)
+        # Uniquement des valeurs simples (texte / booléen), longueur bornée
+        clean = {str(k)[:40]: (v if isinstance(v, bool) else str(v)[:300])
+                 for k, v in data.items() if isinstance(v, (str, bool, int, float))}
+        payload = json.dumps(clean, ensure_ascii=False)
+        if len(payload) > _PREF_MAX_LEN:
+            return JSONResponse({"error": "too large"}, status_code=413)
+        await db.execute(
+            "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, payload),
+        )
+    await db.commit()
+    return JSONResponse({"ok": True})
 
 
 FEUILLES_DIR = os.path.join("data", "feuilles")

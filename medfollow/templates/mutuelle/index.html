@@ -60,6 +60,12 @@
 .t-info { min-width:0; }
 .t-libelle { font-size:.8125rem; font-weight:500; color:var(--gray-700); line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .t-meta { margin-top:3px; font-size:.72rem; color:var(--gray-400); }
+.t-edit { margin-top:5px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.t-edit label { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; color:var(--gray-500); font-weight:600; }
+.t-edit input { height:26px; padding:2px 6px; border:1px solid var(--gray-200); border-radius:6px; font-size:.75rem; color:var(--gray-800); background:#fff; }
+.t-edit input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-light); }
+.t-edit .t-tooth-input { width:74px; }
+.t-edit .t-date-input { width:128px; }
 .t-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
 .t-amount { font-size:.875rem; font-weight:700; color:var(--gray-800); white-space:nowrap; }
 .t-amount-wrap { display:flex; align-items:center; gap:4px; }
@@ -577,6 +583,7 @@ const TODAY = new Date().toISOString().split('T')[0];
 const ALL_ACTS = {{ acts_json | safe }};
 const ALL_PATIENTS = {{ patients_json | safe }};
 const DOCTOR_NAME = {{ doctor_name_json | default('""') | safe }};
+const DOCTOR_PREFS = {{ doctor_prefs_json | default('{}') | safe }} || {};
 {% raw %}
 // ==============================
 // TOOTH SELECTION LOGIC (mirrors ngap-maroc.com fA/tt functions)
@@ -862,7 +869,13 @@ function renderPanel() {
         row.innerHTML = `<span class="t-code">${esc(t.code)}</span>
             <div class="t-info">
                 <div class="t-libelle">${esc(t.libelle)}</div>
-                <div class="t-meta">${t.toothNumber?'Dent '+esc(t.toothNumber)+' · ':''} ${new Date(t.date+'T00:00:00').toLocaleDateString('fr-MA')}</div>
+                <div class="t-edit">
+                    ${(t.toothNumber || getRule(t).mode !== 'none') ? `<label>Dent
+                        <input type="text" class="t-tooth-input" inputmode="numeric" data-id="${t._id}"
+                               value="${esc(t.toothNumber||'')}" placeholder="ex. 36" title="Numéro(s) de dent, séparés par un espace"></label>` : ''}
+                    <label>Date
+                        <input type="date" class="t-date-input" data-id="${t._id}" value="${esc(t.date||'')}"></label>
+                </div>
             </div>
             <div class="t-right">
                 <span class="t-amount-wrap">
@@ -890,6 +903,26 @@ function renderPanel() {
         inp.onblur = () => {
             const t = treatments.find(x => x._id == inp.dataset.id);
             if (t) inp.value = t.montant.toFixed(2);
+        };
+    });
+    // Dent(s) et date modifiables sur place (sans redessiner : le champ garde le focus)
+    list.querySelectorAll('.t-tooth-input').forEach(inp => {
+        inp.oninput = () => {
+            const t = treatments.find(x => x._id == inp.dataset.id);
+            if (!t) return;
+            const nums = inp.value.split(/[^0-9]+/).filter(Boolean);
+            t.toothNumber = nums.sort((a,b)=>parseInt(a)-parseInt(b)).join(' ');
+        };
+        inp.onblur = () => {
+            const t = treatments.find(x => x._id == inp.dataset.id);
+            if (t) inp.value = t.toothNumber || '';
+        };
+    });
+    list.querySelectorAll('.t-date-input').forEach(inp => {
+        inp.onchange = () => {
+            const t = treatments.find(x => x._id == inp.dataset.id);
+            if (!t) return;
+            if (inp.value) t.date = inp.value; else inp.value = t.date;
         };
     });
     refreshPanelTotal();
@@ -1044,9 +1077,30 @@ function applyMutuelleUi() {
         const e = document.getElementById(id+'-err'); if (e) e.style.display = 'none';
     });
 }
+// ---- « Mémoriser » : enregistré sur le compte (serveur), copie locale en secours ----
+const _PREFS_KEYS = { feuille: 'ngap_feuille_doctor', note: 'ngap_note_doctor' };
+function _readPref(kind) {
+    if (DOCTOR_PREFS && DOCTOR_PREFS[kind]) return DOCTOR_PREFS[kind];
+    try { return JSON.parse(localStorage.getItem(_PREFS_KEYS[kind]) || 'null'); } catch { return null; }
+}
+const _prefTimers = {};
+function _writePref(kind, data) {
+    DOCTOR_PREFS[kind] = data;
+    try {
+        if (data) localStorage.setItem(_PREFS_KEYS[kind], JSON.stringify(data));
+        else localStorage.removeItem(_PREFS_KEYS[kind]);
+    } catch {}
+    clearTimeout(_prefTimers[kind]);
+    _prefTimers[kind] = setTimeout(() => {
+        fetch('/mutuelle/doctor-prefs', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind, data }),
+        }).catch(() => {});
+    }, 400);
+}
 function loadFeuilleDoctor() {
     try {
-        const d = JSON.parse(localStorage.getItem('ngap_feuille_doctor') || 'null');
+        const d = _readPref('feuille');
         if (!d) return;
         if (d.inpe) document.getElementById('f-inpe').value = d.inpe;
         if (d.ville) document.getElementById('f-ville').value = d.ville;
@@ -1055,12 +1109,12 @@ function loadFeuilleDoctor() {
     } catch{}
 }
 window.saveFeuilleDoctor = function() {
-    if (!document.getElementById('f-save-inpe').checked) { localStorage.removeItem('ngap_feuille_doctor'); return; }
-    localStorage.setItem('ngap_feuille_doctor', JSON.stringify({
+    if (!document.getElementById('f-save-inpe').checked) { _writePref('feuille', null); return; }
+    _writePref('feuille', {
         inpe: document.getElementById('f-inpe').value,
         ville: document.getElementById('f-ville').value,
         hide_inpe: document.getElementById('f-hide-inpe').checked,
-    }));
+    });
 };
 window.feuilleChanged = function() {
     if (document.getElementById('f-save-inpe').checked) saveFeuilleDoctor();
@@ -1097,7 +1151,7 @@ window.closeFeuille = function() { document.getElementById('modal-feuille').styl
 // ==============================
 function loadNoteDoctor() {
     try {
-        const d = JSON.parse(localStorage.getItem('ngap_note_doctor') || 'null');
+        const d = _readPref('note');
         if (!d) return;
         ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
             const el = document.getElementById('n-'+k);
@@ -1114,7 +1168,7 @@ function loadNoteDoctor() {
     } catch{}
 }
 window.saveNoteDoctor = function() {
-    if (!document.getElementById('n-save').checked) { localStorage.removeItem('ngap_note_doctor'); return; }
+    if (!document.getElementById('n-save').checked) { _writePref('note', null); return; }
     const d = {};
     ['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
         d[k] = (document.getElementById('n-'+k)||{value:''}).value;
@@ -1122,8 +1176,15 @@ window.saveNoteDoctor = function() {
     d.show_inpe = document.getElementById('n-show-inpe').checked;
     d.show_ice = document.getElementById('n-show-ice').checked;
     d.show_if = document.getElementById('n-show-if').checked;
-    localStorage.setItem('ngap_note_doctor', JSON.stringify(d));
+    _writePref('note', d);
 };
+// Cause du bug : les champs du praticien n'avaient aucun écouteur → ce qui était
+// saisi APRÈS avoir coché « Mémoriser » n'était jamais enregistré.
+['praticien','specialite','adresse','ville','tel','inpe','ice','if','cnss'].forEach(k => {
+    const el = document.getElementById('n-'+k);
+    if (el) el.addEventListener('input', () => { if (document.getElementById('n-save').checked) saveNoteDoctor(); });
+});
+document.getElementById('f-hide-inpe').addEventListener('change', () => { if (document.getElementById('f-save-inpe').checked) saveFeuilleDoctor(); });
 window.toggleNoteDoc = function() {
     const sec = document.getElementById('note-doc-section');
     const chev = document.getElementById('note-doc-chevron');

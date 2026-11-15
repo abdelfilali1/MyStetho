@@ -610,6 +610,10 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStartMo
                             {% endif %}
                             <a href="/documents/{{ d.id }}/edit?from=patient" class="btn btn-outline btn-sm">Modifier</a>
                             <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
+                            <form method="POST" action="/documents/{{ d.id }}/delete" style="display:inline;margin:0;" onsubmit='return confirm({{ ("Supprimer le document « " ~ d.title ~ " » ? Cette action est définitive.")|tojson }})'>
+                                <input type="hidden" name="from" value="patient">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer le document">Supprimer</button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
