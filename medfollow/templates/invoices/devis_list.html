@@ -2,12 +2,14 @@
 {% block title %}Devis — Doctivo{% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Devis / plans de traitement</h2>
         <p class="subtitle">Chiffrage prévisionnel — proposé, accepté, converti en facture.</p>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="page-header-actions">
+        {{ view_toggle('facturation') }}
         <a href="/invoices/factures" class="btn btn-outline">Factures</a>
         <a href="/invoices/devis/new" class="btn btn-primary">+ Nouveau devis</a>
     </div>
@@ -24,7 +26,8 @@
     </div>
     <div class="card-body">
         {% if devis %}
-        <table class="table">
+        <div class="view-switch" data-view-key="facturation">
+        <table class="table view-list">
             <thead>
                 <tr><th>N°</th><th>Date</th><th>Patient</th><th>Montant</th><th>Validité</th><th>Statut</th><th></th></tr>
             </thead>
@@ -45,6 +48,29 @@
                 {% endfor %}
             </tbody>
         </table>
+        <div class="view-grid item-grid" style="padding:0;">
+            {% for d in devis %}
+            {% set badge = {'propose':'planifie','accepte':'confirme','refuse':'annule','converti':'en_cours'}.get(d.status, 'planifie') %}
+            <div class="item-card">
+                <div class="item-card-head" style="justify-content:space-between;">
+                    <div style="min-width:0;flex:1;">
+                        <a href="/invoices/devis/{{ d.id }}" class="item-card-title stretched" style="display:block;">{{ d.patient_name }}</a>
+                        <div class="item-card-sub">{{ d.devis_number }} · {{ d.devis_date }}</div>
+                    </div>
+                    <span class="badge badge-{{ badge }}">{{ status_labels.get(d.status, d.status) }}</span>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Montant</span><span><strong>{{ '%.2f' | format(d.total_amount) }} DH</strong></span></div>
+                    <div><span>Validité</span><span>{{ d.valid_until or '—' }}</span></div>
+                </div>
+                <div class="item-card-actions">
+                    <a href="/invoices/devis/{{ d.id }}" class="btn btn-outline btn-sm">Ouvrir</a>
+                    <a href="/patients/{{ d.patient_id }}" class="btn btn-ghost btn-sm">Dossier patient</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
         {% else %}
         <p class="empty-state" style="padding:24px;text-align:center;color:var(--gray-500);">Aucun devis. <a href="/invoices/devis/new">Créer le premier devis</a>.</p>
         {% endif %}

@@ -495,6 +495,33 @@
     })();
     </script>
 
+    <script>
+    // === Vue liste / carreaux (mémorisée par rubrique dans le navigateur) ===
+    (function() {
+        function apply(key, mode) {
+            document.querySelectorAll('.view-switch[data-view-key="' + key + '"]').forEach(function(el) {
+                el.classList.toggle('is-grid', mode === 'grid');
+            });
+            document.querySelectorAll('[data-view-target="' + key + '"]').forEach(function(b) {
+                var on = b.dataset.viewSet === mode;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+        document.querySelectorAll('.view-switch[data-view-key]').forEach(function(el) {
+            var key = el.dataset.viewKey, mode = 'list';
+            try { mode = localStorage.getItem('doctivo.view.' + key) || 'list'; } catch (e) {}
+            apply(key, mode);
+        });
+        document.addEventListener('click', function(e) {
+            var b = e.target.closest('[data-view-target][data-view-set]');
+            if (!b) return;
+            apply(b.dataset.viewTarget, b.dataset.viewSet);
+            try { localStorage.setItem('doctivo.view.' + b.dataset.viewTarget, b.dataset.viewSet); } catch (e) {}
+        });
+    })();
+    </script>
+
     {% block scripts %}{% endblock %}
 
 </body>

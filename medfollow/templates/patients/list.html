@@ -9,12 +9,16 @@
 {% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Patients</h2>
         <p class="subtitle">{{ total_count if total_count is defined else patients|length }} patient{{ 's' if (total_count if total_count is defined else patients|length) != 1 }} enregistré{{ 's' if (total_count if total_count is defined else patients|length) != 1 }}</p>
     </div>
-    <a href="/patients/new" class="btn btn-primary">+ Nouveau patient</a>
+    <div class="page-header-actions">
+        {{ view_toggle('patients') }}
+        <a href="/patients/new" class="btn btn-primary">+ Nouveau patient</a>
+    </div>
 </div>
 
 <div class="card mobile-cards">
@@ -29,6 +33,8 @@
     </div>
     <div class="card-body" style="padding: 0;">
         {% if patients %}
+        <div class="view-switch" data-view-key="patients">
+        <div class="view-list">
         <table class="table">
             <thead>
                 <tr>
@@ -97,6 +103,33 @@
                 {% endif %}
             </div>
             {% endfor %}
+        </div>
+        </div>
+
+        <div class="view-grid item-grid">
+            {% for p in patients %}
+            <div class="item-card">
+                <div class="item-card-head">
+                    <div class="list-avatar">{{ p.first_name[0] }}{{ p.last_name[0] }}</div>
+                    <div style="min-width:0;flex:1;">
+                        {% if user.role == 'secretaire' %}<span class="item-card-title" style="display:block;">{{ p.last_name | upper }} {{ p.first_name }}</span>{% else %}<a href="/patients/{{ p.id }}" class="item-card-title stretched" style="display:block;">{{ p.last_name | upper }} {{ p.first_name }}</a>{% endif %}
+                        <div class="item-card-sub">{% if p.date_of_birth %}{{ p.date_of_birth | calc_age }} ans{% else %}Âge non renseigné{% endif %}{% if p.gender %} · {{ 'Homme' if p.gender == 'M' else 'Femme' if p.gender == 'F' else p.gender }}{% endif %}</div>
+                    </div>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Naissance</span><span>{{ p.date_of_birth or '—' }}</span></div>
+                    <div><span>Téléphone</span><span>{{ p.phone or '—' }}</span></div>
+                    <div><span>Ville</span><span>{{ p.city or '—' }}</span></div>
+                    <div><span>Dernière visite</span><span>{{ p.last_visit or '—' }}</span></div>
+                </div>
+                {% if user.role != 'secretaire' %}
+                <div class="item-card-actions">
+                    <a href="/patients/{{ p.id }}" class="btn btn-outline btn-sm">Voir le dossier</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
         </div>
 
         {% if total_pages is defined and total_pages > 1 %}

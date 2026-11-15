@@ -9,12 +9,14 @@
 {% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Facturation</h2>
         <p class="subtitle">{{ total_count if total_count is defined else invoices|length }} facture{{ 's' if (total_count if total_count is defined else invoices|length) != 1 }}</p>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="page-header-actions">
+        {{ view_toggle('facturation') }}
         <a href="/invoices/devis" class="btn btn-outline">Devis</a>
         <a href="/invoices/export.csv{% if selected_status or (date_from is defined and date_from) or (date_to is defined and date_to) %}?{% if selected_status %}status={{ selected_status }}{% endif %}{% if date_from is defined and date_from %}{% if selected_status %}&{% endif %}date_from={{ date_from }}{% endif %}{% if date_to is defined and date_to %}&date_to={{ date_to }}{% endif %}{% endif %}" class="btn btn-outline">↓ Export CSV</a>
         <a href="/invoices/new" class="btn btn-primary">+ Nouvelle facture</a>
@@ -86,7 +88,8 @@
 <div class="card">
     <div class="card-body" style="padding: 0;">
         {% if invoices %}
-        <table class="table">
+        <div class="view-switch" data-view-key="facturation">
+        <table class="table view-list">
             <thead>
                 <tr><th>N°</th><th>Date</th><th>Patient</th><th>Montant</th><th>Payé</th><th>Statut</th><th></th></tr>
             </thead>
@@ -104,6 +107,29 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="view-grid item-grid">
+            {% for inv in invoices %}
+            <div class="item-card">
+                <div class="item-card-head" style="justify-content:space-between;">
+                    <div style="min-width:0;flex:1;">
+                        <a href="/invoices/{{ inv.id }}" class="item-card-title stretched" style="display:block;">{{ inv.patient_name }}</a>
+                        <div class="item-card-sub">{{ inv.invoice_number }} · {{ inv.invoice_date }}</div>
+                    </div>
+                    <span class="badge badge-{{ 'confirme' if inv.status == 'payee' else 'planifie' if inv.status == 'emise' else 'en_cours' if inv.status == 'partiellement_payee' else 'termine' }}">{{ inv.status }}</span>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Montant</span><span><strong>{{ '%.2f' | format(inv.total_amount) }} DH</strong></span></div>
+                    <div><span>Payé</span><span>{{ '%.2f' | format(inv.paid_amount) }} DH</span></div>
+                </div>
+                <div class="item-card-actions">
+                    <a href="/invoices/{{ inv.id }}" class="btn btn-outline btn-sm">Voir</a>
+                    <a href="/patients/{{ inv.patient_id }}" class="btn btn-ghost btn-sm">Dossier patient</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
 
         {% if total_pages is defined and total_pages > 1 %}
         <div class="pagination">

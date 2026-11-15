@@ -1,0 +1,13 @@
+{# Bouton de changement de vue liste / carreaux. Usage :
+   {% from "_view_toggle.html" import view_toggle %} … {{ view_toggle('patients') }}
+   puis un conteneur <div class="view-switch" data-view-key="patients"> avec .view-list et .view-grid #}
+{% macro view_toggle(key) %}
+<div class="view-toggle no-print" role="group" aria-label="Changer la vue">
+    <button type="button" data-view-target="{{ key }}" data-view-set="list" title="Vue en liste" aria-label="Vue en liste" aria-pressed="true" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+    </button>
+    <button type="button" data-view-target="{{ key }}" data-view-set="grid" title="Vue en carreaux" aria-label="Vue en carreaux" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
+</div>
+{% endmacro %}

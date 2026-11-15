@@ -9,18 +9,23 @@
 {% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Ordonnances</h2>
         <p class="subtitle">{{ total_count if total_count is defined else prescriptions|length }} ordonnance{{ 's' if (total_count if total_count is defined else prescriptions|length) != 1 }}</p>
     </div>
-    <a href="/prescriptions/new" class="btn btn-primary">+ Nouvelle ordonnance</a>
+    <div class="page-header-actions">
+        {{ view_toggle('prescriptions') }}
+        <a href="/prescriptions/new" class="btn btn-primary">+ Nouvelle ordonnance</a>
+    </div>
 </div>
 
 <div class="card">
     <div class="card-body" style="padding: 0;">
         {% if prescriptions %}
-        <table class="table">
+        <div class="view-switch" data-view-key="prescriptions">
+        <table class="table view-list">
             <thead>
                 <tr>
                     <th>#</th>
@@ -54,6 +59,32 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="view-grid item-grid">
+            {% for p in prescriptions %}
+            <div class="item-card">
+                <div class="item-card-head" style="justify-content:space-between;">
+                    <div style="min-width:0;flex:1;">
+                        <a href="/prescriptions/{{ p.id }}" class="item-card-title stretched" style="display:block;">{{ p.patient_name }}</a>
+                        <div class="item-card-sub">Ordonnance n° {{ p.id }} · {{ p.prescription_date }}</div>
+                    </div>
+                    <span class="badge badge-{{ 'confirme' if p.status == 'active' else 'termine' }}">{{ p.status }}</span>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Praticien</span><span>Dr. {{ p.doctor_name }}</span></div>
+                    <div><span>Médicaments</span><span>{{ p.item_count }} médicament{{ 's' if p.item_count != 1 }}</span></div>
+                </div>
+                <div class="item-card-actions">
+                    <a href="/prescriptions/{{ p.id }}" class="btn btn-outline btn-sm">Voir</a>
+                    {% if p.status == 'active' %}
+                    <a href="/prescriptions/{{ p.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+                    {% endif %}
+                    <a href="/prescriptions/{{ p.id }}/pdf" class="btn btn-outline btn-sm" target="_blank">PDF</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
 
         {% if total_pages is defined and total_pages > 1 %}
         <div class="pagination">

@@ -9,12 +9,16 @@
 {% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Documents</h2>
         <p class="subtitle">{{ total_count if total_count is defined else documents|length }} document{{ 's' if (total_count if total_count is defined else documents|length) != 1 }}</p>
     </div>
-    <a href="/documents/upload" class="btn btn-primary">+ Importer un document</a>
+    <div class="page-header-actions">
+        {{ view_toggle('documents') }}
+        <a href="/documents/upload" class="btn btn-primary">+ Importer un document</a>
+    </div>
 </div>
 
 <div class="card" style="margin-bottom: 16px;">
@@ -48,7 +52,9 @@
 <div class="card">
     <div class="card-body" style="padding: 0;">
         {% if documents %}
-        <table class="table">
+        {% set cat_labels = {'radio':'Radiologie','photo_extra_orale':'Photo Extra Orale','photo_intra_orale':'Photo Intra Orale','labo':'Laboratoire','courrier':'Courrier','compte_rendu':'Compte-rendu','ordonnance':'Ordonnance','autre':'Autre'} %}
+        <div class="view-switch" data-view-key="documents">
+        <table class="table view-list">
             <thead>
                 <tr>
                     <th>Titre</th>
@@ -88,6 +94,48 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="view-grid item-grid">
+            {% for d in documents %}
+            {% set fn = (d.file_name or '')|lower %}
+            {% set is_img = fn.endswith('.png') or fn.endswith('.jpg') or fn.endswith('.jpeg') or fn.endswith('.gif') or fn.endswith('.webp') or fn.endswith('.bmp') %}
+            {% set is_previewable = is_img or fn.endswith('.pdf') %}
+            <div class="item-card">
+                <div class="item-card-thumb">
+                    {% if is_img %}
+                    <img src="/documents/{{ d.id }}/view" alt="" loading="lazy">
+                    {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    {% endif %}
+                </div>
+                <div class="item-card-head" style="justify-content:space-between;">
+                    <div style="min-width:0;flex:1;">
+                        {% if is_previewable %}
+                        <a href="/documents/{{ d.id }}/view" class="item-card-title stretched" style="display:block;" onclick='event.preventDefault();previewDoc("/documents/{{ d.id }}/view", {{ d.title|tojson }}, {{ d.file_name|tojson }})'>{{ d.title }}</a>
+                        {% else %}
+                        <a href="/documents/{{ d.id }}/download" class="item-card-title stretched" style="display:block;">{{ d.title }}</a>
+                        {% endif %}
+                        <div class="item-card-sub">{{ d.created_at[:10] }} · {{ '%.1f' | format(d.file_size / 1024) }} Ko</div>
+                    </div>
+                    <span class="badge badge-{{ d.category }}">{{ cat_labels.get(d.category, d.category) }}</span>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Patient</span><span><a href="/patients/{{ d.patient_id }}" class="patient-link">{{ d.patient_name }}</a></span></div>
+                </div>
+                <div class="item-card-actions">
+                    {% if is_previewable %}
+                    <button type="button" class="btn btn-outline btn-sm" onclick='previewDoc("/documents/{{ d.id }}/view", {{ d.title|tojson }}, {{ d.file_name|tojson }})'>Aperçu</button>
+                    {% endif %}
+                    <a href="/documents/{{ d.id }}/edit" class="btn btn-outline btn-sm">Modifier</a>
+                    <a href="/documents/{{ d.id }}/download" class="btn btn-outline btn-sm">Télécharger</a>
+                    <form method="POST" action="/documents/{{ d.id }}/delete" style="display:inline;margin-left:auto;" onsubmit="return confirm('Supprimer le document « {{ d.title }} » ?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">×</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
 
         {% if total_pages is defined and total_pages > 1 %}
         <div class="pagination">

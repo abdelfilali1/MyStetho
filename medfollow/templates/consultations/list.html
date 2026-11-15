@@ -9,12 +9,16 @@
 {% endblock %}
 
 {% block content %}
+{% from "_view_toggle.html" import view_toggle %}
 <div class="page-header">
     <div>
         <h2>Consultations</h2>
         <p class="subtitle">{{ total_count if total_count is defined else consultations|length }} consultation{{ 's' if (total_count if total_count is defined else consultations|length) != 1 }}</p>
     </div>
-    <a href="/consultations/new" class="btn btn-primary">+ Nouvelle consultation</a>
+    <div class="page-header-actions">
+        {{ view_toggle('consultations') }}
+        <a href="/consultations/new" class="btn btn-primary">+ Nouvelle consultation</a>
+    </div>
 </div>
 
 <div class="card" style="margin-bottom:12px;">
@@ -32,7 +36,8 @@
 <div class="card">
     <div class="card-body" style="padding: 0;">
         {% if consultations %}
-        <table class="table">
+        <div class="view-switch" data-view-key="consultations">
+        <table class="table view-list">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -56,6 +61,28 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="view-grid item-grid">
+            {% for c in consultations %}
+            <div class="item-card">
+                <div class="item-card-head">
+                    <div style="min-width:0;flex:1;">
+                        <a href="/consultations/{{ c.id }}" class="item-card-title stretched" style="display:block;">{{ c.patient_name }}</a>
+                        <div class="item-card-sub">{{ c.consultation_date[:10] }} · Dr. {{ c.doctor_name }}</div>
+                    </div>
+                </div>
+                <div class="item-card-meta">
+                    <div><span>Motif</span><span>{{ c.reason or '—' }}</span></div>
+                </div>
+                {% if c.diagnosis %}<div class="item-card-text">{{ c.diagnosis }}</div>{% endif %}
+                <div class="item-card-actions">
+                    <a href="/consultations/{{ c.id }}" class="btn btn-outline btn-sm">Voir</a>
+                    <a href="/patients/{{ c.patient_id }}" class="btn btn-ghost btn-sm">Dossier patient</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
 
         {% if total_pages is defined and total_pages > 1 %}
         <div class="pagination">
